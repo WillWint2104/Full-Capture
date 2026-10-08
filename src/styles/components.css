@@ -77,9 +77,8 @@
 }
 .btn-keys kbd {
   background: transparent;
-  border-color: color-mix(in srgb, currentColor 40%, transparent);
+  border-color: color-mix(in srgb, currentColor 55%, transparent);
   color: inherit;
-  opacity: .85;
 }
 html:has(#shortcutsToggle:not(:checked)) :is(.btn-keys, .rec-keys, .tip-keys) { display: none; }
 
@@ -285,7 +284,7 @@ html:has(#shortcutsToggle:not(:checked)) :is(.btn-keys, .rec-keys, .tip-keys) { 
   transition: background-color .15s var(--ease), color .15s var(--ease), box-shadow .15s var(--ease);
 }
 .seg-opt:hover span { color: var(--text); }
-.seg-opt input:checked + span { background: var(--surface); color: var(--text); box-shadow: 0 0 0 1px var(--line-strong), var(--shadow-xs); }
+.seg-opt input:checked + span { background: var(--ink); color: var(--on-ink); box-shadow: var(--shadow-xs); }
 .seg-opt input:focus-visible + span { outline: 2px solid var(--focus); outline-offset: 2px; }
 
 /* Range */
@@ -475,7 +474,9 @@ details[open] > summary .disclosure-chevron { rotate: 0deg; }
 
 .toasts {
   position: fixed;
-  top: calc(var(--header-h) + var(--s3));
+  /* --banners-bottom is set by the app while a sticky alert is showing,
+     so toasts never cover its buttons. */
+  top: calc(max(var(--header-h), var(--banners-bottom, 0px)) + var(--s3));
   right: var(--s5);
   z-index: 60;
   width: min(380px, calc(100vw - 32px));

@@ -110,3 +110,8 @@
 .le-mid { fill: var(--surface-2); }
 .le-play { fill: var(--muted); }
 .library-empty-title { color: var(--text); font-size: var(--fs-md); font-weight: var(--fw-strong); }
+
+/* Where the take is: a folder icon for the chosen folder, a download icon for Downloads */
+.take-saved .ico-download { display: none; }
+.take[data-saved="download"] .take-saved .ico-folder { display: none; }
+.take[data-saved="download"] .take-saved .ico-download { display: inline-block; }

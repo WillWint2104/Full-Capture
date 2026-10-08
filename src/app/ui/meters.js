@@ -52,9 +52,13 @@ export class Meter {
   }
 }
 
-/** Runs every registered meter on one animation-frame loop. */
+/**
+ * Runs every registered meter on one animation-frame loop. Pass another
+ * window (the floating controls) to run on its frames: it stays visible when
+ * this tab is hidden and this tab's frames stop.
+ */
 export class MeterLoop {
-  constructor() { this.meters = new Set(); this.extra = new Set(); this.raf = 0; }
+  constructor(win = globalThis) { this.win = win; this.meters = new Set(); this.extra = new Set(); this.raf = 0; }
   add(m) { this.meters.add(m); this.#start(); return () => this.meters.delete(m); }
   /** Extra per-frame callbacks (e.g. the spectrum). */
   onFrame(fn) { this.extra.add(fn); this.#start(); return () => this.extra.delete(fn); }
@@ -63,8 +67,9 @@ export class MeterLoop {
     const loop = now => {
       for (const m of this.meters) m.tick(now);
       for (const fn of this.extra) { try { fn(now); } catch (e) { console.error(e); } }
-      this.raf = requestAnimationFrame(loop);
+      this.raf = this.win.requestAnimationFrame(loop);
     };
-    this.raf = requestAnimationFrame(loop);
+    this.raf = this.win.requestAnimationFrame(loop);
   }
+  stop() { if (this.raf) this.win.cancelAnimationFrame(this.raf); this.raf = 0; this.meters.clear(); this.extra.clear(); }
 }

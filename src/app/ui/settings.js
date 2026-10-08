@@ -45,13 +45,18 @@ export class SettingsView {
     on('sysAudioLevel', 'input', e => s.setSystemAudioLevel(Number(e.target.value) / 100));
     on('noVoiceToggle', 'change', e => s.setNoVoice(e.target.checked));
     on('btnResetSettings', 'click', async () => {
-      const ok = await this.confirm({ title: 'Reset all settings?', text: 'Your sound checks, choices and saved folder go back to the defaults. Your recordings are not touched.', ok: 'Reset settings', danger: true });
-      if (ok) { s.resetSettings(); location.reload(); }
+      if ($('btnResetSettings').getAttribute('aria-disabled') === 'true') return;
+      const ok = await this.confirm({ title: 'Reset all settings?', text: 'Your sound checks and choices go back to the defaults. Your recordings and your save folder are not touched.', ok: 'Reset settings', danger: true });
+      // Refused if a take started while the question was open.
+      if (ok && s.resetSettings()) location.reload();
     });
   }
 
   render(st) {
-    const recording = ['countdown', 'recording', 'paused', 'stopping'].includes(st.phase);
+    const recording = ['countdown', 'starting', 'recording', 'paused', 'stopping'].includes(st.phase);
+    show($('settingsLocked'), recording);
+    attr($('btnResetSettings'), 'aria-disabled', recording ? 'true' : null);
+    attr($('btnResetSettings'), 'aria-describedby', recording ? 'settingsLocked' : null);
     const mp4Option = $('formatSelect').querySelector('option[value="mp4"]');
     if (mp4Option) mp4Option.disabled = !st.formats.mp4;
     value($('formatSelect'), st.lesson.format === 'mp4' && !st.formats.mp4 ? 'auto' : st.lesson.format);
@@ -62,7 +67,13 @@ export class SettingsView {
     text($('qualityNote'), QUALITY_PRESETS[st.lesson.quality]?.note || '');
     const e = st.estimate;
     text($('sizeEstimate'), e ? `About ${formatBytes(e.bytesPerHour)} per hour of recording (${e.width}×${e.height}, ${e.container.toUpperCase()}).` : '');
-    for (const id of ['formatSelect', 'qualitySelect', 'rawMicToggle', 'speakersToggle', 'noVoiceToggle']) $(id).disabled = recording;
+    for (const id of ['formatSelect', 'qualitySelect', 'rawMicToggle', 'speakersToggle', 'noVoiceToggle']) {
+      const el = $(id);
+      el.disabled = recording;
+      // Say why it is locked (keeps the control's own description).
+      if (el.dataset.describedby === undefined) el.dataset.describedby = el.getAttribute('aria-describedby') || '';
+      attr(el, 'aria-describedby', [recording ? 'settingsLocked' : '', el.dataset.describedby].filter(Boolean).join(' ') || null);
+    }
 
     value($('countdownToggle'), st.lesson.countdown);
     value($('beepsToggle'), st.prefs.beeps);

@@ -148,6 +148,69 @@ test('keyboard: Alt+R starts and stops, Alt+M adds a chapter', async ({ page }) 
   await expect.poll(() => phase(page), { timeout: 20_000 }).toBe('review');
 });
 
+/** Count MediaRecorder instances the page creates. */
+const countRecorders = () => {
+  const Real = window.MediaRecorder;
+  window.__recorders = 0;
+  window.MediaRecorder = class extends Real { constructor(...a) { super(...a); window.__recorders++; } };
+  for (const k of ['isTypeSupported']) window.MediaRecorder[k] = Real[k].bind(Real);
+};
+
+test('a double click on Start makes one take, and it keeps recording', async ({ page }) => {
+  await openApp(page, {}, { init: countRecorders });
+  await page.click('#btnChooseScreen');
+  await expect(page.locator('#screenSummary')).toBeVisible();
+  await page.dblclick('#btnStart');
+  await expect.poll(() => phase(page), { timeout: 15_000 }).toBe('recording');
+  await page.waitForTimeout(800);
+  expect(await phase(page)).toBe('recording');
+  expect(await page.evaluate(() => window.__recorders)).toBe(1);
+});
+
+test('holding Alt+R down starts once (key repeat is ignored)', async ({ page }) => {
+  await openApp(page, {}, { init: countRecorders });
+  await page.click('#btnChooseScreen');
+  await expect(page.locator('#screenSummary')).toBeVisible();
+  await page.locator('body').click({ position: { x: 2, y: 2 } });
+  await page.keyboard.down('Alt');
+  await page.keyboard.down('r');
+  for (let i = 0; i < 5; i++) await page.keyboard.down('r');   // auto-repeat
+  await page.keyboard.up('r');
+  await page.keyboard.up('Alt');
+  await expect.poll(() => phase(page), { timeout: 15_000 }).toBe('recording');
+  await page.waitForTimeout(800);
+  expect(await phase(page)).toBe('recording');
+  expect(await page.evaluate(() => window.__recorders)).toBe(1);
+});
+
+test('Alt+R with the microphone off explains why and goes to the fix, without recording', async ({ page }) => {
+  await openApp(page, { micEnabled: false }, { init: countRecorders });
+  await page.click('#btnChooseScreen');
+  await expect(page.locator('#screenSummary')).toBeVisible();
+  await page.locator('body').click({ position: { x: 2, y: 2 } });
+  await page.keyboard.press('Alt+r');
+  await expect(page.locator('#startHint')).toBeVisible();
+  await expect(page.locator('#startHint')).toContainText('microphone');
+  await expect(page.locator('#btnMicOn')).toBeFocused();
+  await page.waitForTimeout(500);
+  expect(await phase(page)).toBe('ready');
+  expect(await page.evaluate(() => window.__recorders)).toBe(0);
+});
+
+test('Escape during the countdown cancels without starting a recorder', async ({ page }) => {
+  await openApp(page, { countdown: true }, { init: countRecorders });
+  await page.click('#btnChooseScreen');
+  await expect(page.locator('#screenSummary')).toBeVisible();
+  await page.click('#btnStart');
+  await expect.poll(() => phase(page)).toBe('countdown');
+  await page.keyboard.press('Escape');
+  await expect.poll(() => phase(page)).toBe('ready');
+  await page.waitForTimeout(3500);
+  expect(await phase(page)).toBe('ready');
+  expect(await page.evaluate(() => window.__recorders)).toBe(0);
+  await expect(page.locator('#btnStart')).toBeFocused();
+});
+
 test('a take survives a crash: the next visit offers it and Save it recovers a playable file', async ({ page, context }) => {
   await openApp(page, { lessonName: 'Crash test' });
   await startRecording(page);
@@ -266,7 +329,7 @@ test('camera bubble: preview appears and the recording carries the composited vi
   await expect(page.locator('#bubblePreview')).toBeVisible();
   await page.click('#btnStart');
   await expect.poll(() => phase(page), { timeout: 15_000 }).toBe('recording');
-  expect(await page.evaluate(() => window.fullCapture.state.camera.inTake)).toBe(true);
+  expect(await page.evaluate(() => { const st = window.fullCapture.state; return !!st.take && st.camera.status === 'live'; })).toBe(true);
   await page.waitForTimeout(1500);
   const download = page.waitForEvent('download');
   await page.click('#btnStop');

@@ -70,7 +70,7 @@
       <li class="mode" data-mode="review"><span class="mode-num">3</span>Review</li>
     </ol>
 
-    <nav class="header-actions" aria-label="Save location, help and settings">
+    <div class="header-actions" role="group" aria-label="Save location, help and settings">
       <button id="btnFolder" class="folder-chip" type="button" data-status="none" title="Where new takes are saved">
         <svg class="i folder-ico" aria-hidden="true"><use href="#i-folder"/></svg>
         <svg class="i folder-ico-warn" aria-hidden="true"><use href="#i-alert"/></svg>
@@ -82,14 +82,14 @@
       <button id="btnSettings" class="btn btn-quiet btn-sm header-btn" type="button">
         <svg class="i" aria-hidden="true"><use href="#i-sliders"/></svg><span class="hide-narrow">Settings</span>
       </button>
-    </nav>
+    </div>
   </div>
 </header>
 
 <div id="srStatus" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="srAlert" class="sr-only" role="alert" aria-atomic="true"></div>
 
-<div id="banners" class="banners" hidden></div>
+<div id="banners" class="banners" role="region" aria-label="Alerts" hidden></div>
 <div id="toasts" class="toasts"></div>
 
 <main id="main" class="app-main" tabindex="-1">
@@ -98,7 +98,7 @@
   <section id="recBanner" class="rec-banner" aria-labelledby="recBannerTitle" hidden>
     <span class="rec-banner-icon" aria-hidden="true"><svg class="i"><use href="#i-pause"/></svg></span>
     <div class="rec-banner-text">
-      <h2 id="recBannerTitle" class="rec-banner-title">Paused – not recording</h2>
+      <p id="recBannerTitle" class="rec-banner-title">Paused – not recording</p>
       <p class="rec-banner-sub">Your take so far is safe. Press Resume when you’re ready to carry on.</p>
     </div>
     <div class="rec-banner-actions">
@@ -149,7 +149,7 @@
               <p class="file-preview">
                 <svg class="i" aria-hidden="true"><use href="#i-file"/></svg>
                 <span id="fileNamePreview" class="file-name">Will save as: Lesson (date and time).mp4</span>
-                <button class="btn-link step-change" type="button" data-action="change">Change</button>
+                <button class="btn-link step-change" type="button" data-action="change" aria-label="Change lesson name">Change</button>
               </p>
               <details class="disclosure lesson-notes">
                 <summary class="disclosure-summary">
@@ -174,7 +174,7 @@
 
             <p id="micSummary" class="step-summary" hidden>
               <span class="summary-text" data-field="summary">Microphone</span>
-              <button class="btn-link step-change" type="button" data-action="change">Change</button>
+              <button class="btn-link step-change" type="button" data-action="change" aria-label="Change microphone">Change</button>
             </p>
 
             <div class="step-body">
@@ -496,7 +496,7 @@
                     </label>
                   </div>
                 </div>
-                <p class="help-text with-icon"><svg class="i" aria-hidden="true"><use href="#i-bulb"/></svg>You can also drag the bubble on the preview.</p>
+                <p class="help-text with-icon bubble-drag-hint"><svg class="i" aria-hidden="true"><use href="#i-bulb"/></svg>You can also drag the bubble on the preview.</p>
               </div>
             </div>
           </section>
@@ -552,7 +552,7 @@
             <span class="btn-keys" aria-hidden="true"><kbd>Alt</kbd><kbd>R</kbd></span>
           </button>
           <div class="rec-actions-row">
-            <button id="btnPause" class="btn btn-secondary btn-lg" type="button" aria-pressed="false" aria-keyshortcuts="Alt+P">
+            <button id="btnPause" class="btn btn-secondary btn-lg" type="button" aria-keyshortcuts="Alt+P">
               <svg class="i ico-pause" aria-hidden="true"><use href="#i-pause"/></svg><svg class="i ico-resume" aria-hidden="true"><use href="#i-play"/></svg><span data-field="label">Pause</span>
             </button>
             <button id="btnMarker" class="btn btn-secondary btn-lg" type="button" aria-keyshortcuts="Alt+M">
@@ -580,7 +580,7 @@
       <!-- ============ MODE 3 · REVIEW ============ -->
       <section id="viewReview" class="view view-review" aria-labelledby="reviewHeading" hidden>
         <div class="review-hero">
-          <p class="review-kicker"><span class="review-badge" aria-hidden="true"><svg class="i"><use href="#i-check"/></svg></span>Saved – nice work!</p>
+          <p id="reviewKicker" class="review-kicker"><span class="review-badge" aria-hidden="true"><svg class="i"><use href="#i-check"/></svg></span>Saved – nice work!</p>
           <h1 id="reviewHeading" class="review-heading" tabindex="-1">Take 1</h1>
           <p class="saved-line">
             <svg class="i ico-folder" aria-hidden="true"><use href="#i-folder"/></svg>
@@ -674,18 +674,18 @@
         <p id="stageHint" class="stage-hint" hidden></p>
         <p class="stage-caption">
           <span class="cap cap-setup">Nothing is recorded until you press <strong>Start recording</strong>.</span>
-          <span class="cap cap-recording">The preview is hidden to save power. Your whole screen is still being recorded.</span>
+          <span id="capRecording" class="cap cap-recording">The preview is hidden to save power. Your whole screen is still being recorded.</span>
           <span class="cap cap-paused">Paused – nothing is being recorded until you press <strong>Resume</strong>.</span>
-          <span class="cap cap-review">Watch it back here, or open the file from your folder.</span>
+          <span id="capReview" class="cap cap-review">Watch it back here, or open the file from your folder.</span>
         </p>
       </section>
 
       <aside class="card tips tips-setup" aria-labelledby="tipsSetupTitle">
         <h2 id="tipsSetupTitle" class="card-title">What happens when you press Start recording</h2>
         <ol class="tip-list tip-list-steps">
-          <li><span class="tip-icon" aria-hidden="true"><svg class="i"><use href="#i-clock"/></svg></span>
+          <li id="tipCountdown"><span class="tip-icon" aria-hidden="true"><svg class="i"><use href="#i-clock"/></svg></span>
             <span><strong>A 3-2-1 countdown</strong> gives you a moment to get ready. Press <kbd>Esc</kbd> to cancel.</span></li>
-          <li><span class="tip-icon" aria-hidden="true"><svg class="i"><use href="#i-pip"/></svg></span>
+          <li id="tipFloating"><span class="tip-icon" aria-hidden="true"><svg class="i"><use href="#i-pip"/></svg></span>
             <span><strong>Floating controls</strong> stay on top of your slides: the timer, Pause, Add chapter and Stop &amp; save.</span></li>
           <li><span class="tip-icon" aria-hidden="true"><svg class="i"><use href="#i-shield"/></svg></span>
             <span><strong>A safety copy</strong> is kept while you teach. If the browser closes, you can get the lesson back.</span></li>
@@ -726,10 +726,10 @@
     </div>
   </section>
 
-  <footer class="app-foot">
-    <p><svg class="i" aria-hidden="true"><use href="#i-lock"/></svg>Works offline. Your recordings never leave this computer.</p>
-  </footer>
 </main>
+<footer class="app-foot">
+    <p><svg class="i" aria-hidden="true"><use href="#i-lock"/></svg>Works offline. Your recordings never leave this computer.</p>
+</footer>
 
 <!-- ============ SETTINGS ============ -->
 <dialog id="settingsDialog" class="dialog dialog-settings" aria-labelledby="settingsTitle">
@@ -743,6 +743,7 @@
     </button>
   </div>
   <div class="dialog-body">
+    <p id="settingsLocked" class="notice" hidden>Some settings are locked while you record. Change them after Stop &amp; save.</p>
     <section class="set-group" aria-labelledby="setRecTitle">
       <h3 id="setRecTitle" class="set-title">Recording</h3>
       <div class="set-field">
@@ -1003,7 +1004,7 @@
     <div class="take-info">
       <p class="take-name" data-field="name"></p>
       <p class="take-meta"><span class="take-meta-row"><span data-field="date"></span><span data-field="size"></span><span data-field="chapters"></span></span></p>
-      <p class="take-saved"><svg class="i" aria-hidden="true"><use href="#i-folder"/></svg><span data-field="saved"></span></p>
+      <p class="take-saved"><svg class="i ico-folder" aria-hidden="true"><use href="#i-folder"/></svg><svg class="i ico-download" aria-hidden="true"><use href="#i-download"/></svg><span data-field="saved"></span></p>
     </div>
     <div class="take-actions">
       <button class="btn btn-secondary btn-sm take-play" type="button" data-action="open"><svg class="i" aria-hidden="true"><use href="#i-play"/></svg>Play</button>
@@ -1054,15 +1055,16 @@
         <div class="meter" data-field="meter" role="meter" aria-label="Mic level" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
         <p class="pop-mic-label" data-field="micLabel"></p>
       </div>
+      <p class="pop-talking" data-field="talking" hidden>You’re talking – press Resume</p>
       <button class="btn btn-primary btn-block pop-stop" type="button" data-action="stop" aria-keyshortcuts="Alt+R">
         <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="6.5" width="11" height="11" rx="2" fill="currentColor" stroke="none"/></svg>Stop &amp; save
       </button>
       <div class="pop-row">
-        <button class="btn btn-secondary pop-pause" type="button" data-action="pause" aria-pressed="false" aria-keyshortcuts="Alt+P"><span data-field="label">Pause</span></button>
+        <button class="btn btn-secondary pop-pause" type="button" data-action="pause" aria-keyshortcuts="Alt+P"><span data-field="label">Pause</span></button>
         <button class="btn btn-secondary pop-marker" type="button" data-action="marker" aria-keyshortcuts="Alt+M">
           <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 20.5V4M5.5 4.5h11.75l-2.5 4.25 2.5 4.25H5.5"/></svg>Add chapter<span class="count" data-field="markerCount" hidden></span>
         </button>
-        <button class="icon-btn pop-more" type="button" data-action="more" aria-label="More: discard take" title="More">
+        <button class="icon-btn pop-more" type="button" data-action="more" aria-label="More: discard take" aria-expanded="false" title="More">
           <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="18" cy="12" r="1.5" fill="currentColor" stroke="none"/></svg>
         </button>
       </div>

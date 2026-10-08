@@ -567,9 +567,8 @@ kbd {
 }
 .btn-keys kbd {
   background: transparent;
-  border-color: color-mix(in srgb, currentColor 40%, transparent);
+  border-color: color-mix(in srgb, currentColor 55%, transparent);
   color: inherit;
-  opacity: .85;
 }
 html:has(#shortcutsToggle:not(:checked)) :is(.btn-keys, .rec-keys, .tip-keys) {
   display: none;
@@ -909,9 +908,9 @@ html:has(#shortcutsToggle:not(:checked)) :is(.btn-keys, .rec-keys, .tip-keys) {
   color: var(--text);
 }
 .seg-opt input:checked + span {
-  background: var(--surface);
-  color: var(--text);
-  box-shadow: 0 0 0 1px var(--line-strong), var(--shadow-xs);
+  background: var(--ink);
+  color: var(--on-ink);
+  box-shadow: var(--shadow-xs);
 }
 .seg-opt input:focus-visible + span {
   outline: 2px solid var(--focus);
@@ -1253,7 +1252,7 @@ details[open] > summary .disclosure-chevron {
 }
 .toasts {
   position: fixed;
-  top: calc(var(--header-h) + var(--s3));
+  top: calc(max(var(--header-h), var(--banners-bottom, 0px)) + var(--s3));
   right: var(--s5);
   z-index: 60;
   width: min(380px, calc(100vw - 32px));
@@ -2165,8 +2164,14 @@ html:has(#btnStart[aria-disabled=true]) .steps > .step:is([data-status=todo], [d
 .blocked-help {
   display: none;
 }
-#stepMic:has(#micMessage .message[data-kind=error]):has(#micIntro[hidden]):has(#micControls[hidden]) .blocked-help {
+#stepMic[data-mic=blocked] .blocked-help {
   display: grid;
+}
+#stepMic:is([data-mic=busy], [data-mic=notfound], [data-mic=error]) :is(.mic-level, .noise-row, .soundcheck, .suggest) {
+  display: none;
+}
+#stepCamera:not([data-cam=live]) :is(.option-grid, .bubble-drag-hint) {
+  display: none;
 }
 #stepMic[data-collapsed] :is(#micIntro, .blocked-help) {
   display: none;
@@ -2724,6 +2729,11 @@ html:has(#takeList > .take) .screen-intro:has(.howto-check:checked) .share-howto
 html:has(#scRun:not([hidden])) .start-bar {
   position: static;
 }
+@media (max-height: 480px) {
+  .start-bar {
+    position: static;
+  }
+}
 html:is([data-phase=setup], [data-phase=ready], [data-phase=countdown]) {
   scroll-padding-bottom: 176px;
 }
@@ -2737,10 +2747,6 @@ html:is([data-phase=setup], [data-phase=ready], [data-phase=countdown]) {
   box-shadow: var(--shadow-lg);
 }
 .readiness {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
   font-size: var(--fs-sm);
   color: var(--text-2);
   text-align: center;
@@ -3420,10 +3426,10 @@ html[data-phase=paused] #btnStop .stop-square {
 .ico-resume {
   display: none;
 }
-#btnPause[aria-pressed=true] .ico-pause {
+html[data-phase=paused] #btnPause .ico-pause {
   display: none;
 }
-#btnPause[aria-pressed=true] .ico-resume {
+html[data-phase=paused] #btnPause .ico-resume {
   display: block;
 }
 :is(#btnPause, #btnMarker)[aria-disabled=true] {
@@ -3486,6 +3492,10 @@ html[data-phase=paused] #btnStop .stop-square {
   color: var(--good);
   font-size: var(--fs-md);
   font-weight: var(--fw-strong);
+}
+.review-kicker[data-just-saved=false] {
+  color: var(--muted);
+  font-weight: 400;
 }
 .review-badge {
   display: grid;
@@ -3613,7 +3623,7 @@ html[data-phase=paused] #btnStop .stop-square {
   min-width: 0;
   min-height: 40px;
   padding: 0 var(--s3);
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--border);
   border-radius: var(--r);
   background: var(--surface);
   color: var(--text);
@@ -3631,6 +3641,9 @@ html[data-phase=paused] #btnStop .stop-square {
 .chapter-delete:hover {
   color: var(--bad);
   background: var(--bad-soft);
+}
+.chapter[data-intro] .chapter-delete {
+  visibility: hidden;
 }
 .empty-note {
   font-size: var(--fs-sm);
@@ -3921,6 +3934,15 @@ html[data-phase=paused] #btnStop .stop-square {
   color: var(--text);
   font-size: var(--fs-md);
   font-weight: var(--fw-strong);
+}
+.take-saved .ico-download {
+  display: none;
+}
+.take[data-saved=download] .take-saved .ico-folder {
+  display: none;
+}
+.take[data-saved=download] .take-saved .ico-download {
+  display: inline-block;
 }
 
 /* src/styles/dialogs.css */
@@ -4316,6 +4338,15 @@ body.popout[data-phase=paused] .pop-timer {
 .pop-level:has(.meter[data-zone=loud]) .pop-mic-label {
   color: var(--bad);
 }
+.pop-talking {
+  padding: 8px 12px;
+  border-radius: var(--r);
+  background: var(--warn-soft);
+  color: var(--warn);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-strong);
+  text-align: center;
+}
 .pop-stop {
   min-height: 48px;
 }
@@ -4377,11 +4408,11 @@ body.popout[data-phase=paused] .pop-stop .i {
       transparent 34% 66%,
       currentColor 66%);
 }
-.pop-pause[aria-pressed=true]::before {
+body[data-phase=paused] .pop-pause::before {
   background: currentColor;
   clip-path: polygon(0 0, 100% 50%, 0 100%);
 }
-.pop-pause[aria-pressed=true] {
+body[data-phase=paused] .pop-pause {
   background: var(--record-fill);
   border-color: var(--record-fill);
   color: var(--on-record);
@@ -4623,7 +4654,8 @@ body.popout:is([data-alert=nosound], :has([data-part=nosound]:not([hidden]))) :f
     font-size: var(--fs-sm);
   }
   .toasts {
-    top: calc(var(--header-h) + var(--s2));
+    top: auto;
+    bottom: calc(var(--s4) + 96px);
     left: var(--s4);
     right: var(--s4);
     width: auto;
@@ -4847,6 +4879,14 @@ body.popout:is([data-alert=nosound], :has([data-part=nosound]:not([hidden]))) :f
     max-width: 150px;
   }
 }
+html:has(.banners:not([hidden]) .banner[data-kind=error]) {
+  scroll-padding-top: calc(var(--banners-bottom, 0px) + var(--s3));
+}
+@media (max-width: 479.98px) {
+  #cameraControls .option-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
 
 /* src/styles/a11y.css */
 @media (prefers-reduced-motion: reduce) {
@@ -4898,10 +4938,25 @@ body.popout:is([data-alert=nosound], :has([data-part=nosound]:not([hidden]))) :f
   [data-actions] > button {
     border: 1px solid ButtonText;
   }
-  .btn-record[aria-disabled=true],
-  .btn[aria-disabled=true] {
-    color: GrayText;
-    border-color: GrayText;
+  .btn[aria-disabled=true],
+  .btn:is(.btn-secondary, .btn-quiet, .btn-primary, .btn-record)[aria-disabled=true],
+  #btnStop[aria-disabled=true],
+  .chip-btn[aria-disabled=true] {
+    color: GrayText !important;
+    border-color: GrayText !important;
+  }
+  .take[aria-current=true] {
+    outline: 3px solid Highlight;
+    outline-offset: -3px;
+  }
+  html[data-phase=setup] .mode[data-mode=setup] .mode-num,
+  html[data-phase=ready] .mode[data-mode=setup] .mode-num,
+  html[data-phase=countdown] .mode[data-mode=setup] .mode-num,
+  html:is([data-phase=recording], [data-phase=paused], [data-phase=stopping]) .mode[data-mode=record] .mode-num,
+  html[data-phase=review] .mode[data-mode=review] .mode-num {
+    forced-color-adjust: none;
+    background: Highlight;
+    color: HighlightText;
   }
   .meter,
   .progress,
@@ -5083,7 +5138,7 @@ body.popout:is([data-alert=nosound], :has([data-part=nosound]:not([hidden]))) :f
       <li class="mode" data-mode="review"><span class="mode-num">3</span>Review</li>
     </ol>
 
-    <nav class="header-actions" aria-label="Save location, help and settings">
+    <div class="header-actions" role="group" aria-label="Save location, help and settings">
       <button id="btnFolder" class="folder-chip" type="button" data-status="none" title="Where new takes are saved">
         <svg class="i folder-ico" aria-hidden="true"><use href="#i-folder"/></svg>
         <svg class="i folder-ico-warn" aria-hidden="true"><use href="#i-alert"/></svg>
@@ -5095,14 +5150,14 @@ body.popout:is([data-alert=nosound], :has([data-part=nosound]:not([hidden]))) :f
       <button id="btnSettings" class="btn btn-quiet btn-sm header-btn" type="button">
         <svg class="i" aria-hidden="true"><use href="#i-sliders"/></svg><span class="hide-narrow">Settings</span>
       </button>
-    </nav>
+    </div>
   </div>
 </header>
 
 <div id="srStatus" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="srAlert" class="sr-only" role="alert" aria-atomic="true"></div>
 
-<div id="banners" class="banners" hidden></div>
+<div id="banners" class="banners" role="region" aria-label="Alerts" hidden></div>
 <div id="toasts" class="toasts"></div>
 
 <main id="main" class="app-main" tabindex="-1">
@@ -5111,7 +5166,7 @@ body.popout:is([data-alert=nosound], :has([data-part=nosound]:not([hidden]))) :f
   <section id="recBanner" class="rec-banner" aria-labelledby="recBannerTitle" hidden>
     <span class="rec-banner-icon" aria-hidden="true"><svg class="i"><use href="#i-pause"/></svg></span>
     <div class="rec-banner-text">
-      <h2 id="recBannerTitle" class="rec-banner-title">Paused – not recording</h2>
+      <p id="recBannerTitle" class="rec-banner-title">Paused – not recording</p>
       <p class="rec-banner-sub">Your take so far is safe. Press Resume when you’re ready to carry on.</p>
     </div>
     <div class="rec-banner-actions">
@@ -5162,7 +5217,7 @@ body.popout:is([data-alert=nosound], :has([data-part=nosound]:not([hidden]))) :f
               <p class="file-preview">
                 <svg class="i" aria-hidden="true"><use href="#i-file"/></svg>
                 <span id="fileNamePreview" class="file-name">Will save as: Lesson (date and time).mp4</span>
-                <button class="btn-link step-change" type="button" data-action="change">Change</button>
+                <button class="btn-link step-change" type="button" data-action="change" aria-label="Change lesson name">Change</button>
               </p>
               <details class="disclosure lesson-notes">
                 <summary class="disclosure-summary">
@@ -5187,7 +5242,7 @@ body.popout:is([data-alert=nosound], :has([data-part=nosound]:not([hidden]))) :f
 
             <p id="micSummary" class="step-summary" hidden>
               <span class="summary-text" data-field="summary">Microphone</span>
-              <button class="btn-link step-change" type="button" data-action="change">Change</button>
+              <button class="btn-link step-change" type="button" data-action="change" aria-label="Change microphone">Change</button>
             </p>
 
             <div class="step-body">
@@ -5509,7 +5564,7 @@ body.popout:is([data-alert=nosound], :has([data-part=nosound]:not([hidden]))) :f
                     </label>
                   </div>
                 </div>
-                <p class="help-text with-icon"><svg class="i" aria-hidden="true"><use href="#i-bulb"/></svg>You can also drag the bubble on the preview.</p>
+                <p class="help-text with-icon bubble-drag-hint"><svg class="i" aria-hidden="true"><use href="#i-bulb"/></svg>You can also drag the bubble on the preview.</p>
               </div>
             </div>
           </section>
@@ -5565,7 +5620,7 @@ body.popout:is([data-alert=nosound], :has([data-part=nosound]:not([hidden]))) :f
             <span class="btn-keys" aria-hidden="true"><kbd>Alt</kbd><kbd>R</kbd></span>
           </button>
           <div class="rec-actions-row">
-            <button id="btnPause" class="btn btn-secondary btn-lg" type="button" aria-pressed="false" aria-keyshortcuts="Alt+P">
+            <button id="btnPause" class="btn btn-secondary btn-lg" type="button" aria-keyshortcuts="Alt+P">
               <svg class="i ico-pause" aria-hidden="true"><use href="#i-pause"/></svg><svg class="i ico-resume" aria-hidden="true"><use href="#i-play"/></svg><span data-field="label">Pause</span>
             </button>
             <button id="btnMarker" class="btn btn-secondary btn-lg" type="button" aria-keyshortcuts="Alt+M">
@@ -5593,7 +5648,7 @@ body.popout:is([data-alert=nosound], :has([data-part=nosound]:not([hidden]))) :f
       <!-- ============ MODE 3 · REVIEW ============ -->
       <section id="viewReview" class="view view-review" aria-labelledby="reviewHeading" hidden>
         <div class="review-hero">
-          <p class="review-kicker"><span class="review-badge" aria-hidden="true"><svg class="i"><use href="#i-check"/></svg></span>Saved – nice work!</p>
+          <p id="reviewKicker" class="review-kicker"><span class="review-badge" aria-hidden="true"><svg class="i"><use href="#i-check"/></svg></span>Saved – nice work!</p>
           <h1 id="reviewHeading" class="review-heading" tabindex="-1">Take 1</h1>
           <p class="saved-line">
             <svg class="i ico-folder" aria-hidden="true"><use href="#i-folder"/></svg>
@@ -5687,18 +5742,18 @@ body.popout:is([data-alert=nosound], :has([data-part=nosound]:not([hidden]))) :f
         <p id="stageHint" class="stage-hint" hidden></p>
         <p class="stage-caption">
           <span class="cap cap-setup">Nothing is recorded until you press <strong>Start recording</strong>.</span>
-          <span class="cap cap-recording">The preview is hidden to save power. Your whole screen is still being recorded.</span>
+          <span id="capRecording" class="cap cap-recording">The preview is hidden to save power. Your whole screen is still being recorded.</span>
           <span class="cap cap-paused">Paused – nothing is being recorded until you press <strong>Resume</strong>.</span>
-          <span class="cap cap-review">Watch it back here, or open the file from your folder.</span>
+          <span id="capReview" class="cap cap-review">Watch it back here, or open the file from your folder.</span>
         </p>
       </section>
 
       <aside class="card tips tips-setup" aria-labelledby="tipsSetupTitle">
         <h2 id="tipsSetupTitle" class="card-title">What happens when you press Start recording</h2>
         <ol class="tip-list tip-list-steps">
-          <li><span class="tip-icon" aria-hidden="true"><svg class="i"><use href="#i-clock"/></svg></span>
+          <li id="tipCountdown"><span class="tip-icon" aria-hidden="true"><svg class="i"><use href="#i-clock"/></svg></span>
             <span><strong>A 3-2-1 countdown</strong> gives you a moment to get ready. Press <kbd>Esc</kbd> to cancel.</span></li>
-          <li><span class="tip-icon" aria-hidden="true"><svg class="i"><use href="#i-pip"/></svg></span>
+          <li id="tipFloating"><span class="tip-icon" aria-hidden="true"><svg class="i"><use href="#i-pip"/></svg></span>
             <span><strong>Floating controls</strong> stay on top of your slides: the timer, Pause, Add chapter and Stop &amp; save.</span></li>
           <li><span class="tip-icon" aria-hidden="true"><svg class="i"><use href="#i-shield"/></svg></span>
             <span><strong>A safety copy</strong> is kept while you teach. If the browser closes, you can get the lesson back.</span></li>
@@ -5739,10 +5794,10 @@ body.popout:is([data-alert=nosound], :has([data-part=nosound]:not([hidden]))) :f
     </div>
   </section>
 
-  <footer class="app-foot">
-    <p><svg class="i" aria-hidden="true"><use href="#i-lock"/></svg>Works offline. Your recordings never leave this computer.</p>
-  </footer>
 </main>
+<footer class="app-foot">
+    <p><svg class="i" aria-hidden="true"><use href="#i-lock"/></svg>Works offline. Your recordings never leave this computer.</p>
+</footer>
 
 <!-- ============ SETTINGS ============ -->
 <dialog id="settingsDialog" class="dialog dialog-settings" aria-labelledby="settingsTitle">
@@ -5756,6 +5811,7 @@ body.popout:is([data-alert=nosound], :has([data-part=nosound]:not([hidden]))) :f
     </button>
   </div>
   <div class="dialog-body">
+    <p id="settingsLocked" class="notice" hidden>Some settings are locked while you record. Change them after Stop &amp; save.</p>
     <section class="set-group" aria-labelledby="setRecTitle">
       <h3 id="setRecTitle" class="set-title">Recording</h3>
       <div class="set-field">
@@ -6016,7 +6072,7 @@ body.popout:is([data-alert=nosound], :has([data-part=nosound]:not([hidden]))) :f
     <div class="take-info">
       <p class="take-name" data-field="name"></p>
       <p class="take-meta"><span class="take-meta-row"><span data-field="date"></span><span data-field="size"></span><span data-field="chapters"></span></span></p>
-      <p class="take-saved"><svg class="i" aria-hidden="true"><use href="#i-folder"/></svg><span data-field="saved"></span></p>
+      <p class="take-saved"><svg class="i ico-folder" aria-hidden="true"><use href="#i-folder"/></svg><svg class="i ico-download" aria-hidden="true"><use href="#i-download"/></svg><span data-field="saved"></span></p>
     </div>
     <div class="take-actions">
       <button class="btn btn-secondary btn-sm take-play" type="button" data-action="open"><svg class="i" aria-hidden="true"><use href="#i-play"/></svg>Play</button>
@@ -6067,15 +6123,16 @@ body.popout:is([data-alert=nosound], :has([data-part=nosound]:not([hidden]))) :f
         <div class="meter" data-field="meter" role="meter" aria-label="Mic level" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
         <p class="pop-mic-label" data-field="micLabel"></p>
       </div>
+      <p class="pop-talking" data-field="talking" hidden>You’re talking – press Resume</p>
       <button class="btn btn-primary btn-block pop-stop" type="button" data-action="stop" aria-keyshortcuts="Alt+R">
         <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="6.5" width="11" height="11" rx="2" fill="currentColor" stroke="none"/></svg>Stop &amp; save
       </button>
       <div class="pop-row">
-        <button class="btn btn-secondary pop-pause" type="button" data-action="pause" aria-pressed="false" aria-keyshortcuts="Alt+P"><span data-field="label">Pause</span></button>
+        <button class="btn btn-secondary pop-pause" type="button" data-action="pause" aria-keyshortcuts="Alt+P"><span data-field="label">Pause</span></button>
         <button class="btn btn-secondary pop-marker" type="button" data-action="marker" aria-keyshortcuts="Alt+M">
           <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 20.5V4M5.5 4.5h11.75l-2.5 4.25 2.5 4.25H5.5"/></svg>Add chapter<span class="count" data-field="markerCount" hidden></span>
         </button>
-        <button class="icon-btn pop-more" type="button" data-action="more" aria-label="More: discard take" title="More">
+        <button class="icon-btn pop-more" type="button" data-action="more" aria-label="More: discard take" aria-expanded="false" title="More">
           <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="18" cy="12" r="1.5" fill="currentColor" stroke="none"/></svg>
         </button>
       </div>
@@ -6254,7 +6311,7 @@ body.popout:is([data-alert=nosound], :has([data-part=nosound]:not([hidden]))) :f
     return h > 0 || forceHours ? `${h}:${pad2(m)}:${pad2(s)}` : `${m}:${pad2(s)}`;
   }
   function formatDuration(ms) {
-    const total = Math.max(0, Math.round((ms || 0) / 1e3));
+    const total = Math.max(0, Math.floor((ms || 0) / 1e3));
     const h = Math.floor(total / 3600), m = Math.floor(total / 60) % 60, s = total % 60;
     if (h > 0) return m ? `${h} h ${m} min` : `${h} h`;
     if (m > 0) return s ? `${m} min ${s} s` : `${m} min`;
@@ -6272,16 +6329,18 @@ body.popout:is([data-alert=nosound], :has([data-part=nosound]:not([hidden]))) :f
   var MIN_CHAPTER_MS = 1e4;
   var MIN_CHAPTERS = 3;
   var markerTitle = (n) => `Chapter ${n}`;
+  var INTRO_ID = "intro";
   function buildChapters(markers, durationMs, { introTitle = "Intro" } = {}) {
-    const sorted = (markers || []).filter((m) => Number.isFinite(m.atMs) && m.atMs >= 0 && m.atMs < durationMs).map((m, i) => ({ startMs: Math.floor(m.atMs), title: (m.title || "").trim() || markerTitle(i + 1) })).sort((a, b) => a.startMs - b.startMs);
+    const sorted = (markers || []).filter((m) => Number.isFinite(m.atMs) && m.atMs >= 0 && m.atMs < durationMs).map((m, i) => ({ id: m.id ?? `m${i}`, startMs: Math.floor(m.atMs), title: (m.title || "").trim() || markerTitle(i + 1) })).sort((a, b) => a.startMs - b.startMs);
     const chapters = [];
     for (const m of sorted) {
       const prev = chapters[chapters.length - 1];
       if (prev && m.startMs - prev.startMs < 1e3) continue;
       chapters.push(m);
     }
-    if (!chapters.length || chapters[0].startMs >= MIN_CHAPTER_MS) chapters.unshift({ startMs: 0, title: introTitle });
-    else chapters[0] = { ...chapters[0], startMs: 0 };
+    const intro = (introTitle || "").trim() || "Intro";
+    if (!chapters.length || chapters[0].startMs >= MIN_CHAPTER_MS) chapters.unshift({ id: INTRO_ID, startMs: 0, title: intro, intro: true });
+    else chapters[0] = { ...chapters[0], startMs: 0, moved: chapters[0].startMs > 0 };
     const issues = [];
     if (chapters.length < MIN_CHAPTERS) {
       issues.push(`YouTube needs at least ${MIN_CHAPTERS} chapters; this take has ${chapters.length}.`);
@@ -10266,19 +10325,21 @@ ${list(win10)}
 
   // src/app/session.js
   var COUNTDOWN_FROM = 3;
-  var TEST_CLIP_MS = 8e3;
   var LOW_STORAGE_BYTES = 2 * 1024 ** 3;
   var TALKING_WHILE_PAUSED_S = 5;
+  var TOGGLE_GUARD_MS = 400;
   var PREF_KEYS = ["beeps", "floatingControls", "hidePreview", "shortcuts", "theme"];
+  var ACTIVE_PHASES = ["starting", "recording", "paused", "stopping"];
+  var BLOCKED = { status: "blocked", title: "Microphone blocked", text: "Click the icon at the left of the address bar, switch Microphone on, then click Reload." };
   var MIC_ERRORS = {
-    NotAllowedError: { status: "blocked", title: "Microphone blocked", text: "Click the icon at the left of the address bar, set Microphone to Allow, then reload this page." },
-    SecurityError: { status: "blocked", title: "Microphone blocked", text: "Click the icon at the left of the address bar, set Microphone to Allow, then reload this page." },
+    NotAllowedError: BLOCKED,
+    SecurityError: BLOCKED,
     NotFoundError: { status: "notfound", title: "No microphone found", text: "Plug in your headset, then press Try again." },
     NotReadableError: { status: "busy", title: "Your microphone is busy", text: "Close Teams, Zoom or other apps using it, then press Try again." },
     AbortError: { status: "busy", title: "Your microphone is busy", text: "Close Teams, Zoom or other apps using it, then press Try again." },
     OverconstrainedError: { status: "notfound", title: "Your saved microphone isn’t connected", text: "Plug it in and press Try again, or pick another microphone." }
   };
-  var MIC_ERROR_FOR_KIND = { blocked: MIC_ERRORS.NotAllowedError, missing: MIC_ERRORS.NotFoundError, busy: MIC_ERRORS.NotReadableError };
+  var MIC_ERROR_FOR_KIND = { blocked: BLOCKED, missing: MIC_ERRORS.NotFoundError, busy: MIC_ERRORS.NotReadableError };
   var DEAD_MIC_ALERT_MS = 6e3;
   var newId2 = () => globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
   var Session = class extends Emitter {
@@ -10294,11 +10355,17 @@ ${list(win10)}
     #recorder = null;
     // --- live state
     #phase = null;
-    // explicit phases only: 'countdown' | 'recording' | 'paused' | 'stopping'
+    // explicit phases only: 'countdown' | 'starting' | 'recording' | 'paused' | 'stopping'
+    #preparing = false;
+    // record() is checking things before the countdown (picker open, folder prompt)
+    #abortStart = false;
+    // Stop/Cancel pressed while a take was still starting
+    #lastToggle = 0;
+    #lastPauseToggle = 0;
     #countdown = null;
     #countdownTimer = null;
     #screen = null;
-    // { stream, videoTrack, audioTrack, surface, label, width, height }
+    // { stream, videoTrack, audioTrack, surface, label, width, height, nativeWidth, nativeHeight }
     #mic = { status: "off", deviceId: "default", label: "", devices: [] };
     #audioStarted = false;
     #silent = false;
@@ -10307,42 +10374,52 @@ ${list(win10)}
     #scClipAbort = null;
     #micError = null;
     // { status, title, text } for the inline card
+    #micWarning = null;
+    // { title, text } while a stand-in mic is in use
     #talkingSince = null;
     // audio-clock time speech started while paused
     #talkingWhilePaused = false;
     #lastMeterT = null;
     #endedBy = /* @__PURE__ */ new Map();
     // take id -> 'share-ended'
+    #lastSaved = null;
+    // id of the take saved this visit (Review says "Saved – nice work!")
     #wakeLock = null;
     #deadMicTimer = null;
-    #testClip = { state: "idle", remainingMs: 0, url: null, size: 0, abort: null, timer: null };
-    #camera = { status: "off", stream: null, label: "", devices: [] };
+    #camera = { status: "off", stream: null, label: "", devices: [], activeId: "", error: "" };
+    #cameraGen = 0;
+    // bumps on every camera change, so a slow open can't resurrect an old one
     #take = null;
-    // { id, filename, elapsedMs, bytes, markers, savingTo }
+    // { id, filename, lessonName, elapsedMs, bytes, markers, savingTo, ... }
     #review = null;
     // take id shown in review
     #takes = [];
     // library rows
     #urls = /* @__PURE__ */ new Map();
     // take id -> object URL (this session only)
+    #urlJobs = /* @__PURE__ */ new Map();
+    // take id -> in-flight #ensureUrl promise
+    #chapterCache = /* @__PURE__ */ new WeakMap();
     #recovery = [];
+    #recovering = /* @__PURE__ */ new Set();
     #legacy = null;
     #kept = /* @__PURE__ */ new Set();
     // take ids whose chunks the journal keeps as a safety copy of a download
     #alerts = /* @__PURE__ */ new Map();
+    #dismissed = /* @__PURE__ */ new Map();
+    // alert id -> value at dismissal (storage-low: free bytes)
     #storage = null;
     #storageTimer = null;
     #dirty = false;
     #snapshot = null;
-    #offDeviceChange = null;
     /** Current immutable snapshot. */
     get state() {
       if (!this.#snapshot) this.#snapshot = this.#buildSnapshot();
       return this.#snapshot;
     }
-    /** True while a take is being recorded or saved (the UI warns before closing). */
+    /** True while a take is starting, recording or saving (the UI warns before closing). */
     get busy() {
-      return this.#phase === "recording" || this.#phase === "paused" || this.#phase === "stopping";
+      return ACTIVE_PHASES.includes(this.#phase);
     }
     // ------------------------------------------------------------------ boot
     async init() {
@@ -10367,7 +10444,7 @@ ${list(win10)}
       const kept = this.#journal ? await this.#journal.listKept().catch(() => []) : [];
       this.#kept = new Set(kept.map((m) => m.id));
       await this.#refreshDevices();
-      this.#offDeviceChange = onDeviceChange(() => this.#refreshDevices());
+      onDeviceChange(() => this.#refreshDevices());
       document.addEventListener("visibilitychange", () => {
         if (this.busy) this.#keepAwake();
       });
@@ -10381,7 +10458,7 @@ ${list(win10)}
       const permission = await this.#micPermission();
       const openMic = s.micEnabled && !s.noVoice && permission === "granted";
       if (!openMic) this.#mic = { ...this.#mic, status: permission === "denied" ? "blocked" : s.noVoice ? "off" : "needs-permission" };
-      if (permission === "denied" && !s.noVoice) this.#micError = MIC_ERRORS.NotAllowedError;
+      if (permission === "denied" && !s.noVoice) this.#micError = BLOCKED;
       try {
         await this.#engine.start({
           deviceId: s.micDeviceId,
@@ -10407,7 +10484,7 @@ ${list(win10)}
       try {
         const st = await navigator.permissions.query({ name: "microphone" });
         st.onchange = () => {
-          if (st.state === "denied") this.#setMicError(MIC_ERRORS.NotAllowedError);
+          if (st.state === "denied") this.#setMicError(BLOCKED);
           else if (st.state === "granted" && this.#mic.status === "blocked") this.enableMic();
         };
         return st.state;
@@ -10464,14 +10541,18 @@ ${list(win10)}
           );
         } else if (m.status === "live") {
           this.#clearAlert("mic-lost");
-          if (prev === "lost") this.#notice({ kind: "success", title: "Microphone is back", text: m.message || `Using ${m.label || "your microphone"}.` });
+          this.#micError = null;
+          if (prev === "lost") {
+            this.#notice({ kind: "success", title: "Microphone is back", text: m.message || `Using ${m.label || "your microphone"}.` });
+            this.#micWarning = null;
+          } else {
+            this.#micWarning = m.message ? { title: "Using a different microphone", text: m.message } : null;
+          }
           this.#applyCalibration();
           this.#refreshDevices();
-        }
-        if (m.status === "live") this.#micError = null;
-        else if (m.status === "blocked" || m.status === "error") {
-          const err = MIC_ERROR_FOR_KIND[m.errorKind] || (m.status === "blocked" ? MIC_ERRORS.NotAllowedError : null);
-          this.#micError = err ? { ...err, text: m.message || err.text } : { status: "error", title: "The microphone didn’t start", text: m.message || "Press Try again, or pick another microphone." };
+        } else if (m.status === "blocked" || m.status === "error") {
+          const err = MIC_ERROR_FOR_KIND[m.errorKind] || (m.status === "blocked" ? BLOCKED : null);
+          this.#micError = err || { status: "error", title: "The microphone didn’t start", text: m.message || "Press Try again, or pick another microphone." };
           this.#mic = { ...this.#mic, status: this.#micError.status };
         }
         this.#changed();
@@ -10501,11 +10582,6 @@ ${list(win10)}
       });
       e.on("context", ({ state }) => {
         this.#audioStarted = state === "running";
-        this.#changed();
-      });
-      e.on("monitor", ({ on, message: message2 }) => {
-        this.#monitor = !!on;
-        if (!on && message2) this.#notice({ kind: "info", title: "Listening switched off", text: message2, timeoutMs: 6e3 });
         this.#changed();
       });
       e.on("error", ({ message: message2 }) => this.#notice({ kind: "error", title: "Audio problem", text: message2 }));
@@ -10542,7 +10618,10 @@ ${list(win10)}
     // ---------------------------------------------------------------- screen
     /** Ask the teacher to pick a screen. Resolves true when one is shared. */
     async chooseScreen() {
-      if (this.busy || this.#phase === "countdown") return false;
+      if (this.#phase || this.#preparing) return false;
+      return this.#pickScreen();
+    }
+    async #pickScreen() {
       const preset = QUALITY_PRESETS[this.#settings.quality] || QUALITY_PRESETS.standard;
       let picked;
       try {
@@ -10550,7 +10629,7 @@ ${list(win10)}
       } catch (e) {
         const code = e instanceof CaptureError ? e.code : "failed";
         if (code === "cancelled") {
-          this.#notice({ kind: "info", title: "No screen chosen", text: "Click “Choose screen” and pick a monitor on the “Entire screen” tab.", timeoutMs: 6e3 });
+          this.#notice({ kind: "info", title: "No screen chosen", text: "Click “Choose screen” and pick a monitor on the “Entire screen” tab.", timeoutMs: 8e3 });
         } else if (code === "blocked") {
           this.#notice({ kind: "error", title: "Screen capture is blocked here", text: e.message || "Open this file directly in Chrome or Edge (not inside another app’s preview), then try again." });
         } else {
@@ -10562,19 +10641,10 @@ ${list(win10)}
       this.#screen = picked;
       picked.videoTrack.addEventListener("ended", () => this.#onScreenEnded(picked));
       this.#engine?.setSystemAudioTrack(this.#settings.systemAudio ? picked.audioTrack : null);
-      if (picked.surface !== "monitor") {
-        this.#alert(
-          "window-only",
-          "warning",
-          "Only one window is being recorded",
-          "You picked a single window or tab. To record everything on a monitor, click “Change” and use the “Entire screen” tab."
-        );
-      } else {
-        this.#clearAlert("window-only");
-      }
       this.#changed();
       return true;
     }
+    /** "Finish – stop sharing my screen". */
     stopScreen() {
       if (this.busy) return;
       this.#releaseScreen();
@@ -10585,7 +10655,6 @@ ${list(win10)}
       this.#screen.stream.getTracks().forEach((t) => t.stop());
       this.#engine?.setSystemAudioTrack(null);
       this.#screen = null;
-      this.#clearAlert("window-only");
     }
     #onScreenEnded(picked) {
       if (this.#screen !== picked) return;
@@ -10594,7 +10663,11 @@ ${list(win10)}
         this.stop();
         return;
       }
-      if (this.#phase === "countdown") this.cancelCountdown();
+      if (this.#phase === "countdown") {
+        this.cancelCountdown();
+        this.#notice({ kind: "warning", title: "Recording didn’t start", text: "Screen sharing stopped during the countdown. Choose a screen again when you’re ready.", timeoutMs: 8e3 });
+      }
+      if (this.#phase === "starting") this.#abortStart = true;
       this.#releaseScreen();
       this.#changed();
     }
@@ -10614,6 +10687,8 @@ ${list(win10)}
       else await this.enableMic();
     }
     async setMicDevice(deviceId) {
+      this.#stopCheckForChange();
+      this.#micWarning = null;
       this.#settings = saveSettings({ micDeviceId: deviceId });
       await this.#engine?.setDevice(deviceId);
       this.#applyCalibration();
@@ -10621,19 +10696,27 @@ ${list(win10)}
     }
     async setAudioMode(mode) {
       if (mode !== "clean" && mode !== "studio") return;
+      this.#stopCheckForChange();
       this.#settings = saveSettings({ audioMode: mode });
       await this.#engine?.setMode(mode);
       this.#applyCalibration();
       this.#changed();
     }
     async setSpeakers(on) {
+      this.#stopCheckForChange();
       this.#settings = saveSettings({ speakers: !!on });
       await this.#engine?.setSpeakers(!!on);
       this.#changed();
     }
+    /** A verdict measured on two different set-ups would be wrong. */
+    #stopCheckForChange() {
+      if (!this.#sc.running) return;
+      this.cancelSoundCheck();
+      this.#notice({ kind: "info", title: "Sound check stopped", text: "You changed the microphone settings. Run Check my sound again.", timeoutMs: 6e3 });
+    }
+    /** Mic level slider (the engine's 'gain' event saves it). */
     setGain(gain) {
       this.#engine?.setGain(gain);
-      this.#settings = saveSettings({ micGain: this.#engine ? this.#engine.gain : gain });
       this.#changed();
     }
     setGate(on) {
@@ -10646,35 +10729,13 @@ ${list(win10)}
       this.#engine?.setAutoLevel(!!on);
       this.#changed();
     }
-    setMonitor(on) {
-      const ok = this.#engine ? this.#engine.setMonitor(!!on) !== false : false;
-      if (on && !ok) {
-        this.#monitor = false;
-        this.#changed();
-      }
-      if (on && !ok) {
-        this.#notice({ kind: "info", title: "Listening is off while recording computer sound", text: "Your voice would be recorded twice. Use Listen before you start, with headphones." });
-      } else if (on) {
-        this.#notice({ kind: "warning", title: "Listening through your speakers?", text: "Use headphones: through speakers this causes a loud squeal.", timeoutMs: 6e3 });
-      }
-      this.#monitor = !!on && ok;
-      this.#changed();
-    }
-    #monitor = false;
-    setSystemAudio(on) {
-      this.#settings = saveSettings({ systemAudio: !!on });
-      this.#engine?.setSystemAudioTrack(on && this.#screen ? this.#screen.audioTrack : null);
-      if (on && this.#screen && !this.#screen.audioTrack) {
-        this.#notice({ kind: "info", title: "This share has no computer sound", text: "To include sound, click “Change”, pick the screen again and tick “Also share system audio”." });
-      }
-      this.#changed();
-    }
     setSystemAudioLevel(v) {
       const level = Math.max(0, Math.min(1.5, Number(v) || 0));
       this.#settings = saveSettings({ systemAudioLevel: level });
       this.#engine?.setSystemAudioLevel(level);
       this.#changed();
     }
+    /** Calibrations are stored per microphone (by its label, which survives id changes) and processing mode. */
     #calibrationKey() {
       const label2 = this.#engine?.micInfo?.label || this.#mic.label || this.#settings.micDeviceId;
       return `${label2}|${this.#settings.audioMode}`;
@@ -10688,30 +10749,37 @@ ${list(win10)}
     }
     // ------------------------------------------------------------ sound check
     async startSoundCheck() {
-      if (!this.#engine || this.busy || this.#sc.running) return;
+      if (!this.#engine || this.#phase || this.#preparing || this.#sc.running) return;
       if (!this.#settings.micEnabled) await this.setMicEnabled(true);
       await this.firstGesture();
-      this.discardTestClip();
       this.#engine.setAutoLevel(false);
       this.#soundCheck?.cancel();
       const sc = new SoundCheck(this.#engine);
       this.#soundCheck = sc;
       if (this.#sc.clipUrl) URL.revokeObjectURL(this.#sc.clipUrl);
       this.#sc = { running: true, phase: "countdown", remainingMs: 0, fraction: 0, instruction: "", result: null, clipUrl: null };
+      const finished = () => {
+        if (this.#soundCheck === sc) this.#soundCheck = null;
+        this.#engine.setAutoLevel(this.#settings.autoLevel);
+      };
       sc.on("progress", (p) => {
         if (p.phase === "voice" && this.#sc.phase !== "voice") this.#recordCheckClip();
         this.#sc = { ...this.#sc, ...p, running: true };
         this.#changed();
       });
       sc.on("cancelled", () => {
-        this.#scClipAbort?.abort();
+        finished();
+        this.#dropCheckClip();
         this.#sc = { ...this.#sc, running: false, phase: null };
         this.#changed();
       });
-      sc.on("done", (result) => this.#onSoundCheckDone(result));
+      sc.on("done", (result) => {
+        finished();
+        this.#onSoundCheckDone(result);
+      });
       sc.on("error", ({ message: message2 }) => {
-        this.#scClipAbort?.abort();
-        if (this.#soundCheck === sc) this.#soundCheck = null;
+        finished();
+        this.#dropCheckClip();
         this.#sc = { ...this.#sc, running: false, phase: null };
         this.#notice({ kind: "warning", title: "The sound check stopped", text: message2 });
         this.#changed();
@@ -10729,7 +10797,7 @@ ${list(win10)}
       const abort = new AbortController();
       this.#scClipAbort = abort;
       try {
-        const blob = await recordClip(this.#engine.recordTrack, (CHECK_TIMING?.voiceMs || 5e3) + 400, { mimeType: this.#formats.audio || void 0, signal: abort.signal });
+        const blob = await recordClip(this.#engine.recordTrack, CHECK_TIMING.voiceMs + 400, { mimeType: this.#formats.audio || void 0, signal: abort.signal });
         if (this.#scClipAbort !== abort || !blob?.size) return;
         if (this.#sc.clipUrl) URL.revokeObjectURL(this.#sc.clipUrl);
         this.#sc = { ...this.#sc, clipUrl: URL.createObjectURL(blob) };
@@ -10737,13 +10805,19 @@ ${list(win10)}
       } catch {
       }
     }
+    /** Stop the voice-phase clip and throw away what it caught. */
+    #dropCheckClip() {
+      const abort = this.#scClipAbort;
+      this.#scClipAbort = null;
+      abort?.abort();
+    }
     #onSoundCheckDone(result) {
-      this.#soundCheck = null;
-      const gateOn = !!(result.calibration && result.gateEnabled);
-      const applied = result.calibration && Number.isFinite(result.recommendedGain) ? `Mic level set to ${Math.round(result.recommendedGain * 100)}% for your voice.${gateOn ? " Room noise between sentences is turned down (Settings › Advanced)." : ""}` : "";
+      const usable = !!(result.calibration && Number.isFinite(result.recommendedGain)) && !this.busy;
+      const gateOn = usable && !!result.gateEnabled;
+      const applied = usable ? `Mic level set to ${Math.round(result.recommendedGain * 100)}% for your voice.${gateOn ? " Room noise between sentences is turned down (Settings › Advanced)." : ""}` : "";
       result = { ...result, applied };
       this.#sc = { ...this.#sc, running: false, phase: null, remainingMs: 0, fraction: 1, instruction: "", result };
-      if (result.calibration && Number.isFinite(result.recommendedGain)) {
+      if (usable) {
         this.#engine.setGain(result.recommendedGain);
         this.#engine.setCalibration(result.calibration);
         const calibrations = { ...this.#settings.calibrations || {} };
@@ -10756,19 +10830,8 @@ ${list(win10)}
           at: Date.now()
         };
         if (gateOn) this.#engine.setGate(true);
-        this.#settings = saveSettings({ calibrations, micGain: result.recommendedGain, autoLevel: false, ...gateOn ? { gate: true } : {} });
+        this.#settings = saveSettings({ calibrations, micGain: result.recommendedGain, ...gateOn ? { gate: true } : {} });
       }
-      this.#changed();
-    }
-    /** Freeze the settings the check chose and run it again to confirm. */
-    lockAndRetest() {
-      this.setAutoLevel(false);
-      this.startSoundCheck();
-    }
-    dismissSoundCheck() {
-      this.#scClipAbort?.abort();
-      if (this.#sc.clipUrl) URL.revokeObjectURL(this.#sc.clipUrl);
-      this.#sc = { running: false, phase: null, remainingMs: 0, fraction: 0, instruction: "", result: null, clipUrl: null };
       this.#changed();
     }
     /** "Copy these steps" under "How to fix this in Windows". */
@@ -10783,53 +10846,11 @@ ${list(win10)}
       this.#notice(ok ? { kind: "success", title: "Prompt copied", text: "Paste it into Claude Code on this computer.", timeoutMs: 4e3 } : { kind: "error", title: "Couldn’t copy", text: "Your browser blocked the clipboard." });
       return text2;
     }
-    // -------------------------------------------------------------- test clip
-    async startTestClip() {
-      if (!this.#engine || this.busy || this.#testClip.state === "recording") return;
-      await this.firstGesture();
-      this.discardTestClip();
-      const abort = new AbortController();
-      const started = performance.now();
-      const timer = setInterval(() => {
-        this.#testClip = { ...this.#testClip, remainingMs: Math.max(0, TEST_CLIP_MS - (performance.now() - started)) };
-        this.#changed();
-      }, 250);
-      this.#testClip = { state: "recording", remainingMs: TEST_CLIP_MS, url: null, size: 0, abort, timer };
-      this.#changed();
-      try {
-        const blob = await recordClip(this.#engine.recordTrack, TEST_CLIP_MS, { mimeType: this.#formats.audio || void 0, signal: abort.signal });
-        clearInterval(timer);
-        if (this.#testClip.abort !== abort) return;
-        if (!blob || !blob.size) {
-          this.#testClip = { state: "idle", remainingMs: 0, url: null, size: 0, abort: null, timer: null };
-          this.#notice({ kind: "error", title: "The test caught no sound", text: "Check the microphone is on, then try again." });
-        } else {
-          this.#testClip = { state: "ready", remainingMs: 0, url: URL.createObjectURL(blob), size: blob.size, abort: null, timer: null };
-        }
-      } catch (e) {
-        clearInterval(timer);
-        if (this.#testClip.abort === abort) this.#testClip = { state: "idle", remainingMs: 0, url: null, size: 0, abort: null, timer: null };
-        if (e?.name !== "AbortError") this.#notice({ kind: "error", title: "Test recording failed", text: e.message || String(e) });
-      }
-      this.#changed();
-    }
-    /** Stop the test early; whatever was recorded so far is kept for playback. */
-    stopTestClip() {
-      this.#testClip.abort?.abort();
-    }
-    discardTestClip() {
-      const t = this.#testClip;
-      if (t.timer) clearInterval(t.timer);
-      if (t.url) URL.revokeObjectURL(t.url);
-      const abort = t.abort;
-      this.#testClip = { state: "idle", remainingMs: 0, url: null, size: 0, abort: null, timer: null };
-      abort?.abort();
-      this.#changed();
-    }
     // ----------------------------------------------------------------- camera
     async setCamera(on) {
       this.#settings = saveSettings({ camera: !!on });
       if (!on) {
+        this.#cameraGen++;
         this.#stopCamera();
         this.#compositor?.setCameraVisible(false);
         this.#compositor?.setCameraTrack(null);
@@ -10837,8 +10858,7 @@ ${list(win10)}
         return;
       }
       if (!isCompositingSupported()) {
-        this.#camera = { ...this.#camera, status: "error" };
-        this.#notice({ kind: "warning", title: "Camera bubble isn’t available", text: "This browser can’t add the camera to the video. Update Chrome or Edge to use it." });
+        this.#camera = { ...this.#camera, status: "error", error: "This browser can’t add the camera to the video. Update Chrome or Edge to use it." };
         this.#changed();
         return;
       }
@@ -10849,18 +10869,30 @@ ${list(win10)}
       if (this.#settings.camera) await this.#startCamera();
     }
     async #startCamera() {
+      const gen = ++this.#cameraGen;
       this.#compositor?.setCameraTrack(null);
       this.#stopCamera();
       this.#camera = { ...this.#camera, status: "starting", error: "" };
       this.#changed();
       try {
         const stream = await openCamera(this.#settings.cameraDeviceId || void 0);
+        if (gen !== this.#cameraGen || !this.#settings.camera) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
         const track = stream.getVideoTracks()[0];
         track.addEventListener("ended", () => {
           if (this.#camera.stream !== stream) return;
-          this.#camera = { ...this.#camera, status: "error", stream: null };
+          this.#camera = { ...this.#camera, status: "error", stream: null, error: "The camera stopped. Check it is plugged in, then press Try again." };
           this.#compositor?.setCameraTrack(null);
-          this.#alert("camera-lost", "warning", "Camera disconnected", "The camera stopped. The recording continues without the bubble; turn the camera off and on again once it is reconnected.");
+          if (this.busy) {
+            this.#alert(
+              "camera-lost",
+              "warning",
+              "Camera disconnected",
+              "The recording carries on without the camera bubble. It comes back in your next take once the camera is reconnected."
+            );
+          }
           this.#changed();
         });
         this.#camera = { ...this.#camera, status: "live", stream, label: track.label, activeId: track.getSettings().deviceId || "" };
@@ -10873,13 +10905,14 @@ ${list(win10)}
         }
         this.#refreshDevices();
       } catch (e) {
+        if (gen !== this.#cameraGen) return;
         const code = e instanceof CaptureError ? e.code : e?.name === "NotAllowedError" ? "blocked" : "failed";
         if (code === "cancelled") {
           this.#settings = saveSettings({ camera: false });
           this.#camera = { ...this.#camera, status: "off", stream: null };
         } else {
-          this.#camera = { ...this.#camera, status: code === "blocked" ? "blocked" : "error", stream: null, error: e?.message || "" };
-          this.#notice({ kind: "error", title: code === "blocked" ? "Camera blocked" : "Camera didn’t start", text: e?.message || "Switch the camera off and on to try again." });
+          const text2 = (e?.message || "The camera didn’t start.").replace(/switch the camera (off and )?on again/i, "press Try again");
+          this.#camera = { ...this.#camera, status: code === "blocked" ? "blocked" : "error", stream: null, error: text2 };
         }
       }
       this.#changed();
@@ -10887,7 +10920,7 @@ ${list(win10)}
     #stopCamera() {
       const s = this.#camera.stream;
       if (s) s.getTracks().forEach((t) => t.stop());
-      this.#camera = { ...this.#camera, status: "off", stream: null };
+      this.#camera = { ...this.#camera, status: "off", stream: null, activeId: "" };
       this.#clearAlert("camera-lost");
     }
     setBubble(patch) {
@@ -10922,10 +10955,12 @@ ${list(win10)}
       this.#settings = saveSettings({ [key]: key === "theme" ? value2 : !!value2 });
       this.#changed();
     }
-    /** Settings › Reset all settings. The UI reloads the page afterwards. */
+    /** Settings › Reset all settings. Refused mid-take. The UI reloads the page afterwards. Resolves true when done. */
     resetSettings() {
+      if (this.busy || this.#phase === "countdown") return false;
       this.#settings = resetSettings();
       this.#changed();
+      return true;
     }
     async setQuality(quality) {
       if (!QUALITY_PRESETS[quality]) return;
@@ -10936,7 +10971,7 @@ ${list(win10)}
         try {
           track.contentHint = p.contentHint;
           const size = outputSize(this.#screen.nativeWidth || this.#screen.width, this.#screen.nativeHeight || this.#screen.height, p.maxHeight);
-          await track.applyConstraints({ width: { max: size.width }, height: { max: size.height }, frameRate: { max: p.fps } });
+          await track.applyConstraints({ width: { max: size.width }, height: { max: size.height }, frameRate: { max: p.fps }, resizeMode: "crop-and-scale" });
           const st = track.getSettings();
           this.#screen = { ...this.#screen, width: st.width || this.#screen.width, height: st.height || this.#screen.height };
         } catch {
@@ -10945,31 +10980,64 @@ ${list(win10)}
       this.#changed();
     }
     // -------------------------------------------------------------- recording
-    /** The big button: start (or cancel the countdown, or stop). */
-    async toggleRecord(opts) {
-      if (this.#phase === "countdown") return this.cancelCountdown();
-      if (this.#phase === "recording" || this.#phase === "paused") return this.stop();
-      if (this.#phase === "stopping") return;
-      return this.record(opts);
+    /** Why Start can't go ahead yet, or null. One rule for the button, Alt+R and the floating controls. */
+    get startBlocker() {
+      const s = this.#settings;
+      if (s.noVoice) return null;
+      if (this.#mic.status === "live" && s.micEnabled) return null;
+      const blocked = ["blocked", "notfound", "busy", "error", "lost"].includes(this.#mic.status);
+      return blocked ? "Your microphone isn’t working yet. Fix it in step 2, or choose “Record without my voice” in Settings." : "Turn on your microphone first (step 2), or choose “Record without my voice” in Settings.";
     }
-    /** Start a take: pick a screen if needed, check sound, count down, record. */
-    async record({ withoutSound = false } = {}) {
-      if (this.#phase) return;
-      await this.firstGesture();
-      if (!this.#screen && !await this.chooseScreen()) return;
-      if (this.#sc.running) this.cancelSoundCheck();
-      if (this.#testClip.state === "recording") this.discardTestClip();
-      if (!withoutSound && !this.#hasSound()) {
-        this.#notice({
-          id: "no-sound-source",
-          kind: "warning",
-          title: "Nothing would be heard",
-          text: this.#settings.micEnabled ? "The microphone isn’t working yet. Fix it in the Microphone panel, or record without sound." : "The microphone is off and the shared screen has no sound.",
-          actions: [{ label: "Record without sound", action: "record", args: [{ withoutSound: true }] }]
-        });
+    /** The big button, Alt+R and the floating Start: start, cancel the countdown, or stop. */
+    async toggleRecord(opts) {
+      const now2 = performance.now();
+      if (now2 - this.#lastToggle < TOGGLE_GUARD_MS) return;
+      this.#lastToggle = now2;
+      if (this.#phase === "countdown") return this.cancelCountdown();
+      if (this.#phase === "starting") {
+        this.#abortStart = true;
         return;
       }
-      if (!this.#settings.countdown) return this.#startTake();
+      if (this.#phase === "recording" || this.#phase === "paused") return this.stop();
+      if (this.#phase === "stopping" || this.#preparing) return;
+      return this.record(opts);
+    }
+    /**
+     * Start a take: reconnect the folder and pick a screen if needed, check the
+     * microphone, count down, record. Must start from a click or key press (the
+     * folder prompt and the screen picker need it).
+     */
+    async record({ withoutSound = false } = {}) {
+      if (this.#phase || this.#preparing) return;
+      this.#preparing = true;
+      this.#abortStart = false;
+      this.#changed();
+      try {
+        await this.firstGesture();
+        if (!withoutSound && this.startBlocker) {
+          this.#notice({
+            id: "no-voice",
+            kind: "warning",
+            title: "Your microphone isn’t on",
+            text: this.startBlocker,
+            actions: [{ label: "Record without my voice", action: "record", args: [{ withoutSound: true }] }]
+          });
+          return;
+        }
+        if (this.#folder?.status === "needs-permission") {
+          await this.reconnectFolder();
+          if (this.#folder.status !== "ready") {
+            this.#notice({ kind: "warning", title: `This take will go to Downloads`, text: `Your “${this.#folder.name}” folder needs permission again. Click “Reconnect” at the top before the next take.`, timeoutMs: 1e4 });
+          }
+        }
+        if (!this.#screen && !await this.#pickScreen()) return;
+        if (this.#abortStart) return;
+      } finally {
+        this.#preparing = false;
+        this.#changed();
+      }
+      if (this.#sc.running) this.cancelSoundCheck();
+      if (!this.#settings.countdown) return this.#beginTake();
       this.#phase = "countdown";
       this.#countdown = COUNTDOWN_FROM;
       this.#changed();
@@ -10982,51 +11050,63 @@ ${list(win10)}
         clearInterval(this.#countdownTimer);
         this.#countdownTimer = null;
         this.#countdown = null;
-        this.#phase = null;
-        this.#startTake();
+        this.#beginTake();
       }, 1e3);
     }
-    #hasSound() {
-      const e = this.#engine;
-      if (!e || !e.running) return false;
-      const micOk = this.#settings.micEnabled && this.#mic.status === "live";
-      const sysOk = this.#settings.systemAudio && !!this.#screen?.audioTrack;
-      return micOk || sysOk || this.#settings.noVoice;
-    }
     cancelCountdown() {
+      if (this.#phase === "starting") {
+        this.#abortStart = true;
+        return;
+      }
       if (this.#phase !== "countdown") return;
       clearInterval(this.#countdownTimer);
       this.#countdownTimer = null;
       this.#countdown = null;
       this.#phase = null;
+      this.#notice({ kind: "info", title: "Countdown cancelled", text: "Nothing was recorded.", timeoutMs: 3e3 });
       this.#changed();
+    }
+    /** The 'starting' phase covers the seconds a take needs to open its file and journal. */
+    async #beginTake() {
+      this.#phase = "starting";
+      this.#changed();
+      const ok = await this.#startTake();
+      if (!ok && this.#phase === "starting") this.#phase = null;
+      this.#changed();
+      if (ok && this.#abortStart) {
+        this.#abortStart = false;
+        await this.cancelTake({ quiet: true });
+        this.#notice({ kind: "info", title: "Recording cancelled", text: "Nothing was saved.", timeoutMs: 4e3 });
+      }
     }
     async #startTake() {
       const screen = this.#screen;
       if (!screen || screen.videoTrack.readyState !== "live") {
-        this.#notice({ kind: "error", title: "The shared screen has gone", text: "Choose a screen again, then press record." });
+        this.#notice({ kind: "error", title: "The shared screen has gone", text: "Choose a screen again, then press Start recording." });
         this.#releaseScreen();
-        this.#changed();
-        return;
+        return false;
       }
+      if (this.#sc.running) this.cancelSoundCheck();
       const s = this.#settings;
+      const lessonName = s.lessonName;
       const preset = QUALITY_PRESETS[s.quality] || QUALITY_PRESETS.standard;
       const st = screen.videoTrack.getSettings();
       const { width, height } = outputSize(st.width || screen.width, st.height || screen.height, preset.maxHeight);
       const fps = preset.fps;
       let videoTrack = screen.videoTrack;
+      let compositor = null;
       const camTrack = this.#camera.stream?.getVideoTracks()[0];
       if (s.camera && camTrack && camTrack.readyState === "live" && isCompositingSupported()) {
         try {
-          this.#compositor = new Compositor({ screenTrack: screen.videoTrack, cameraTrack: camTrack, width, height, fps, bubble: s.bubble });
-          this.#compositor.on("warning", (w) => {
+          compositor = new Compositor({ screenTrack: screen.videoTrack, cameraTrack: camTrack, width, height, fps, bubble: s.bubble });
+          compositor.on("warning", (w) => {
             const cam = this.#camera.stream?.getVideoTracks()[0];
             if (!cam || cam.readyState !== "live") return;
             this.#notice({ kind: "warning", title: "Camera bubble", text: w.message });
           });
-          videoTrack = this.#compositor.start();
+          videoTrack = compositor.start();
         } catch (e) {
-          this.#compositor = null;
+          compositor = null;
           videoTrack = screen.videoTrack;
           this.#notice({ kind: "warning", title: "Recording without the camera bubble", text: e.message || String(e) });
         }
@@ -11035,7 +11115,7 @@ ${list(win10)}
       if (options.note) this.#notice({ kind: "info", title: "Recording as WebM", text: options.note, timeoutMs: 6e3 });
       const id = newId2();
       const startedAt = Date.now();
-      const filename = makeFilename({ lessonName: s.lessonName, date: new Date(startedAt), ext: options.ext, take: this.#nextTakeNumber(s.lessonName) });
+      const filename = makeFilename({ lessonName, date: new Date(startedAt), ext: options.ext, take: this.#nextTakeNumber(lessonName) });
       const begin = async (sink) => {
         const rec = new TakeRecorder({
           id,
@@ -11044,7 +11124,7 @@ ${list(win10)}
           options,
           sink,
           journal: this.#journal,
-          meta: { lessonName: s.lessonName, filename, startedAt }
+          meta: { lessonName, filename, startedAt }
         });
         await rec.start();
         return rec;
@@ -11067,31 +11147,46 @@ ${list(win10)}
         }
         if (!recorder) {
           if (e?.code === "screen-gone") this.#releaseScreen();
-          this.#compositor?.stop();
-          this.#compositor = null;
+          compositor?.stop();
           this.#notice({ kind: "error", title: "Recording couldn’t start", text: e.message || String(e) });
-          this.#changed();
-          return;
+          return false;
         }
       }
+      this.#compositor = compositor;
       this.#recorder = recorder;
-      this.#take = { id, filename, elapsedMs: 0, bytes: 0, markers: [], savingTo: recorder.savingTo || savingTo, startedAt, thumbnail: "", safetyCopy: !!recorder.safetyCopy };
+      this.#take = {
+        id,
+        filename,
+        lessonName,
+        elapsedMs: 0,
+        bytes: 0,
+        markers: [],
+        savingTo: recorder.savingTo || savingTo,
+        folderName: this.#folder?.name || "",
+        startedAt,
+        thumbnail: "",
+        safetyCopy: !!recorder.safetyCopy,
+        screen
+      };
       this.#phase = "recording";
       this.#review = null;
       this.#engine.setRecording(true);
-      if (this.#monitor && this.#screen?.audioTrack && s.systemAudio) this.setMonitor(false);
       recorder.on("state", ({ state }) => {
+        if (this.#recorder !== recorder) return;
         if (state === "paused") this.#phase = "paused";
         else if (state === "recording") this.#phase = "recording";
         this.#changed();
       });
       recorder.on("tick", ({ elapsedMs, bytes }) => {
         if (this.#take?.id !== id) return;
-        this.#take = { ...this.#take, elapsedMs, bytes };
+        const safetyCopy = bytes > 0 ? !!recorder.safetyCopy : this.#take.safetyCopy;
+        this.#take = { ...this.#take, elapsedMs, bytes, safetyCopy };
         this.#changed();
       });
       recorder.on("warning", (w) => {
-        if (["journal-failed", "no-journal", "no-data"].includes(w.code) && this.#take?.id === id) this.#take = { ...this.#take, safetyCopy: !!recorder.safetyCopy };
+        if (this.#take?.id === id && ["journal-failed", "no-journal", "no-data"].includes(w.code)) {
+          this.#take = { ...this.#take, safetyCopy: w.code === "no-data" ? false : !!recorder.safetyCopy };
+        }
         if (w.code === "saved-elsewhere") return;
         this.#notice({ kind: "warning", title: "Recording", text: w.message });
         this.#changed();
@@ -11112,10 +11207,14 @@ ${list(win10)}
       setTimeout(async () => {
         if (this.#take?.id !== id) return;
         const thumb = await captureThumbnail(videoTrack);
-        if (this.#take?.id === id) this.#take = { ...this.#take, thumbnail: thumb };
+        if (this.#take?.id === id) {
+          this.#take = { ...this.#take, thumbnail: thumb };
+          this.#changed();
+        }
       }, 1500);
-      this.#changed();
+      return true;
     }
+    /** The take number the next take of this lesson gets ("…, take 2"). */
     #nextTakeNumber(lessonName) {
       const today = (/* @__PURE__ */ new Date()).toDateString();
       const same = this.#takes.filter((t) => (t.lessonName || "") === (lessonName || "") && new Date(t.createdAt).toDateString() === today);
@@ -11124,6 +11223,9 @@ ${list(win10)}
     togglePause() {
       const r = this.#recorder;
       if (!r) return;
+      const now2 = performance.now();
+      if (now2 - this.#lastPauseToggle < TOGGLE_GUARD_MS) return;
+      this.#lastPauseToggle = now2;
       if (this.#phase === "recording") r.pause();
       else if (this.#phase === "paused") r.resume();
     }
@@ -11133,13 +11235,13 @@ ${list(win10)}
       const m = r.addMarker(title || markerTitle(r.markers.length + 1));
       if (!m) return null;
       this.#take = { ...this.#take, markers: [...r.markers] };
-      this.#notice({ kind: "info", title: `${m.title} marked`, text: `at ${formatClock(m.atMs)}`, timeoutMs: 2e3 });
+      this.#notice({ kind: "info", title: `${m.title} added`, text: `at ${formatClock(m.atMs)}`, timeoutMs: 2500 });
       this.#changed();
       return m;
     }
-    /** Stop and save the take. */
+    /** Stop and save the take. The phase stays 'stopping' until the take is filed and shown. */
     async stop() {
-      if (this.#phase === "countdown") return this.cancelCountdown();
+      if (this.#phase === "countdown" || this.#phase === "starting") return this.cancelCountdown();
       if (this.#phase !== "recording" && this.#phase !== "paused") return;
       const recorder = this.#recorder;
       const take = this.#take;
@@ -11155,14 +11257,15 @@ ${list(win10)}
           this.#notice({ kind: "error", title: "Saving failed", text: String(e?.message || e) });
         }
       }
-      this.#afterTake();
+      this.#releaseTake();
       if (!result) {
+        this.#phase = null;
         this.#changed();
         return;
       }
       const row = {
         id: result.id,
-        lessonName: this.#settings.lessonName,
+        lessonName: take.lessonName,
         filename: result.filename,
         container: result.container,
         mimeType: result.mimeType,
@@ -11188,8 +11291,9 @@ ${list(win10)}
       });
       if (row.savedTo === "folder" && row.markers.length) this.saveChaptersFile(row.id, { quiet: true });
       this.#review = row.id;
+      this.#lastSaved = row.id;
       if (result.endedBy === "share-ended") this.#endedBy.set(row.id, "share-ended");
-      if (this.#endedBy.get(row.id) === "share-ended") this.#releaseScreen();
+      if (this.#endedBy.get(row.id) === "share-ended" && this.#screen === take.screen) this.#releaseScreen();
       if (result.warning) this.#notice({ kind: "warning", title: "Take saved, with a problem", text: result.warning });
       else this.#notice({
         kind: "success",
@@ -11197,11 +11301,12 @@ ${list(win10)}
         text: row.savedTo === "folder" ? `${row.filename} is in your “${row.folderName}” folder.` : `${row.filename} is in your Downloads folder.`,
         timeoutMs: 6e3
       });
+      this.#phase = null;
       this.#changed();
     }
     /** Stop and throw the take away (the UI confirms first). */
-    async cancelTake() {
-      if (this.#phase === "countdown") return this.cancelCountdown();
+    async cancelTake({ quiet = false } = {}) {
+      if (this.#phase === "countdown" || this.#phase === "starting") return this.cancelCountdown();
       if (this.#phase !== "recording" && this.#phase !== "paused") return;
       const recorder = this.#recorder;
       this.#phase = "stopping";
@@ -11211,19 +11316,21 @@ ${list(win10)}
       } catch (e) {
         console.warn("cancel failed", e);
       }
-      this.#afterTake();
-      this.#notice({ kind: "info", title: "Take discarded", text: "Nothing was saved.", timeoutMs: 4e3 });
+      this.#releaseTake();
+      this.#phase = null;
+      if (!quiet) this.#notice({ kind: "info", title: "Take discarded", text: "Nothing was saved.", timeoutMs: 4e3 });
       this.#changed();
     }
-    #afterTake() {
+    /** Release what a take held (the phase is the caller's business). */
+    #releaseTake() {
       this.#compositor?.stop();
       this.#compositor = null;
       this.#recorder = null;
       this.#take = null;
-      this.#phase = null;
       this.#engine?.setRecording(false);
       this.#stopStorageWatch();
       this.#releaseWakeLock();
+      this.#clearAlert("camera-lost");
     }
     /**
      * Stop Windows from sleeping or dimming mid-lesson. Browsers drop the lock
@@ -11258,10 +11365,10 @@ ${list(win10)}
     }
     async openTake(id) {
       const t = this.#findTake(id);
-      if (!t || this.busy) return;
+      if (!t || this.busy || this.#phase) return;
       await this.#ensureUrl(t);
       if (!this.#urls.has(id)) {
-        this.#notice({ kind: "info", title: "Open it from your Downloads folder", text: `${t.filename} was downloaded in an earlier session, so it can’t be played here.` });
+        this.#notice({ kind: "info", title: "Open it from your Downloads folder", text: `${t.filename} was downloaded in an earlier session, so it can’t be played here.`, timeoutMs: 8e3 });
       }
       this.#review = id;
       this.#changed();
@@ -11270,24 +11377,43 @@ ${list(win10)}
       this.#review = null;
       this.#changed();
     }
-    /** Make an object URL for a take from wherever its bytes still are. */
-    async #ensureUrl(t) {
-      if (this.#urls.has(t.id)) return;
-      let blob = null;
-      if (t.savedTo === "folder") blob = await this.#folderFile(t);
-      else if (this.#kept.has(t.id) && this.#journal) blob = await this.#journal.assemble(t.id).catch(() => null);
-      if (blob) this.#urls.set(t.id, URL.createObjectURL(blob));
+    /** Make an object URL for a take from wherever its bytes still are (one job per take at a time). */
+    #ensureUrl(t) {
+      if (this.#urls.has(t.id)) return Promise.resolve();
+      if (this.#urlJobs.has(t.id)) return this.#urlJobs.get(t.id);
+      const job = (async () => {
+        let blob = null;
+        if (t.savedTo === "folder") blob = await this.#folderFile(t);
+        else if (this.#kept.has(t.id) && this.#journal) blob = await this.#journal.assemble(t.id).catch(() => null);
+        if (blob) this.#setUrl(t.id, blob);
+      })().finally(() => this.#urlJobs.delete(t.id));
+      this.#urlJobs.set(t.id, job);
+      return job;
     }
-    async #folderFile(t) {
-      if (!this.#folder || this.#folder.status === "unsupported") return null;
+    #setUrl(id, blob) {
+      const old = this.#urls.get(id);
+      if (old) URL.revokeObjectURL(old);
+      this.#urls.set(id, URL.createObjectURL(blob));
+    }
+    #dropUrl(id) {
+      const url = this.#urls.get(id);
+      if (url) URL.revokeObjectURL(url);
+      this.#urls.delete(id);
+    }
+    /** The chosen folder, asking for permission again if needed (call from a click). True when usable for this take. */
+    async #folderReadyFor(t) {
+      if (!this.#folder || this.#folder.status === "unsupported" || this.#folder.status === "none") return false;
       if (this.#folder.status === "needs-permission") {
         try {
           await this.#folder.reconnect();
         } catch {
-          return null;
+          return false;
         }
       }
-      if (this.#folder.status !== "ready" || t.folderName && this.#folder.name !== t.folderName) return null;
+      return this.#folder.status === "ready" && (!t.folderName || this.#folder.name === t.folderName);
+    }
+    async #folderFile(t) {
+      if (!await this.#folderReadyFor(t)) return null;
       try {
         return await this.#folder.getFile(t.filename);
       } catch {
@@ -11300,85 +11426,116 @@ ${list(win10)}
       await this.#ensureUrl(t);
       const url = this.#urls.get(id);
       if (url) downloadUrl(url, t.filename);
-      else this.#notice({ kind: "info", title: "File not available here", text: `Look for ${t.filename} in your Downloads folder.` });
+      else this.#notice({ kind: "info", title: "File not available here", text: `Look for ${t.filename} in your Downloads folder.`, timeoutMs: 8e3 });
     }
     /** Remove a take from the list, and delete its file when it lives in the folder. */
     async deleteTake(id) {
       const t = this.#findTake(id);
       if (!t) return;
-      let fileNote = "";
-      if (t.savedTo === "folder" && this.#folder?.status === "ready" && (!t.folderName || this.#folder.name === t.folderName)) {
-        try {
-          await this.#folder.remove(t.filename);
-          await this.#folder.remove(sidecarName(t.filename, "chapters.txt")).catch(() => {
-          });
-        } catch {
-          fileNote = " The file itself couldn’t be deleted; remove it from the folder yourself.";
+      let removed = "";
+      if (t.savedTo === "folder") {
+        if (await this.#folderReadyFor(t)) {
+          try {
+            await this.#folder.remove(t.filename);
+            await this.#folder.remove(sidecarName(t.filename, "chapters.txt")).catch(() => {
+            });
+            removed = `${t.filename} was deleted from “${t.folderName || this.#folder.name}”.`;
+          } catch {
+            removed = `${t.filename} was removed from the list, but the file couldn’t be deleted. Remove it from the folder yourself.`;
+          }
+        } else {
+          removed = `${t.filename} was removed from the list. The file is still in your “${t.folderName || "lessons"}” folder.`;
         }
-      } else if (t.savedTo === "download") {
-        fileNote = " If it was downloaded, delete it from your Downloads folder too.";
+      } else {
+        removed = `${t.filename} was removed from the list. Delete it from your Downloads folder too.`;
       }
-      const url = this.#urls.get(id);
-      if (url) {
-        URL.revokeObjectURL(url);
-        this.#urls.delete(id);
-      }
+      this.#dropUrl(id);
       if (this.#kept.delete(id)) await this.#journal?.discard(id).catch(() => {
       });
+      this.#endedBy.delete(id);
       if (this.#review === id) this.#review = null;
       try {
         await this.#library.remove(id);
       } catch {
       }
-      this.#notice({ kind: "info", title: "Take deleted", text: `${t.filename} was removed.${fileNote}`, timeoutMs: 6e3 });
+      this.#notice({ kind: "info", title: "Take deleted", text: removed, timeoutMs: 8e3 });
       this.#changed();
     }
-    /** Rename a take (and its file when it lives in the chosen folder). */
+    /**
+     * Rename a take. A take in the chosen folder gets its file renamed too; a
+     * downloaded take keeps its file name (that file is out of our reach).
+     */
     async renameTake(id, lessonName) {
       const t = this.#findTake(id);
       if (!t) return;
       const name = String(lessonName ?? "").trim();
       if (!name || name === t.lessonName) return;
+      if (t.savedTo !== "folder") {
+        await this.#library.update(id, { lessonName: name });
+        this.#notice({ kind: "success", title: "Renamed in your list", text: `The downloaded file is still called ${t.filename}.`, timeoutMs: 5e3 });
+        return;
+      }
+      if (!await this.#folderReadyFor(t)) {
+        this.#notice({ kind: "warning", title: "Couldn’t rename the file", text: `Reconnect your “${t.folderName || "lessons"}” folder (top of the page), then try again.` });
+        this.#changed();
+        return;
+      }
       const stamp = t.filename.match(/ \([^)]*\)\.\w+$/);
       let filename = stamp ? `${safeName(name)}${stamp[0]}` : makeFilename({ lessonName: name, date: new Date(t.createdAt), ext: t.container });
-      if (t.savedTo === "folder" && this.#folder?.status === "ready" && (!t.folderName || this.#folder.name === t.folderName)) {
-        try {
-          filename = await this.#folder.rename(t.filename, filename);
-          if (t.markers?.length) await this.#folder.rename(sidecarName(t.filename, "chapters.txt"), sidecarName(filename, "chapters.txt")).catch(() => {
-          });
-        } catch (e) {
-          this.#notice({ kind: "error", title: "Couldn’t rename the file", text: e.message || String(e) });
-          return;
-        }
+      try {
+        filename = await this.#folder.rename(t.filename, filename);
+        if (t.markers?.length) await this.#folder.rename(sidecarName(t.filename, "chapters.txt"), sidecarName(filename, "chapters.txt")).catch(() => {
+        });
+      } catch (e) {
+        this.#notice({ kind: "error", title: "Couldn’t rename the file", text: e.message || String(e) });
+        return;
       }
+      this.#dropUrl(id);
       await this.#library.update(id, { lessonName: name, filename });
+      await this.#ensureUrl({ ...t, filename }).catch(() => {
+      });
       this.#notice({ kind: "success", title: "Renamed", text: filename, timeoutMs: 3e3 });
+      this.#changed();
     }
     async renameMarker(takeId, markerId, title) {
       const t = this.#findTake(takeId);
       if (!t) return;
-      const markers = t.markers.map((m) => m.id === markerId ? { ...m, title: String(title ?? "").slice(0, 100) } : m);
+      const clean = String(title ?? "").slice(0, 100);
+      if (markerId === INTRO_ID) {
+        await this.#library.update(takeId, { introTitle: clean });
+        return;
+      }
+      const markers = t.markers.map((m) => m.id === markerId ? { ...m, title: clean } : m);
       await this.#library.update(takeId, { markers });
     }
     async deleteMarker(takeId, markerId) {
       const t = this.#findTake(takeId);
-      if (!t) return;
+      if (!t || markerId === INTRO_ID) return;
       await this.#library.update(takeId, { markers: t.markers.filter((m) => m.id !== markerId) });
+    }
+    #chaptersOf(t) {
+      let c = this.#chapterCache.get(t);
+      if (!c) {
+        c = buildChapters(t.markers || [], t.durationMs || 0, { introTitle: t.introTitle });
+        this.#chapterCache.set(t, c);
+      }
+      return c;
     }
     chaptersFor(takeId) {
       const t = this.#findTake(takeId);
-      if (!t) return { chapters: [], text: "", issues: [], youtubeReady: false };
-      return buildChapters(t.markers, t.durationMs);
+      return t ? this.#chaptersOf(t) : { chapters: [], text: "", issues: [], youtubeReady: false };
     }
     async copyChapters(takeId) {
-      const { text: text2, issues } = this.chaptersFor(takeId);
+      const t = this.#findTake(takeId);
+      if (!t?.markers?.length) return;
+      const { text: text2, issues } = this.#chaptersOf(t);
       const ok = await copyText(text2);
-      this.#notice(ok ? { kind: issues.length ? "warning" : "success", title: "Chapters copied", text: issues.length ? issues.join(" ") : "Paste them into your YouTube description.", timeoutMs: 6e3 } : { kind: "error", title: "Couldn’t copy", text: "Your browser blocked the clipboard." });
+      this.#notice(ok ? { kind: issues.length ? "warning" : "success", title: "Chapters copied", text: issues.length ? issues.join(" ") : "Paste them into your YouTube description.", timeoutMs: 8e3 } : { kind: "error", title: "Couldn’t copy", text: "Your browser blocked the clipboard." });
     }
     async saveChaptersFile(takeId, { quiet = false } = {}) {
       const t = this.#findTake(takeId);
-      if (!t) return;
-      const { text: text2 } = this.chaptersFor(takeId);
+      if (!t?.markers?.length) return;
+      const { text: text2 } = this.#chaptersOf(t);
       const name = sidecarName(t.filename, "chapters.txt");
       if (t.savedTo === "folder" && this.#folder?.status === "ready") {
         try {
@@ -11437,13 +11594,15 @@ ${list(win10)}
     /** Rebuild an unfinished recording from the crash journal and save it. */
     async recover(id) {
       const item = this.#recovery.find((r) => r.id === id);
-      if (!item) return;
+      if (!item || this.#recovering.has(id) || this.busy) return;
+      this.#recovering.add(id);
+      this.#changed();
       try {
         const { blob, durationMs } = item.legacy ? await this.#legacy.assembleInfo() : await this.#journal.assembleInfo(id);
         const ext = /mp4/.test(blob.type) ? "mp4" : "webm";
         const base = item.filename ? item.filename.replace(/\.(mp4|webm)$/i, "") : makeFilename({ lessonName: item.lessonName, date: new Date(item.startedAt || Date.now()), ext }).replace(/\.\w+$/, "");
         const filename = `RECOVERED_${base}.${ext}`;
-        let savedTo = "download", folderName = "";
+        let savedTo = "download", folderName = "", savedName = filename;
         if (this.#folder?.status === "ready") {
           let created = null;
           try {
@@ -11452,7 +11611,7 @@ ${list(win10)}
             await created.writable.close();
             savedTo = "folder";
             folderName = this.#folder.name;
-            item.savedName = created.name;
+            savedName = created.name;
           } catch {
             savedTo = "download";
             if (created) {
@@ -11465,13 +11624,13 @@ ${list(win10)}
         }
         const rowId = item.legacy ? newId2() : id;
         if (savedTo === "download") {
-          this.#urls.set(rowId, URL.createObjectURL(blob));
+          this.#setUrl(rowId, blob);
           downloadUrl(this.#urls.get(rowId), filename);
         }
         await this.#library.add({
           id: rowId,
           lessonName: item.lessonName,
-          filename: item.savedName || filename,
+          filename: savedName,
           container: ext,
           mimeType: blob.type,
           durationMs: durationMs || item.elapsedMs,
@@ -11488,20 +11647,24 @@ ${list(win10)}
           this.#kept.add(rowId);
         } else await this.#journal.discard(id);
         this.#recovery = this.#recovery.filter((r) => r !== item);
-        this.#notice({ kind: "success", title: "Recording recovered", text: savedTo === "folder" ? `${item.savedName || filename} is in “${folderName}”.` : `${filename} is in your Downloads folder.` });
+        this.#notice({ kind: "success", title: "Recording recovered", text: savedTo === "folder" ? `${savedName} is in “${folderName}”.` : `${savedName} is in your Downloads folder.` });
       } catch (e) {
         this.#notice({ kind: "error", title: "Recovery failed", text: e.message || String(e) });
+      } finally {
+        this.#recovering.delete(id);
       }
       this.#changed();
     }
     async discardRecovery(id) {
       const item = this.#recovery.find((r) => r.id === id);
-      if (!item) return;
+      if (!item || this.#recovering.has(id)) return;
+      this.#recovering.add(id);
       try {
         if (item.legacy) await this.#legacy.discard();
         else await this.#journal.discard(id);
       } catch {
       }
+      this.#recovering.delete(id);
       this.#recovery = this.#recovery.filter((r) => r !== item);
       this.#changed();
     }
@@ -11509,14 +11672,17 @@ ${list(win10)}
     async #checkStorage() {
       const est = this.#journal ? await this.#journal.estimate().catch(() => null) : null;
       this.#storage = est;
-      if (est && est.quota && est.quota - est.usage < LOW_STORAGE_BYTES) {
+      const free = est && est.quota ? est.quota - est.usage : Infinity;
+      const dismissedAt = this.#dismissed.get("storage-low");
+      const tighter = dismissedAt == null || free < Math.min(dismissedAt / 2, 1024 ** 3);
+      if (free < LOW_STORAGE_BYTES && tighter) {
         this.#alert(
           "storage-low",
           "warning",
           "Storage is nearly full",
-          `About ${formatBytes(est.quota - est.usage)} left for the safety copy of your recording. Free up disk space before a long lesson.`
+          `About ${formatBytes(free)} left for the safety copy of your recording. Free up disk space before a long lesson.`
         );
-      } else {
+      } else if (free >= LOW_STORAGE_BYTES) {
         this.#clearAlert("storage-low");
       }
       this.#changed();
@@ -11543,6 +11709,7 @@ ${list(win10)}
       if (this.#alerts.delete(id)) this.#changed();
     }
     dismissAlert(id) {
+      if (id === "storage-low" && this.#storage?.quota) this.#dismissed.set(id, this.#storage.quota - this.#storage.usage);
       this.#clearAlert(id);
     }
     // --------------------------------------------------------------- snapshot
@@ -11561,9 +11728,10 @@ ${list(win10)}
       return this.#screen ? "ready" : "setup";
     }
     #takeView(t) {
-      const chapters = buildChapters(t.markers || [], t.durationMs || 0);
+      const chapters = this.#chaptersOf(t);
       const playable = this.#urls.has(t.id) || t.savedTo === "folder" || this.#kept.has(t.id);
-      return { ...t, url: this.#urls.get(t.id) || null, playable, chapters };
+      const chapterCount = t.markers?.length ? chapters.chapters.length : 0;
+      return { ...t, url: this.#urls.get(t.id) || null, playable, chapters, chapterCount };
     }
     #checkStale(gain) {
       const cal = this.#settings.calibrations?.[this.#calibrationKey()];
@@ -11581,10 +11749,12 @@ ${list(win10)}
       const s = this.#settings;
       const e = this.#engine;
       const review = this.#review ? this.#findTake(this.#review) : null;
+      const take = this.#take && { ...this.#take, markers: [...this.#take.markers], talkingWhilePaused: this.#talkingWhilePaused };
+      if (take) delete take.screen;
       return Object.freeze({
         phase: this.#phaseName(),
+        preparing: this.#preparing,
         countdown: this.#countdown,
-        audioStarted: this.#audioStarted,
         screen: this.#screen && {
           label: this.#screen.label,
           surface: this.#screen.surface,
@@ -11594,24 +11764,23 @@ ${list(win10)}
           stream: this.#screen.stream
         },
         mic: { enabled: s.micEnabled, status: s.micEnabled ? this.#mic.status : "off", deviceId: s.micDeviceId, label: this.#mic.label, devices: this.#mic.devices },
+        micError: this.#micError,
+        micWarning: this.#micWarning,
+        startBlocker: this.startBlocker,
         audio: {
           mode: s.audioMode,
           speakers: s.speakers,
           gain: e ? e.gain : s.micGain,
           gate: s.gate,
           autoLevel: s.autoLevel,
-          monitor: this.#monitor,
           systemAudio: s.systemAudio,
           systemAudioLevel: s.systemAudioLevel,
           calibrated: !!s.calibrations?.[this.#calibrationKey()],
           calibration: s.calibrations?.[this.#calibrationKey()] || null,
           checkStale: this.#checkStale(e ? e.gain : s.micGain),
-          silent: this.#silent,
           clipping: this.#clipping
         },
         soundCheck: { ...this.#sc },
-        micError: this.#micError,
-        testClip: { state: this.#testClip.state, remainingMs: this.#testClip.remainingMs, url: this.#testClip.url, size: this.#testClip.size },
         camera: {
           enabled: s.camera,
           status: s.camera ? this.#camera.status : "off",
@@ -11621,21 +11790,18 @@ ${list(win10)}
           bubble: { ...s.bubble },
           supported: isCompositingSupported(),
           previewStream: this.#camera.stream,
-          error: this.#camera.error || "",
-          inTake: !!this.#compositor
+          error: this.#camera.error || ""
         },
-        lesson: { name: s.lessonName, format: s.format, quality: s.quality, countdown: s.countdown, notes: s.notes },
+        lesson: { name: s.lessonName, format: s.format, quality: s.quality, countdown: s.countdown, notes: s.notes, nextTake: this.#nextTakeNumber(s.lessonName) },
         prefs: { beeps: s.beeps, floatingControls: s.floatingControls, hidePreview: s.hidePreview, shortcuts: s.shortcuts, noVoice: s.noVoice, theme: s.theme },
-        theme: s.theme,
         estimate: this.#estimate(),
         formats: { mp4: this.#formats.mp4, webm: this.#formats.webm },
-        take: this.#take && { ...this.#take, markers: [...this.#take.markers], talkingWhilePaused: this.#talkingWhilePaused },
-        review: review && { ...this.#takeView(review), endedBy: this.#endedBy.get(review.id) || null },
+        take,
+        review: review && { ...this.#takeView(review), endedBy: this.#endedBy.get(review.id) || null, justSaved: review.id === this.#lastSaved },
         library: this.#takes.map((t) => this.#takeView(t)),
         folder: { supported: FolderStore.isSupported(), status: this.#folder ? this.#folder.status : "unsupported", name: this.#folder?.name || "" },
-        recovery: this.#recovery.map((r) => ({ ...r })),
-        alerts: [...this.#alerts.values()],
-        storage: this.#storage
+        recovery: this.#recovery.map((r) => ({ ...r, busy: this.#recovering.has(r.id) })),
+        alerts: [...this.#alerts.values()]
       });
     }
     /** AnalyserNode for the optional spectrum view (Settings › Advanced › detailed meters). */
@@ -11649,17 +11815,6 @@ ${list(win10)}
     /** The AudioContext, for UI sounds such as countdown beeps. */
     get audioContext() {
       return this.#engine?.context || null;
-    }
-    /** Release everything (page unload). */
-    async dispose() {
-      this.cancelCountdown();
-      this.#offDeviceChange?.();
-      this.#stopStorageWatch();
-      this.discardTestClip();
-      this.#stopCamera();
-      this.#releaseScreen();
-      for (const url of this.#urls.values()) URL.revokeObjectURL(url);
-      await this.#engine?.stop();
     }
   };
 
@@ -11810,7 +11965,8 @@ ${list(win10)}
     }
   };
   var MeterLoop = class {
-    constructor() {
+    constructor(win = globalThis) {
+      this.win = win;
       this.meters = /* @__PURE__ */ new Set();
       this.extra = /* @__PURE__ */ new Set();
       this.raf = 0;
@@ -11837,14 +11993,21 @@ ${list(win10)}
             console.error(e);
           }
         }
-        this.raf = requestAnimationFrame(loop);
+        this.raf = this.win.requestAnimationFrame(loop);
       };
-      this.raf = requestAnimationFrame(loop);
+      this.raf = this.win.requestAnimationFrame(loop);
+    }
+    stop() {
+      if (this.raf) this.win.cancelAnimationFrame(this.raf);
+      this.raf = 0;
+      this.meters.clear();
+      this.extra.clear();
     }
   };
 
   // src/app/ui/notices.js
-  var TOAST_MS = 5e3;
+  var TOAST_MS = 6e3;
+  var bannerSeq = 0;
   var Notices = class {
     constructor(session, { confirm }) {
       this.session = session;
@@ -11856,14 +12019,18 @@ ${list(win10)}
       this.bannerEls = /* @__PURE__ */ new Map();
       this.toastIds = /* @__PURE__ */ new Map();
       session.on("notice", (n) => this.toast(n));
+      window.addEventListener("scroll", () => this.#placeToasts(), { passive: true });
+      window.addEventListener("resize", () => this.#placeToasts());
     }
     /** Announce routine state changes to screen readers. */
     announce(message2) {
+      if (!message2) return;
       text(this.status, "");
       requestAnimationFrame(() => text(this.status, message2));
     }
     /** Announce something urgent. */
     shout(message2) {
+      if (!message2) return;
       text(this.alertRegion, "");
       requestAnimationFrame(() => text(this.alertRegion, message2));
     }
@@ -11871,13 +12038,16 @@ ${list(win10)}
       if (id && this.toastIds.has(id)) this.toastIds.get(id).remove();
       const el = fill(clone2("tplToast"), { title, text: body });
       el.dataset.kind = kind;
-      el.setAttribute("role", kind === "error" ? "alert" : "status");
+      el.removeAttribute("role");
       this.#actions(el, actions, () => this.#dismissToast(el, id));
       onAction(el, (a) => {
         if (a === "dismiss") this.#dismissToast(el, id);
       });
       this.toasts.prepend(el);
       if (id) this.toastIds.set(id, el);
+      const spoken = `${title}. ${body}`.trim();
+      if (kind === "error" || actions.length) this.shout(actions.length ? `${spoken} ${actions.map((a) => a.label).join(", ")} button in the message at the top right.` : spoken);
+      else this.announce(spoken);
       const ms = timeoutMs ?? (kind === "error" || actions.length ? 0 : TOAST_MS);
       if (ms > 0) {
         let left = ms, started = performance.now(), timer = setTimeout(() => this.#dismissToast(el, id), left);
@@ -11887,7 +12057,7 @@ ${list(win10)}
         };
         const resume = () => {
           started = performance.now();
-          timer = setTimeout(() => this.#dismissToast(el, id), Math.max(1200, left));
+          timer = setTimeout(() => this.#dismissToast(el, id), Math.max(1500, left));
         };
         el.addEventListener("mouseenter", pause);
         el.addEventListener("mouseleave", resume);
@@ -11895,12 +12065,13 @@ ${list(win10)}
         el.addEventListener("focusout", resume);
       }
       while (this.toasts.children.length > 4) this.toasts.lastElementChild.remove();
+      this.#placeToasts();
     }
     #dismissToast(el, id) {
       el.remove();
       if (id && this.toastIds.get(id) === el) this.toastIds.delete(id);
     }
-    /** Buttons for session actions, e.g. {label:'Record without sound', action:'record', args:[…]}. */
+    /** Buttons for session actions, e.g. {label:'Record without my voice', action:'record', args:[…]}. */
     #actions(el, actions, done) {
       const box = el.querySelector("[data-actions]");
       if (!box) return;
@@ -11920,31 +12091,40 @@ ${list(win10)}
         box.append(b);
       }
     }
+    /** Toasts sit below the alerts and the paused banner, so they never cover their buttons. */
+    #placeToasts() {
+      let bottom = 0;
+      for (const el of [this.banners, $("recBanner")]) {
+        if (!el || el.hidden || !el.children.length) continue;
+        bottom = Math.max(bottom, el.getBoundingClientRect().bottom);
+      }
+      document.documentElement.style.setProperty("--banners-bottom", `${Math.round(Math.max(0, bottom))}px`);
+    }
     /** Render the sticky banners from the snapshot: alerts + recovery cards. */
     render(state) {
       const want = /* @__PURE__ */ new Map();
       for (const a of state.alerts) {
+        const sticky = a.id === "mic-lost" || a.id === "no-audio";
         want.set(`alert:${a.id}`, {
           kind: a.kind,
           title: a.title,
           text: a.text,
-          role: "alert",
-          actions: a.id === "mic-lost" || a.id === "no-audio" ? [] : [{ label: "Dismiss", run: () => this.session.dismissAlert(a.id) }],
-          dismissible: a.id !== "mic-lost" && a.id !== "no-audio",
+          urgent: true,
+          actions: sticky ? [] : [{ label: "Dismiss", run: () => this.session.dismissAlert(a.id) }],
+          dismissible: !sticky,
           onDismiss: () => this.session.dismissAlert(a.id)
         });
       }
-      const recording = ["recording", "paused", "stopping"].includes(state.phase);
+      const recording = ["starting", "recording", "paused", "stopping"].includes(state.phase);
       for (const r of state.recovery) {
         const when = r.startedAt ? new Date(r.startedAt).toLocaleString(void 0, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "earlier";
         const length = r.elapsedMs > 6e4 ? `about ${formatDuration(r.elapsedMs).replace(/ \d+ s$/, "")}` : r.elapsedMs > 0 ? "under a minute" : r.bytes ? formatBytes(r.bytes) : "an unknown length";
         want.set(`recovery:${r.id}`, {
           kind: "warning",
-          role: "region",
           recovery: true,
           title: "We found a recording that didn’t finish",
-          text: `“${r.lessonName || "Untitled lesson"}”, ${when}, ${length}. Save it before it’s lost.`,
-          actions: recording ? [] : [
+          text: r.busy ? `Saving “${r.lessonName || "Untitled lesson"}”…` : `“${r.lessonName || "Untitled lesson"}”, ${when}, ${length}. Save it before it’s lost.`,
+          actions: recording || r.busy ? [] : [
             { label: "Save it", primary: true, run: () => this.session.recover(r.id) },
             { label: "Delete it…", confirm: { title: "Delete the unfinished recording?", text: "It will be gone for good. This can’t be undone.", ok: "Delete recording", danger: true }, run: () => this.session.discardRecovery(r.id) }
           ],
@@ -11957,6 +12137,7 @@ ${list(win10)}
           this.bannerEls.delete(key);
         }
       }
+      show(this.banners, want.size > 0);
       for (const [key, b] of want) {
         let el = this.bannerEls.get(key);
         const isNew = !el;
@@ -11967,9 +12148,14 @@ ${list(win10)}
           });
           this.banners.append(el);
           this.bannerEls.set(key, el);
+          const title = el.querySelector('[data-field="title"]');
+          if (title) {
+            title.id = `bannerTitle${++bannerSeq}`;
+            el.setAttribute("aria-labelledby", title.id);
+          }
         }
         el.dataset.kind = b.kind;
-        el.setAttribute("role", b.role);
+        el.setAttribute("role", "region");
         fill(el, { title: b.title, text: b.text });
         const sig = JSON.stringify(b.actions.map((a) => a.label));
         if (el.dataset.sig !== sig) {
@@ -11977,10 +12163,13 @@ ${list(win10)}
           this.#actions(el, b.actions);
         }
         for (const d of el.querySelectorAll('[data-action="dismiss"]')) show(d, !!b.dismissible);
-        if (isNew && b.role === "alert") this.shout(`${b.title}. ${b.text}`);
-        if (isNew && b.recovery) focusEl(el.querySelector('[data-field="title"]'));
+        if (isNew && b.urgent) this.shout(`${b.title}. ${b.text}`);
+        if (isNew && b.recovery) {
+          this.announce(`${b.title}. ${b.text}`);
+          requestAnimationFrame(() => focusEl(el.querySelector('[data-field="title"]')));
+        }
       }
-      show(this.banners, this.bannerEls.size > 0);
+      requestAnimationFrame(() => this.#placeToasts());
     }
   };
 
@@ -12083,11 +12272,12 @@ ${list(win10)}
     container.append(el);
   }
   var SetupView = class {
-    constructor(session, { meters, notices, popout, settingsDialog }) {
+    constructor(session, { meters, notices, popout, settingsDialog, startOrStop }) {
       this.session = session;
       this.notices = notices;
       this.popout = popout;
       this.settingsDialog = settingsDialog;
+      this.startOrStop = startOrStop;
       this.expanded = /* @__PURE__ */ new Set();
       this.freshResult = false;
       this.lessonDone = false;
@@ -12095,6 +12285,8 @@ ${list(win10)}
       this.prevScPhase = null;
       this.prevResult = null;
       this.prevScreen = null;
+      this.prevMicStatus = null;
+      this.focusVerdict = false;
       this.micMeter = new Meter($("micMeter"), $("micMeterLabel"));
       meters.add(this.micMeter);
       session.on("meter", (m) => this.micMeter.set(m.voice?.rmsDb ?? -100, m.voice?.peakDb ?? -100));
@@ -12103,14 +12295,18 @@ ${list(win10)}
     #wire() {
       const s = this.session;
       $("lessonName").addEventListener("input", (e) => s.setLessonName(e.target.value));
-      $("lessonName").addEventListener("change", (e) => {
+      const commitName = (e) => {
         if (!e.target.value.trim()) return;
         this.lessonDone = true;
         this.expanded.delete("stepLesson");
         requestAnimationFrame(() => this.render(s.state));
-      });
+      };
+      $("lessonName").addEventListener("change", commitName);
       $("lessonName").addEventListener("keydown", (e) => {
-        if (e.key === "Enter") e.target.blur();
+        if (e.key === "Enter") {
+          e.preventDefault();
+          commitName(e);
+        }
       });
       $("lessonSuggest").addEventListener("click", () => {
         const next = suggestNextName(s.state.lesson.name);
@@ -12122,18 +12318,22 @@ ${list(win10)}
         }
       });
       $("notes").addEventListener("input", (e) => s.setNotes(e.target.value));
-      $("btnMicOn").addEventListener("click", () => s.enableMic());
+      $("btnMicOn").addEventListener("click", () => {
+        if ($("btnMicOn").getAttribute("aria-disabled") !== "true") s.enableMic();
+      });
       $("micSelect").addEventListener("change", (e) => s.setMicDevice(e.target.value));
       $("micSuggest").addEventListener("click", (e) => {
         const id = e.currentTarget.dataset.deviceId;
         if (id) s.setMicDevice(id);
       });
       $("noiseToggle").addEventListener("change", (e) => s.setAudioMode(e.target.checked ? "clean" : "studio"));
-      $("btnSoundCheck").addEventListener("click", () => {
+      const check = () => {
         this.expanded.add("stepMic");
+        this.focusVerdict = true;
         s.startSoundCheck();
-      });
-      $("btnScAgain").addEventListener("click", () => s.startSoundCheck());
+      };
+      $("btnSoundCheck").addEventListener("click", check);
+      $("btnScAgain").addEventListener("click", check);
       $("btnScPlay").addEventListener("click", () => {
         const a = $("scAudio");
         if (!a.src) return;
@@ -12150,6 +12350,7 @@ ${list(win10)}
       $("btnScCopyPrompt").addEventListener("click", () => s.copyDesktopPrompt());
       this.#wireSummary("micSummary", "stepMic");
       $("btnChooseScreen").addEventListener("click", () => {
+        if ($("btnChooseScreen").getAttribute("aria-disabled") === "true") return;
         this.expanded.delete("stepScreen");
         s.chooseScreen();
       });
@@ -12161,19 +12362,21 @@ ${list(win10)}
       for (const r of document.querySelectorAll('input[name="bubbleSize"]')) r.addEventListener("change", (e) => e.target.checked && s.setBubble({ size: e.target.value }));
       $("bubbleMirror").addEventListener("change", (e) => s.setBubble({ mirror: e.target.checked }));
       for (const [id, pos] of Object.entries(CORNERS)) $(id).addEventListener("click", () => s.setBubble(pos));
-      $("btnStart").addEventListener("click", () => this.#onStart());
+      $("btnStart").addEventListener("click", () => this.startOrStop("button"));
       document.addEventListener("click", (e) => {
         const btn = e.target.closest('[data-action="expand-step"], [data-action="change"], [data-action="cancel-sound-check"]');
         if (!btn || btn.closest("template")) return;
         if (btn.dataset.action === "cancel-sound-check") {
           s.cancelSoundCheck();
+          requestAnimationFrame(() => focusEl($("btnSoundCheck")));
           return;
         }
         const step = btn.closest("section.step, .step");
         if (!step?.id) return;
         this.expanded.add(step.id);
         this.render(s.state);
-        focusEl(step.querySelector("h2"));
+        const target = { stepLesson: "lessonName", stepMic: "micSelect" }[step.id];
+        focusEl((target && $(target)?.getClientRects().length ? $(target) : null) || step.querySelector("h2"));
       });
     }
     /** A collapsed step's summary line without its own "Change" button re-opens the step when clicked. */
@@ -12186,30 +12389,32 @@ ${list(win10)}
         focusEl($(stepId).querySelector("h2"));
       });
     }
-    #onStart() {
-      const st = this.session.state;
-      const btn = $("btnStart");
-      if (btn.getAttribute("aria-disabled") === "true") {
-        text($("startHint"), "Turn on your microphone first, or choose “Record without my voice” in Settings.");
-        show($("startHint"), true);
-        this.expanded.add("stepMic");
-        this.render(st);
-        focusEl($("stepMic").querySelector("h2"));
-        ($("btnMicOn").offsetParent ? $("btnMicOn") : $("stepMic"))?.scrollIntoView({ block: "center", behavior: "smooth" });
-        return;
-      }
-      show($("startHint"), false);
-      if (st.phase !== "countdown" && st.prefs.floatingControls && st.screen && !this.popout.isOpen) this.popout.open();
-      this.session.toggleRecord();
+    /** Start was pressed (or Alt+R) while the microphone isn't ready: say why and go there. */
+    explainBlocked(reason) {
+      text($("startHint"), reason);
+      show($("startHint"), true);
+      this.expanded.add("stepMic");
+      this.render(this.session.state);
+      this.notices.shout(reason);
+      const fix = [$("btnMicOn"), $("micMessage")?.querySelector("button")].find((b) => b && b.getClientRects().length);
+      if (fix) {
+        fix.setAttribute("aria-describedby", "startHint");
+        focusEl(fix);
+        fix.scrollIntoView({ block: "center", behavior: "smooth" });
+      } else focusEl($("stepMic").querySelector("h2"));
     }
     render(st) {
-      const inSetup = ["setup", "ready", "countdown"].includes(st.phase);
-      if (st.screen && !this.prevScreen) this.freshResult = false;
+      const inSetup = ["setup", "ready", "countdown", "starting"].includes(st.phase);
+      if (st.screen && !this.prevScreen) {
+        this.freshResult = false;
+        this.expanded.delete("stepMic");
+      }
       this.prevScreen = st.screen;
       this.#renderLesson(st);
       this.#renderMic(st);
       this.#renderScreen(st);
       this.#renderCamera(st);
+      this.#renderTips(st);
       this.#renderStart(st);
       this.#announce(st, inSetup);
       this.prevPhase = st.phase;
@@ -12230,17 +12435,20 @@ ${list(win10)}
       const recorded = next && st.library.some((t) => (t.lessonName || "").trim() === name.trim());
       showWithWrapper($("lessonSuggest"), !!recorded);
       if (recorded) label($("lessonSuggest"), `${next}?`);
-      text($("fileNamePreview"), `Will save as: ${displayFilename(makeFilename({ lessonName: name, ext: st.estimate?.container || "mp4" }))}`);
+      const preview = makeFilename({ lessonName: name, ext: st.estimate?.container || "mp4", take: st.lesson.nextTake });
+      text($("fileNamePreview"), `Will save as: ${displayFilename(preview)}`);
     }
     #renderMic(st) {
       const { mic, audio, soundCheck: sc } = st;
       const live = mic.status === "live";
       const err = st.micError;
       const noVoice = st.prefs.noVoice;
-      show($("micIntro"), !noVoice && (mic.status === "needs-permission" || mic.status === "starting"));
+      const locked = st.phase === "countdown" || st.phase === "starting" || st.preparing;
+      attr($("stepMic"), "data-mic", noVoice ? "off" : mic.status);
+      show($("micIntro"), !noVoice && ["needs-permission", "starting", "off"].includes(mic.status));
       attr($("btnMicOn"), "aria-disabled", mic.status === "starting" ? "true" : null);
       label($("btnMicOn"), mic.status === "starting" ? "Starting…" : "Turn on microphone");
-      show($("micControls"), live || mic.status === "lost" || mic.status === "notfound" || mic.status === "busy");
+      show($("micControls"), live || ["lost", "notfound", "busy"].includes(mic.status));
       setOptions($("micSelect"), mic.devices.length ? mic.devices : [{ deviceId: "default", label: mic.label || "" }], mic.deviceId, friendlyMicLabel);
       const headset = mic.devices.find((d) => HEADSET.test(d.label) && d.deviceId !== "default" && d.deviceId !== "communications");
       const usingHeadset = HEADSET.test(mic.label || "");
@@ -12255,9 +12463,10 @@ ${list(win10)}
       if (noVoice) msg = { kind: "info", title: "Recording without your voice", text: "Your microphone is off on purpose.", actions: [{ label: "Turn on microphone", run: () => this.session.setNoVoice(false) }] };
       else if (err && !live) msg = { kind: err.status === "notfound" ? "warning" : "error", title: err.title, text: err.text, actions: [{ label: "Try again", run: () => this.session.enableMic() }] };
       else if (mic.status === "lost") msg = { kind: "error", title: "Microphone disconnected", text: "Plug it back in. Sound returns as soon as it reconnects." };
+      else if (live && st.micWarning) msg = { kind: "warning", title: st.micWarning.title, text: `${st.micWarning.text} Pick your microphone in the list if it’s plugged in.` };
       else if (live && audio.clipping) msg = { kind: "warning", title: "Your mic is overloading", text: "Lower the input volume in Windows, or move the mic a little further away." };
       message($("micMessage"), msg, (a) => a.run());
-      show($("btnSoundCheck"), live && !sc.running);
+      show($("btnSoundCheck"), live && !sc.running && !locked);
       label($("btnSoundCheck"), sc.result || audio.calibrated ? "Check again" : "Check my sound");
       show($("scRun"), sc.running);
       if (sc.running) {
@@ -12277,6 +12486,7 @@ ${list(win10)}
         this.expanded.add("stepMic");
       }
       show($("scResult"), !!r && !sc.running);
+      show($("btnScAgain"), !locked);
       if (r && !sc.running) {
         text($("scHeadline"), r.headline);
         attr($("scHeadline"), "data-status", r.status);
@@ -12284,7 +12494,7 @@ ${list(win10)}
         const worst = [r.voice, r.background].filter(Boolean).sort((a, b) => rank(b.level) - rank(a.level))[0];
         const lead = r.status === "ideal" ? r.voice : worst;
         text($("scText"), lead?.advice || "");
-        this.#renderTips(r, lead);
+        this.#renderVerdictTips(r, lead);
         text($("scApplied"), r.applied || "");
         show($("scApplied"), !!r.applied);
         const audioEl = $("scAudio");
@@ -12300,43 +12510,49 @@ ${list(win10)}
       }
       this.prevResult = r;
       const cal = audio.calibration;
-      let status = "todo", chip = "To do", summary = "";
+      const failed = r && ["novoice", "clipping", "notready"].includes(r.status);
+      let status = "todo", chip = "To do", summary = "", unchecked = false;
       if (noVoice) {
         status = "done";
         chip = "Voice off";
         summary = "Off – recording without your voice";
       } else if (["blocked", "notfound", "busy", "error", "lost"].includes(mic.status)) {
         status = "attention";
-        chip = "Needs attention";
+        chip = mic.status === "blocked" ? "Blocked" : "Needs attention";
       } else if (live) {
-        const label2 = shortLabel(mic.label);
-        if (audio.checkStale) {
+        const name = shortLabel(mic.label);
+        if (st.micWarning) {
+          status = "attention";
+          chip = "Check the mic";
+        } else if (failed) {
+          status = "attention";
+          chip = "Needs attention";
+        } else if (audio.checkStale) {
           status = "attention";
           chip = "Settings changed – check again";
         } else if (cal && (cal.status === "ideal" || cal.status === "usable")) {
           status = "done";
           chip = cal.status === "ideal" ? "Sounds great ✓" : "Usable ✓";
           const at = cal.at ? new Date(cal.at).toLocaleTimeString(void 0, { hour: "2-digit", minute: "2-digit" }) : "";
-          summary = `${label2} · ${cal.status === "ideal" ? "Sounds great" : "Usable"}${at ? ` · checked ${at}` : ""}`;
-        } else if (cal) {
-          status = "attention";
-          chip = "Needs attention";
+          summary = `${name} · ${at ? `Sound checked ${at} · ` : ""}${cal.status === "ideal" ? "Sounds great" : "Usable"}`;
         } else {
-          status = "todo";
-          chip = "On · check your sound";
-          summary = label2;
+          status = "done";
+          chip = "On – sound not checked";
+          summary = `${name} · sound not checked`;
+          unchecked = true;
         }
       } else if (mic.status === "starting") chip = "Starting…";
-      const collapsed = status === "done" && !this.expanded.has("stepMic") && !sc.running && !this.freshResult;
+      const collapsed = status === "done" && !this.expanded.has("stepMic") && !sc.running && !this.freshResult && !!summary && (!unchecked || !!st.screen);
       this.#step("stepMic", status, collapsed);
       text($("micChip"), chip);
       show($("micSummary"), collapsed);
       const summaryText = $("micSummary").querySelector('[data-field="summary"]') || null;
       if (summaryText) text(summaryText, summary);
       else if (!$("micSummary").querySelector("button")) text($("micSummary"), summary);
+      this.micStepStatus = status;
     }
     /** The other findings, below the one sentence the card leads with. */
-    #renderTips(r, lead) {
+    #renderVerdictTips(r, lead) {
       const box = $("scTips");
       const sig = JSON.stringify([r.background, r.voice, lead?.advice]);
       if (box.dataset.sig === sig) return;
@@ -12372,11 +12588,11 @@ ${list(win10)}
       const sc = st.screen;
       show($("screenIntro"), !sc);
       label($("btnChooseScreen"), sc ? "Change" : "Choose screen");
+      attr($("btnChooseScreen"), "aria-label", sc ? "Choose a different screen" : null);
       show($("screenSummary"), !!sc);
       let status = "todo", chip = "To do", msg = null;
       if (sc) {
-        const kind = sc.surface === "monitor" ? "Whole screen" : sc.surface === "browser" ? "A browser tab" : "One window";
-        text($("screenLabel"), kind);
+        text($("screenLabel"), surfaceName(sc.surface));
         text($("screenDetail"), `${sc.width}×${sc.height}${sc.surface !== "monitor" && sc.label ? ` · ${sc.label}` : ""}`);
         if (sc.surface === "monitor") {
           status = "done";
@@ -12384,7 +12600,12 @@ ${list(win10)}
         } else {
           status = "attention";
           chip = "Check this";
-          msg = { kind: "warning", title: "Only one window will be recorded", text: "To record everything on a monitor, click Change and use the “Entire screen” tab.", actions: [{ label: "Change", run: () => this.session.chooseScreen() }] };
+          msg = {
+            kind: "warning",
+            title: sc.surface === "browser" ? "Only one browser tab will be recorded" : "Only one window will be recorded",
+            text: "To record everything on a monitor (and include computer sound), choose the “Entire screen” tab.",
+            actions: [{ label: "Choose a different screen", run: () => this.session.chooseScreen() }]
+          };
         }
       }
       message($("screenMessage"), msg, (a) => a.run());
@@ -12392,85 +12613,120 @@ ${list(win10)}
       show(sysChip, !!sc);
       if (sc) {
         const included = sc.hasAudio && st.audio.systemAudio;
-        text(sysChip, !st.audio.systemAudio ? "Computer sound: off" : sc.hasAudio ? "Computer sound: included ✓" : "Computer sound: not included – choose again to include it");
+        text(sysChip, !st.audio.systemAudio ? "Computer sound: off" : sc.hasAudio ? "Computer sound: included ✓" : sc.surface === "window" ? "Computer sound: not included – windows can’t share sound" : "Computer sound: not included – choose again and tick “Share system audio”");
         attr(sysChip, "data-status", included ? "done" : "todo");
       }
       show($("screenTip"), !!sc && !!globalThis.screen?.isExtended && sc.surface === "monitor");
       const collapsed = status === "done" && !this.expanded.has("stepScreen");
       this.#step("stepScreen", status, collapsed);
       text($("screenChip"), chip);
-      attr($("btnChooseScreen"), "aria-disabled", st.phase === "countdown" ? "true" : null);
+      attr($("btnChooseScreen"), "aria-disabled", ["countdown", "starting"].includes(st.phase) || st.preparing ? "true" : null);
     }
     #renderCamera(st) {
       const cam = st.camera;
       value($("cameraToggle"), cam.enabled);
       show($("cameraControls"), cam.enabled);
+      attr($("stepCamera"), "data-cam", cam.enabled ? cam.status : "off");
       setOptions($("cameraSelect"), cam.devices.length ? cam.devices : [{ deviceId: cam.deviceId || "", label: cam.label || "Camera" }], cam.deviceId, (d) => d.label || "Camera");
       for (const r of document.querySelectorAll('input[name="bubbleShape"]')) value(r, r.value === cam.bubble.shape);
       for (const r of document.querySelectorAll('input[name="bubbleSize"]')) value(r, r.value === cam.bubble.size);
       value($("bubbleMirror"), cam.bubble.mirror);
+      const corner = `btnCorner${cam.bubble.y < 0.5 ? "T" : "B"}${cam.bubble.x < 0.5 ? "L" : "R"}`;
+      for (const id of Object.keys(CORNERS)) attr($(id), "aria-pressed", id === corner ? "true" : "false");
       let status = "todo", chip = "Optional", msg = null;
       if (!cam.supported) msg = { kind: "info", title: "Camera bubble isn’t available here", text: "Update Chrome or Edge to add your camera to lessons." };
       if (cam.enabled) {
+        const retry = [{ label: "Try again", run: () => this.session.setCamera(true) }];
         if (cam.status === "live") {
           status = "done";
           chip = "On ✓";
         } else if (cam.status === "starting") chip = "Starting…";
         else if (cam.status === "blocked") {
           status = "attention";
-          chip = "Needs attention";
-          msg = { kind: "error", title: "Camera blocked", text: cam.error || "Click the icon at the left of the address bar and allow the camera.", actions: [{ label: "Try again", run: () => this.session.setCamera(true) }] };
+          chip = "Blocked";
+          msg = { kind: "error", title: "Camera blocked", text: cam.error || "Click the icon at the left of the address bar, switch Camera on, then press Try again.", actions: retry };
         } else if (cam.status === "error") {
           status = "attention";
           chip = "Needs attention";
-          msg = msg || { kind: "error", title: "Camera didn’t start", text: cam.error || "Another app may be using it. Close Teams, Zoom or the Camera app.", actions: [{ label: "Try again", run: () => this.session.setCamera(true) }] };
+          msg = { kind: "error", title: "Camera didn’t start", text: cam.error || "Another app may be using it. Close Teams, Zoom or the Camera app, then press Try again.", actions: cam.supported ? retry : [] };
         }
       }
       message($("cameraMessage"), msg, (a) => a.run());
       this.#step("stepCamera", status, false);
       text($("cameraChip"), chip);
     }
+    /** The "what happens when you press Start" card matches the settings. */
+    #renderTips(st) {
+      show($("tipCountdown"), st.lesson.countdown);
+      show($("tipFloating"), st.prefs.floatingControls);
+    }
     #renderStart(st) {
-      const { mic, screen, lesson, prefs } = st;
-      const micReady = mic.status === "live" || prefs.noVoice;
+      const { mic, screen, lesson, prefs, folder } = st;
+      const micReady = !st.startBlocker;
       const parts = [];
-      parts.push(prefs.noVoice ? "✓ Voice off" : micReady ? `✓ Microphone: ${shortLabel(mic.label)}` : "✗ Microphone: not on yet");
-      parts.push(screen ? `✓ ${screen.surface === "monitor" ? "Whole screen" : "One window"}` : "• Screen: you’ll pick it next");
+      if (prefs.noVoice) parts.push("✓ Voice off");
+      else if (mic.status === "blocked") parts.push("✗ Microphone blocked");
+      else if (!micReady) parts.push("✗ Microphone not on yet");
+      else parts.push(`✓ Microphone: ${shortLabel(mic.label)}${this.micStepStatus === "attention" ? " (check it)" : ""}`);
+      if (screen) parts.push(`${screen.surface === "monitor" ? "✓" : "!"} ${surfaceName(screen.surface)}`);
+      else parts.push("Screen: you’ll pick it next");
       if (st.camera.enabled && st.camera.status === "live") parts.push("✓ Camera");
       parts.push(`Lesson: ${lesson.name.trim() || "Untitled"}`);
-      const allSet = micReady && screen;
-      text($("readiness"), allSet ? `All set · ${parts.slice(0, -1).join(" · ")} · ${parts[parts.length - 1]}` : parts.join(" · "));
+      parts.push(folder.status === "ready" ? `Saves to “${folder.name}”` : folder.status === "needs-permission" ? `Saves to “${folder.name}” (asks permission)` : "Saves to Downloads");
+      const allSet = micReady && screen && screen.surface === "monitor" && this.micStepStatus === "done";
+      text($("readiness"), (allSet ? "All set · " : "") + parts.join(" · "));
       attr($("readiness"), "data-ready", allSet ? "true" : "false");
       const btn = $("btnStart");
       const counting = st.phase === "countdown";
-      label(btn, counting ? `Cancel (${st.countdown})` : "Start recording");
-      attr(btn, "aria-disabled", !counting && !micReady ? "true" : null);
-      attr(btn, "data-state", counting ? "countdown" : "idle");
-      attr(btn, "aria-keyshortcuts", "Alt+R");
+      const starting = st.phase === "starting" || st.preparing;
+      label(btn, counting ? `Cancel (${st.countdown})` : starting ? "Starting…" : "Start recording");
+      attr(btn, "aria-disabled", !counting && !micReady || starting ? "true" : null);
+      attr(btn, "data-state", counting ? "countdown" : starting ? "starting" : "idle");
       if (micReady) show($("startHint"), false);
     }
     #announce(st, inSetup) {
       const sc = st.soundCheck;
       if (sc.running && !this.prevScPhase) requestAnimationFrame(() => $("scRun").scrollIntoView({ block: "nearest", behavior: "smooth" }));
       if (sc.running && sc.phase !== this.prevScPhase) {
-        const say = { background: "Stay quiet for 3 seconds.", voice: "Now read the sentence aloud." }[sc.phase];
+        const say = { background: "Stay quiet for 3 seconds.", voice: `Now read this aloud: ${TEST_LINE}` }[sc.phase];
         if (say) this.notices.announce(say);
       }
       if (!sc.running && this.prevScPhase && sc.result) {
-        this.notices.announce(sc.result.headline);
-        requestAnimationFrame(() => focusEl($("scHeadline")));
+        const a = document.activeElement;
+        if (this.focusVerdict && (!a || a === document.body || $("stepMic").contains(a))) requestAnimationFrame(() => focusEl($("scHeadline")));
+        else this.notices.announce(sc.result.headline);
+        this.focusVerdict = false;
       }
       this.prevScPhase = sc.running ? sc.phase : null;
-      if (st.phase === "countdown" && this.prevPhase !== "countdown") this.notices.announce("Recording starts in 3 seconds. Press Escape to cancel.");
+      const ms = st.mic.status;
+      if (ms !== this.prevMicStatus && this.prevMicStatus) {
+        if (ms === "live" && this.prevMicStatus === "starting") this.notices.announce(`Microphone on: ${shortLabel(st.mic.label)}.`);
+        if (["blocked", "notfound", "busy", "error"].includes(ms) && st.micError) this.notices.shout(`${st.micError.title}. ${st.micError.text}`);
+      }
+      this.prevMicStatus = ms;
+      if (st.phase === "countdown" && this.prevPhase !== "countdown") this.notices.announce(`Recording starts in ${st.countdown} seconds. Press Escape to cancel.`);
       if (!inSetup) this.expanded.clear();
     }
   };
+  var surfaceName = (surface) => surface === "monitor" ? "Whole screen" : surface === "browser" ? "A browser tab" : "One window";
   var rank = (level) => ({ good: 0, warn: 1, bad: 2 })[level] ?? 0;
 
   // src/app/ui/stage.js
+  function placeWords({ x, y }) {
+    const col = x < 0.34 ? "left" : x > 0.66 ? "right" : "centre";
+    const row = y < 0.34 ? "top" : y > 0.66 ? "bottom" : "middle";
+    if (row === "middle" && col === "centre") return "centre";
+    return row === "middle" ? `middle ${col}` : col === "centre" ? `${row} centre` : `${row} ${col}`;
+  }
+  var RECORDED = {
+    monitor: "Your whole screen is still being recorded.",
+    window: "The window you chose is still being recorded.",
+    browser: "The tab you chose is still being recorded."
+  };
   var Stage = class {
-    constructor(session) {
+    constructor(session, { notices } = {}) {
       this.session = session;
+      this.notices = notices;
       this.el = $("stage");
       this.screenVideo = $("screenVideo");
       this.reviewVideo = $("reviewVideo");
@@ -12485,6 +12741,7 @@ ${list(win10)}
       }
       this.reviewVideo.playsInline = true;
       this.reviewVideo.controls = true;
+      attr(this.reviewVideo, "aria-label", "Playback of your take");
       this.#wireDrag();
       new ResizeObserver(() => this.#placeBubble()).observe(this.el);
     }
@@ -12515,7 +12772,11 @@ ${list(win10)}
       }
       show(this.reviewVideo, !!url);
       show($("stageEmpty"), !screenStream && !url && !recording);
-      text($("stageLabel"), url ? "Playing back" : hideLive ? "Recording – preview hidden" : screenStream ? recording ? "Live preview" : "Live preview" : review ? "This take can’t be played here" : "Preview");
+      text($("stageLabel"), url ? "Playing back" : phase === "starting" ? "Starting…" : hideLive ? "Recording – preview hidden" : screenStream ? "Live preview" : review ? "This take can’t be played here" : "Preview");
+      text($("capRecording"), `The preview is hidden to save power. ${RECORDED[st.screen?.surface] || RECORDED.monitor}`);
+      if (review) {
+        text($("capReview"), review.savedTo === "folder" ? `Watch it back here, or open the file from your “${review.folderName || "lessons"}” folder.` : "Watch it back here, or open the file from your Downloads folder.");
+      }
       attr(this.el, "data-mode", url ? "playback" : recording ? "recording" : screenStream ? "live" : "empty");
       const cam = st.camera;
       const camStream = cam.enabled && cam.status === "live" ? cam.previewStream : null;
@@ -12539,7 +12800,8 @@ ${list(win10)}
         }
       }
       let hint = "";
-      if (st.screen && st.screen.surface !== "monitor") hint = "Only one window is being recorded";
+      if (st.screen?.surface === "window") hint = "Only this window is being recorded";
+      else if (st.screen?.surface === "browser") hint = "Only this tab is being recorded";
       else if (showBubble && phase !== "countdown" && !recording) hint = "Drag the camera bubble to move it";
       text($("stageHint"), hint);
       show($("stageHint"), !!hint);
@@ -12599,15 +12861,21 @@ ${list(win10)}
       this.bubble.addEventListener("pointerup", end);
       this.bubble.addEventListener("pointercancel", end);
       attr(this.bubble, "tabindex", "0");
-      attr(this.bubble, "role", "img");
+      attr(this.bubble, "role", "group");
+      attr(this.bubble, "aria-roledescription", "movable camera bubble");
       attr(this.bubble, "aria-label", "Camera bubble. Use the arrow keys to move it.");
+      let announceTimer = 0;
       this.bubble.addEventListener("keydown", (e) => {
         const step = e.shiftKey ? 0.1 : 0.02;
         const d = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key];
         if (!d || !this.bubbleState) return;
         e.preventDefault();
         const b = this.bubbleState;
-        this.session.setBubble({ x: Math.max(0, Math.min(1, b.x + d[0])), y: Math.max(0, Math.min(1, b.y + d[1])) });
+        const pos = { x: Math.max(0, Math.min(1, b.x + d[0])), y: Math.max(0, Math.min(1, b.y + d[1])) };
+        this.bubbleState = { ...b, ...pos };
+        this.session.setBubble(pos);
+        clearTimeout(announceTimer);
+        announceTimer = setTimeout(() => this.notices?.announce(`Camera bubble: ${placeWords(this.bubbleState)}.`), 500);
       });
     }
   };
@@ -12637,11 +12905,18 @@ ${list(win10)}
         if ($("btnStop").getAttribute("aria-disabled") === "true") return;
         session.stop();
       });
-      $("btnPause").addEventListener("click", () => session.togglePause());
+      const enabled = (id) => $(id).getAttribute("aria-disabled") !== "true";
+      $("btnPause").addEventListener("click", () => {
+        if (enabled("btnPause")) session.togglePause();
+      });
       $("btnResumeBig").addEventListener("click", () => session.togglePause());
-      $("btnMarker").addEventListener("click", () => session.addMarker());
+      $("btnMarker").addEventListener("click", () => {
+        if (enabled("btnMarker")) session.addMarker();
+      });
       $("btnPopout").addEventListener("click", () => this.popout.isOpen ? this.popout.close() : this.popout.open());
-      $("btnDiscard").addEventListener("click", () => this.discard());
+      $("btnDiscard").addEventListener("click", () => {
+        if (enabled("btnDiscard")) this.discard();
+      });
       attr($("btnStop"), "aria-keyshortcuts", "Alt+R");
       attr($("btnPause"), "aria-keyshortcuts", "Alt+P");
       attr($("btnMarker"), "aria-keyshortcuts", "Alt+M");
@@ -12649,7 +12924,8 @@ ${list(win10)}
     /** Confirm, then throw the take away. */
     async discard() {
       const st = this.session.state;
-      if (!st.take) return;
+      if (!st.take || !["recording", "paused"].includes(st.phase)) return;
+      const id = st.take.id;
       const mins = Math.floor(st.take.elapsedMs / 6e4);
       const ok = await this.confirm({
         title: "Discard this take?",
@@ -12658,7 +12934,8 @@ ${list(win10)}
         cancel: "Keep recording",
         danger: true
       });
-      if (ok) this.session.cancelTake();
+      const now2 = this.session.state;
+      if (ok && now2.take?.id === id && ["recording", "paused"].includes(now2.phase)) this.session.cancelTake();
     }
     #tickClock(now2) {
       const c = this.clock;
@@ -12679,7 +12956,8 @@ ${list(win10)}
         const pill = $("recPill");
         text(pill, phase === "paused" ? "❚❚ Paused" : phase === "stopping" ? "Saving…" : "● Recording");
         attr(pill, "data-state", phase);
-        text($("recSafety"), st.take.safetyCopy ? "Safety copy: on" : "Safety copy: off");
+        const where = st.take.savingTo === "folder" ? `Saving into “${st.take.folderName || "your folder"}”` : "Downloads when you stop";
+        text($("recSafety"), `${where} · safety copy ${st.take.safetyCopy ? "on" : "off"}`);
         attr($("recSafety"), "data-on", st.take.safetyCopy ? "true" : "false");
         show($("recSysRow"), !!st.screen?.hasAudio && st.audio.systemAudio);
         if (st.prefs.noVoice) text($("recMicLabel"), "Voice off");
@@ -12687,7 +12965,6 @@ ${list(win10)}
         attr($("btnStop"), "aria-disabled", stopping ? "true" : null);
         label($("btnStop"), stopping ? "Saving…" : "Stop & save");
         label($("btnPause"), phase === "paused" ? "Resume" : "Pause");
-        attr($("btnPause"), "aria-pressed", phase === "paused" ? "true" : "false");
         attr($("btnPause"), "aria-disabled", stopping ? "true" : null);
         attr($("btnMarker"), "aria-disabled", stopping ? "true" : null);
         const n = st.take.markers.length;
@@ -12707,11 +12984,14 @@ ${list(win10)}
       }
       const prev = this.prevPhase;
       if (phase !== prev) {
-        if (phase === "recording" && (prev === "countdown" || prev === "ready" || prev === "setup" || prev === "review")) {
+        if (phase === "recording" && prev !== "paused") {
           this.notices.announce("Recording started.");
           requestAnimationFrame(() => focusEl($("btnStop")));
         }
-        if (phase === "paused") this.notices.announce("Paused. Not recording.");
+        if (phase === "paused") {
+          this.notices.announce("Paused. Not recording.");
+          requestAnimationFrame(() => $("recBanner")?.scrollIntoView({ block: "nearest", behavior: "smooth" }));
+        }
         if (phase === "recording" && prev === "paused") this.notices.announce("Recording resumed.");
         if (phase === "stopping") this.notices.announce("Saving…");
       }
@@ -12726,6 +13006,7 @@ ${list(win10)}
 
   // src/app/ui/review.js
   var takeNumber = (t) => Number((t.filename || "").match(/take (\d+)\)/)?.[1] || 1);
+  var whenText = (ms) => new Date(ms).toLocaleString(void 0, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
   function savedLine(t) {
     const name = displayFilename(t.filename);
     if (t.savedTo === "folder") return `Saved to ${t.folderName || "your folder"} › ${name} ✓`;
@@ -12750,13 +13031,14 @@ ${list(win10)}
           name.blur();
         }
       });
+      const ready = (id) => $(id).getAttribute("aria-disabled") !== "true";
       $("btnCopyChapters").addEventListener("click", () => {
         const r = session.state.review;
-        if (r) session.copyChapters(r.id);
+        if (r && ready("btnCopyChapters")) session.copyChapters(r.id);
       });
       $("btnSaveChapters").addEventListener("click", () => {
         const r = session.state.review;
-        if (r) session.saveChaptersFile(r.id);
+        if (r && ready("btnSaveChapters")) session.saveChaptersFile(r.id);
       });
       $("btnNewTake").addEventListener("click", () => {
         session.closeReview();
@@ -12774,10 +13056,11 @@ ${list(win10)}
         session.stopScreen();
         notices.toast({ kind: "success", title: "Screen sharing stopped", text: "You’re all done. Your takes are listed below.", timeoutMs: 4e3 });
       });
-      onAction($("chapterList"), (action, btn) => {
+      onAction($("chapterList"), (action, btn, e) => {
+        if (e.detail > 1) return;
         const r = session.state.review;
         const row = btn.closest(".chapter");
-        if (r && row && action === "delete") session.deleteMarker(r.id, row.dataset.id);
+        if (r && row && action === "delete" && !row.dataset.intro) session.deleteMarker(r.id, row.dataset.id);
       });
       $("chapterList").addEventListener("change", (e) => {
         const r = session.state.review;
@@ -12819,6 +13102,10 @@ ${list(win10)}
         return;
       }
       text($("reviewHeading"), `Take ${takeNumber(r)} · ${formatDuration(r.durationMs)} · ${formatBytes(r.size)}`);
+      const kicker = $("reviewKicker");
+      show(kicker.querySelector(".review-badge"), !!r.justSaved);
+      label(kicker, r.justSaved ? "Saved – nice work!" : `Recorded ${whenText(r.createdAt)}`);
+      attr(kicker, "data-just-saved", r.justSaved ? "true" : "false");
       value($("reviewName"), r.lessonName || "");
       attr($("reviewName"), "placeholder", "Untitled lesson");
       text($("reviewSaved"), savedLine(r));
@@ -12832,33 +13119,47 @@ ${list(win10)}
       text($("reviewNotice"), notes.join(" "));
       show($("reviewNotice"), notes.length > 0);
       const list = $("chapterList");
-      const markers = [...r.markers || []].sort((a, b) => a.atMs - b.atMs);
-      const sig = JSON.stringify(markers.map((m) => [m.id, m.atMs, m.title]));
+      const hasMarkers = !!r.markers?.length;
+      const chapters = hasMarkers ? r.chapters?.chapters || [] : [];
+      const hours = r.durationMs >= 36e5;
+      const sig = JSON.stringify(chapters.map((c) => [c.id, c.startMs, c.title, !!c.moved]));
       if (list.dataset.sig !== sig || list.dataset.take !== r.id) {
         list.dataset.sig = sig;
         list.dataset.take = r.id;
-        const focusedId = document.activeElement?.closest?.(".chapter")?.dataset.id;
-        list.replaceChildren(...markers.map((m) => {
-          const el = fill(clone2("tplChapter"), { time: formatTimestamp(m.atMs, r.durationMs >= 36e5), title: m.title });
-          el.dataset.id = m.id;
-          el.querySelector('[data-field="title"]')?.setAttribute("aria-label", `Chapter title at ${formatTimestamp(m.atMs)}`);
+        const focusedId = document.activeElement?.closest?.("#chapterList .chapter")?.dataset.id;
+        list.replaceChildren(...chapters.map((c) => {
+          const at = formatTimestamp(c.startMs, hours);
+          const el = fill(clone2("tplChapter"), { time: at, title: c.title });
+          el.dataset.id = c.id;
+          if (c.intro) el.dataset.intro = "true";
+          const input = el.querySelector('[data-field="title"]');
+          input?.setAttribute("aria-label", c.intro ? `Opening chapter title, at ${at}` : `Chapter title at ${at}`);
+          if (c.moved) el.querySelector('[data-field="time"]')?.setAttribute("title", "Moved to 0:00 – YouTube chapters must start at the beginning");
+          const del = el.querySelector('[data-action="delete"]');
+          if (del) del.setAttribute("aria-label", `Delete chapter “${c.title}”`);
+          if (del && c.intro) {
+            del.disabled = true;
+            del.setAttribute("aria-hidden", "true");
+          }
           return el;
         }));
         if (focusedId) list.querySelector(`.chapter[data-id="${CSS.escape(focusedId)}"] [data-field="title"]`)?.focus();
       }
-      show($("chapterEmpty"), markers.length === 0);
-      const issues = markers.length ? r.chapters?.issues || [] : [];
+      show($("chapterEmpty"), !hasMarkers);
+      const issues = hasMarkers ? r.chapters?.issues || [] : [];
       text($("chapterIssues"), issues.join(" "));
       show($("chapterIssues"), issues.length > 0);
-      attr($("btnCopyChapters"), "aria-disabled", markers.length ? null : "true");
-      attr($("btnSaveChapters"), "aria-disabled", markers.length ? null : "true");
+      for (const id of ["btnCopyChapters", "btnSaveChapters"]) {
+        attr($(id), "aria-disabled", hasMarkers ? null : "true");
+        attr($(id), "aria-describedby", hasMarkers ? null : "chapterEmpty");
+      }
       show($("btnDownloadTake"), !!r.playable);
       label($("btnDownloadTake"), r.savedTo === "folder" ? "Download a copy" : "Download again");
       show($("btnFinish"), !!st.screen);
       if (r.id !== this.prevReviewId) {
         this.prevReviewId = r.id;
         if (st.phase === "review") {
-          this.notices.announce(`Saved as ${r.filename}, ${formatDuration(r.durationMs)}.`);
+          this.notices.announce(r.justSaved ? `Saved as ${r.filename}, ${formatDuration(r.durationMs)}.` : `Opened ${r.filename}, ${formatDuration(r.durationMs)}.`);
           requestAnimationFrame(() => focusEl($("reviewHeading")));
         }
       }
@@ -12873,22 +13174,29 @@ ${list(win10)}
         const t = rows[i];
         seen.add(t.id);
         let el = this.takeEls.get(t.id);
-        const sig = JSON.stringify([t.lessonName, t.filename, t.durationMs, t.size, t.markers?.length, t.savedTo, t.thumbnail ? 1 : 0, t.playable]);
+        const sig = JSON.stringify([t.lessonName, t.filename, t.durationMs, t.size, t.chapterCount, t.savedTo, t.folderName, t.thumbnail ? 1 : 0, t.playable, t.createdAt]);
         if (!el || el.dataset.sig !== sig) {
+          const name = t.lessonName || t.filename;
+          const when = whenText(t.createdAt);
+          const n = t.chapterCount || 0;
           const fresh = fill(clone2("tplTake"), {
             thumb: t.thumbnail || "",
-            name: t.lessonName || t.filename,
-            date: new Date(t.createdAt).toLocaleString(void 0, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }),
+            name,
+            date: when,
             duration: formatDuration(t.durationMs),
             size: formatBytes(t.size),
-            chapters: t.markers?.length ? `${t.markers.length} chapter${t.markers.length === 1 ? "" : "s"}` : "",
+            chapters: n ? `${n} chapter${n === 1 ? "" : "s"}` : "",
             saved: t.savedTo === "folder" ? `In “${t.folderName || "your folder"}”` : "Downloaded"
           });
           fresh.dataset.id = t.id;
           fresh.dataset.sig = sig;
+          fresh.dataset.saved = t.savedTo === "folder" ? "folder" : "download";
+          const about = `${name}, ${when}`;
+          const names = { open: `Play ${about}`, download: `Download ${about}`, "copy-chapters": `Copy chapters of ${about}`, delete: `Delete ${about}` };
+          for (const b of fresh.querySelectorAll("[data-action]")) if (names[b.dataset.action]) b.setAttribute("aria-label", names[b.dataset.action]);
           for (const b of fresh.querySelectorAll('[data-action="download"]')) show(b, !!t.playable);
-          for (const b of fresh.querySelectorAll('[data-action="copy-chapters"]')) show(b, !!t.markers?.length);
-          for (const b of fresh.querySelectorAll('[data-field="chapters"]')) show(b, !!t.markers?.length);
+          for (const b of fresh.querySelectorAll('[data-action="copy-chapters"]')) show(b, n > 0);
+          for (const b of fresh.querySelectorAll('[data-field="chapters"]')) show(b, n > 0);
           if (el) el.replaceWith(fresh);
           else list.insertBefore(fresh, before);
           el = fresh;
@@ -12950,15 +13258,16 @@ ${list(win10)}
       on("sysAudioLevel", "input", (e) => s.setSystemAudioLevel(Number(e.target.value) / 100));
       on("noVoiceToggle", "change", (e) => s.setNoVoice(e.target.checked));
       on("btnResetSettings", "click", async () => {
-        const ok = await this.confirm({ title: "Reset all settings?", text: "Your sound checks, choices and saved folder go back to the defaults. Your recordings are not touched.", ok: "Reset settings", danger: true });
-        if (ok) {
-          s.resetSettings();
-          location.reload();
-        }
+        if ($("btnResetSettings").getAttribute("aria-disabled") === "true") return;
+        const ok = await this.confirm({ title: "Reset all settings?", text: "Your sound checks and choices go back to the defaults. Your recordings and your save folder are not touched.", ok: "Reset settings", danger: true });
+        if (ok && s.resetSettings()) location.reload();
       });
     }
     render(st) {
-      const recording = ["countdown", "recording", "paused", "stopping"].includes(st.phase);
+      const recording = ["countdown", "starting", "recording", "paused", "stopping"].includes(st.phase);
+      show($("settingsLocked"), recording);
+      attr($("btnResetSettings"), "aria-disabled", recording ? "true" : null);
+      attr($("btnResetSettings"), "aria-describedby", recording ? "settingsLocked" : null);
       const mp4Option = $("formatSelect").querySelector('option[value="mp4"]');
       if (mp4Option) mp4Option.disabled = !st.formats.mp4;
       value($("formatSelect"), st.lesson.format === "mp4" && !st.formats.mp4 ? "auto" : st.lesson.format);
@@ -12967,7 +13276,12 @@ ${list(win10)}
       text($("qualityNote"), QUALITY_PRESETS[st.lesson.quality]?.note || "");
       const e = st.estimate;
       text($("sizeEstimate"), e ? `About ${formatBytes(e.bytesPerHour)} per hour of recording (${e.width}×${e.height}, ${e.container.toUpperCase()}).` : "");
-      for (const id of ["formatSelect", "qualitySelect", "rawMicToggle", "speakersToggle", "noVoiceToggle"]) $(id).disabled = recording;
+      for (const id of ["formatSelect", "qualitySelect", "rawMicToggle", "speakersToggle", "noVoiceToggle"]) {
+        const el = $(id);
+        el.disabled = recording;
+        if (el.dataset.describedby === void 0) el.dataset.describedby = el.getAttribute("aria-describedby") || "";
+        attr(el, "aria-describedby", [recording ? "settingsLocked" : "", el.dataset.describedby].filter(Boolean).join(" ") || null);
+      }
       value($("countdownToggle"), st.lesson.countdown);
       value($("beepsToggle"), st.prefs.beeps);
       value($("floatingToggle"), st.prefs.floatingControls);
@@ -13074,10 +13388,11 @@ ${list(win10)}
     return c.toDataURL("image/png");
   }
   var Chrome = class {
-    constructor(session, { settings, popout }) {
+    constructor(session, { settings, popout, startOrStop }) {
       this.session = session;
       this.settings = settings;
       this.popout = popout;
+      this.startOrStop = startOrStop;
       this.favKind = null;
       this.icons = {};
       this.prevCountdown = null;
@@ -13101,34 +13416,30 @@ ${list(win10)}
     /** Shortcuts shared with the floating controls. Returns true if handled. */
     handleKey(e) {
       const st = this.session.state;
-      if (e.key === "Escape" && st.phase === "countdown") {
+      if (e.key === "Escape" && (st.phase === "countdown" || st.phase === "starting")) {
         this.session.cancelCountdown();
         return true;
       }
       if (!st.prefs.shortcuts || !e.altKey || e.ctrlKey || e.metaKey) return false;
       const k = e.key.toLowerCase();
-      if (k === "r") {
-        this.session.toggleRecord();
-        return true;
-      }
-      if (k === "p") {
-        this.session.togglePause();
-        return true;
-      }
-      if (k === "m") {
-        this.session.addMarker();
-        return true;
-      }
-      return false;
+      if (!["r", "p", "m"].includes(k)) return false;
+      if (e.repeat) return true;
+      if (k === "r") this.startOrStop("keyboard");
+      if (k === "p") this.session.togglePause();
+      if (k === "m") this.session.addMarker();
+      return true;
     }
     #onKey(e) {
+      if (document.querySelector("dialog[open]")) return;
       const t = e.target;
-      const typing = t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) && t.type !== "checkbox" && t.type !== "radio" && t.type !== "range";
+      const typing = t && (t.isContentEditable || /^(INPUT|TEXTAREA)$/.test(t.tagName)) && !["checkbox", "radio", "range"].includes(t.type);
       if (typing && e.key !== "Escape") return;
-      if (document.querySelector("dialog[open]") && e.key !== "Escape") return;
       if (this.handleKey(e)) e.preventDefault();
     }
     render(st) {
+      for (const [id, keys] of [["btnStart", "Alt+R"], ["btnStop", "Alt+R"], ["btnPause", "Alt+P"], ["btnMarker", "Alt+M"], ["btnResumeBig", "Alt+P"]]) {
+        attr($(id), "aria-keyshortcuts", st.prefs.shortcuts ? keys : null);
+      }
       const theme = st.prefs.theme;
       attr(document.documentElement, "data-theme", theme === "light" || theme === "dark" ? theme : null);
       attr(document.documentElement, "data-phase", st.phase);
@@ -13143,6 +13454,9 @@ ${list(win10)}
       let title = this.baseTitle + suffix, fav = "idle";
       if (st.phase === "countdown") {
         title = `Starting in ${st.countdown}…${suffix}`;
+        fav = "live";
+      } else if (st.phase === "starting") {
+        title = `Starting…${suffix}`;
         fav = "live";
       } else if ((st.phase === "recording" || st.phase === "paused") && noSound) {
         title = `⚠ No sound!${suffix}`;
@@ -13193,17 +13507,20 @@ ${list(win10)}
 
   // src/app/ui/popout.js
   var Popout = class {
-    constructor(session, { meters, toast, onClose }) {
+    constructor(session, { notices, toast, onClose } = {}) {
       this.session = session;
-      this.meters = meters;
+      this.notices = notices;
       this.toast = toast;
       this.onClose = onClose;
       this.keyHandler = null;
+      this.startOrStop = null;
       this.win = null;
       this.opening = false;
       this.meter = null;
-      this.offMeterLoop = null;
+      this.loop = null;
       this.confirming = false;
+      this.prevPhase = null;
+      this.prevNoSound = false;
       this.clock = { elapsedMs: 0, at: 0, running: false };
       this.onChange = (st) => this.render(st);
       this.onMeter = (m) => this.meter?.set(m.voice?.rmsDb ?? -100, m.voice?.peakDb ?? -100);
@@ -13225,7 +13542,7 @@ ${list(win10)}
       }
       if (this.opening) return false;
       if (!this.supported) {
-        this.toast({ kind: "info", title: "Floating controls need Chrome or Edge 116+", text: "You can keep this tab open on your other screen instead." });
+        this.toast?.({ kind: "info", title: "Floating controls need Chrome or Edge 116+", text: "You can keep this tab open on your other screen instead." });
         return false;
       }
       this.opening = true;
@@ -13233,7 +13550,7 @@ ${list(win10)}
         this.win = await documentPictureInPicture.requestWindow({ width: 320, height: 420, disallowReturnToOpener: false });
       } catch (e) {
         this.opening = false;
-        this.toast({ kind: "warning", title: "Couldn’t open the floating controls", text: e.message || String(e) });
+        this.toast?.({ kind: "warning", title: "Couldn’t open the floating controls", text: e.message || String(e) });
         return false;
       }
       this.opening = false;
@@ -13250,23 +13567,36 @@ ${list(win10)}
       const w = this.win, d = w.document;
       for (const node of document.head.querySelectorAll('style, link[rel="stylesheet"]')) d.head.append(node.cloneNode(true));
       d.title = "Full Capture";
+      d.documentElement.lang = document.documentElement.lang || "en";
       d.body.classList.add("popout");
       const root = clone2("tplPopout", document);
       d.body.append(d.adoptNode(root));
       this.root = root;
+      this.status = d.createElement("div");
+      this.status.className = "sr-only";
+      this.status.setAttribute("role", "status");
+      this.status.setAttribute("aria-live", "polite");
+      this.status.setAttribute("aria-atomic", "true");
+      this.alert = d.createElement("div");
+      this.alert.className = "sr-only";
+      this.alert.setAttribute("role", "alert");
+      this.alert.setAttribute("aria-atomic", "true");
+      d.body.append(this.status, this.alert);
       const meterEl = root.querySelector('[data-field="meter"]') || root.querySelector(".meter");
       this.meter = new Meter(meterEl, root.querySelector('[data-field="micLabel"]'), {
         labels: { good: "We can hear you ✓", quiet: "Too quiet", loud: "Too loud", off: "No sound" }
       });
-      this.offMeterLoop = this.meters.add(this.meter);
-      this.offTick = this.meters.onFrame((now2) => this.#tickClock(now2));
-      onAction(root, (action) => this.#act(action));
+      this.loop = new MeterLoop(w);
+      this.loop.add(this.meter);
+      this.loop.onFrame((now2) => this.#tickClock(now2));
+      onAction(root, (action, btn, e) => this.#act(action, e));
       d.addEventListener("keydown", (e) => {
-        if (this.keyHandler?.(e)) e.preventDefault();
         if (e.key === "Escape" && this.confirming) {
-          this.confirming = false;
-          this.render(this.session.state);
+          e.preventDefault();
+          this.#closeConfirm();
+          return;
         }
+        if (this.keyHandler?.(e)) e.preventDefault();
       });
       w.navigator.wakeLock?.request("screen").then((lock) => {
         this.wakeLock = lock;
@@ -13275,27 +13605,42 @@ ${list(win10)}
       this.offChange = this.session.on("change", this.onChange);
       this.offMeter = this.session.on("meter", this.onMeter);
       w.addEventListener("pagehide", () => this.#teardown(), { once: true });
+      this.prevPhase = null;
       this.render(this.session.state);
     }
     #teardown() {
       this.offChange?.();
       this.offMeter?.();
-      this.offMeterLoop?.();
-      this.offTick?.();
+      this.loop?.stop();
+      this.loop = null;
       this.wakeLock?.release().catch(() => {
       });
       this.wakeLock = null;
       this.win = null;
       this.root = null;
       this.meter = null;
+      this.status = null;
+      this.alert = null;
       this.confirming = false;
       this.onClose?.();
     }
-    #act(action) {
+    #say(message2, urgent = false) {
+      const region = urgent ? this.alert : this.status;
+      if (!region || !message2) return;
+      text(region, "");
+      this.win?.requestAnimationFrame(() => text(region, message2));
+    }
+    #closeConfirm() {
+      this.confirming = false;
+      this.render(this.session.state);
+      this.root?.querySelector('[data-action="more"]')?.focus();
+    }
+    #act(action, e) {
       const s = this.session;
       switch (action) {
         case "start":
-          s.toggleRecord();
+          if (this.startOrStop) this.startOrStop("popout");
+          else s.toggleRecord();
           break;
         case "stop":
           s.stop();
@@ -13304,7 +13649,7 @@ ${list(win10)}
           s.togglePause();
           break;
         case "marker":
-          s.addMarker();
+          if (!e || e.detail <= 1) s.addMarker();
           break;
         case "more":
           this.confirming = true;
@@ -13312,28 +13657,31 @@ ${list(win10)}
           this.root?.querySelector('[data-action="discard-no"]')?.focus();
           break;
         case "discard-no":
-          this.confirming = false;
-          this.render(s.state);
+          this.#closeConfirm();
           break;
-        case "discard-yes":
+        case "discard-yes": {
           this.confirming = false;
-          s.cancelTake();
+          const st = s.state;
+          if (st.take && ["recording", "paused"].includes(st.phase)) s.cancelTake();
+          else this.render(st);
           break;
+        }
       }
     }
     #tickClock(now2) {
       if (!this.root) return;
       const c = this.clock;
+      if (!c.at) return;
       const ms = c.running ? c.elapsedMs + (now2 - c.at) : c.elapsedMs;
       const timer = this.root.querySelector('[data-field="timer"]');
-      if (timer && c.at) text(timer, formatClock(ms));
+      if (timer) text(timer, formatClock(ms));
     }
     render(st) {
       const root = this.root;
       if (!root) return;
       const phase = st.phase;
       const active = ["recording", "paused", "stopping"].includes(phase);
-      const counting = phase === "countdown";
+      const counting = phase === "countdown" || phase === "starting";
       const noSound = active && st.alerts.some((a) => a.id === "no-audio" || a.id === "mic-lost");
       if (!active) this.confirming = false;
       const part = (name) => root.querySelector(`[data-part="${name}"]`);
@@ -13350,26 +13698,32 @@ ${list(win10)}
         pill,
         lesson: st.lesson.name.trim() || "Untitled lesson",
         notes: st.lesson.notes,
-        countdown: counting ? String(st.countdown) : ""
+        countdown: phase === "countdown" ? String(st.countdown) : ""
       });
       for (const el of root.querySelectorAll('[data-field="pill"]')) attr(el, "data-state", noSound ? "nosound" : phase);
       for (const el of root.querySelectorAll('[data-field="notes"]')) show(el, !!st.lesson.notes.trim());
-      for (const el of root.querySelectorAll('[data-field="countdown"]')) show(el, counting);
+      for (const el of root.querySelectorAll('[data-field="countdown"]')) show(el, phase === "countdown");
+      for (const el of root.querySelectorAll('[data-field="talking"]')) show(el, phase === "paused" && !!st.take?.talkingWhilePaused);
       if (active && st.take) {
         const running = phase === "recording";
-        if (st.take.elapsedMs !== this.clock.elapsedMs || running !== this.clock.running) this.clock = { elapsedMs: st.take.elapsedMs, at: performance.now(), running };
+        if (st.take.elapsedMs !== this.clock.elapsedMs || running !== this.clock.running || !this.clock.at) {
+          this.clock = { elapsedMs: st.take.elapsedMs, at: this.win.performance.now(), running };
+        }
       } else {
-        this.clock = { elapsedMs: 0, at: performance.now(), running: false };
+        this.clock = { elapsedMs: 0, at: this.win.performance.now(), running: false };
       }
+      const timer = root.querySelector('[data-field="timer"]');
+      if (timer) text(timer, formatClock(this.clock.elapsedMs));
       for (const b of root.querySelectorAll('[data-action="pause"]')) {
         label(b, phase === "paused" ? "Resume" : "Pause");
-        attr(b, "aria-pressed", phase === "paused" ? "true" : "false");
+        attr(b, "aria-disabled", phase === "stopping" ? "true" : null);
       }
       for (const b of root.querySelectorAll('[data-action="start"]')) {
-        label(b, counting ? `Cancel (${st.countdown})` : "Start recording");
-        attr(b, "aria-disabled", !counting && !st.screen ? "true" : null);
+        label(b, phase === "countdown" ? `Cancel (${st.countdown})` : phase === "starting" ? "Cancel" : "Start recording");
+        attr(b, "aria-disabled", !counting && (!st.screen || st.preparing) ? "true" : null);
       }
       for (const b of root.querySelectorAll('[data-action="stop"], [data-action="marker"], [data-action="more"]')) attr(b, "aria-disabled", phase === "stopping" ? "true" : null);
+      for (const b of root.querySelectorAll('[data-action="more"]')) attr(b, "aria-expanded", this.confirming ? "true" : "false");
       const confirmText = root.querySelector('[data-part="confirm"] [data-field="confirmText"]');
       if (confirmText && st.take) text(confirmText, `Discard ${formatDuration(st.take.elapsedMs)}? This can’t be undone.`);
       if (st.take) {
@@ -13378,6 +13732,16 @@ ${list(win10)}
           show(el, st.take.markers.length > 0);
         }
       }
+      const prev = this.prevPhase;
+      if (prev !== null && phase !== prev) {
+        if (phase === "recording") this.#say(prev === "paused" ? "Recording resumed." : "Recording started.");
+        else if (phase === "paused") this.#say("Paused. Not recording.");
+        else if (phase === "stopping") this.#say("Saving…");
+        else if (phase === "review") this.#say("Saved.");
+      }
+      if (noSound && !this.prevNoSound) this.#say("No sound from your microphone.", true);
+      this.prevNoSound = noSound;
+      this.prevPhase = phase;
     }
   };
 
@@ -13386,26 +13750,105 @@ ${list(win10)}
     setup: "viewSetup",
     ready: "viewSetup",
     countdown: "viewSetup",
+    starting: "viewSetup",
     recording: "viewRecording",
     paused: "viewRecording",
     stopping: "viewRecording",
     review: "viewReview"
   };
+  var FOCUS_NEXT = {
+    btnMicOn: ["micSelect", "stepMic"],
+    btnSoundCheck: ["scStep", "btnScAgain"],
+    btnScAgain: ["scStep", "btnSoundCheck"],
+    btnChooseScreenBig: ["btnChooseScreen"],
+    btnResumeBig: ["btnPause"],
+    btnDiscard: ["btnStart"],
+    btnStop: ["reviewHeading", "btnStart"],
+    btnDeleteTake: ["btnStart"],
+    btnFinish: ["btnNewTake"],
+    btnNewTake: ["btnStart"],
+    lessonName: ["lessonName"]
+  };
+  var PHASE_FOCUS = { setup: "btnStart", ready: "btnStart", countdown: "btnStart", starting: "btnStart", recording: "btnStop", paused: "btnResumeBig", stopping: "recTimer", review: "reviewHeading" };
+  var isShown = (el) => !!el && el.isConnected && !el.closest("[hidden]") && el.getClientRects().length > 0;
+  var FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
   function createUI(session) {
     const meters = new MeterLoop();
     const confirm = createConfirm();
     const notices = new Notices(session, { confirm });
     const render = () => renderAll(session.state);
-    const popout = new Popout(session, { meters, toast: (n) => notices.toast(n), onClose: render });
+    const popout = new Popout(session, { notices, toast: (n) => notices.toast(n), onClose: render });
     const settings = new SettingsView(session, { meters, confirm });
-    const chrome = new Chrome(session, { settings, popout });
+    const startOrStop = (source) => controller.startOrStop(source);
+    const chrome = new Chrome(session, { settings, popout, startOrStop });
     popout.keyHandler = (e) => chrome.handleKey(e);
+    popout.startOrStop = startOrStop;
     wireDialog("helpDialog", ["btnHelp"], "btnHelpClose");
-    const setup = new SetupView(session, { meters, notices, popout, settingsDialog: settings });
-    const stage = new Stage(session);
+    const setup = new SetupView(session, { meters, notices, popout, settingsDialog: settings, startOrStop });
+    const stage = new Stage(session, { notices });
     const recording = new RecordingView(session, { meters, notices, confirm, popout });
     const review = new ReviewView(session, { notices, confirm });
     const parts = [chrome, notices, setup, stage, recording, review, settings, popout];
+    const controller = {
+      /**
+       * Start (or cancel the countdown, or stop). One path for the big button,
+       * Alt+R and the floating Start, so the same microphone rule applies to all.
+       * Must run inside the click/key event: the floating controls and the
+       * folder prompt need its user activation.
+       */
+      startOrStop(source = "button") {
+        const st = session.state;
+        const idle = ["setup", "ready", "review"].includes(st.phase) && !st.preparing;
+        if (idle && st.startBlocker) {
+          setup.explainBlocked(st.startBlocker);
+          return;
+        }
+        if (idle && st.prefs.floatingControls && st.screen && !popout.isOpen && popout.supported) popout.open();
+        if (idle && !(st.prefs.floatingControls && st.screen)) offerPopoutOnStart = true;
+        session.toggleRecord();
+      }
+    };
+    let offerPopoutOnStart = false;
+    let prevPhase = null;
+    function offerPopout(st) {
+      if (prevPhase !== "recording" && st.phase === "recording" && offerPopoutOnStart) {
+        offerPopoutOnStart = false;
+        if (st.prefs.floatingControls && popout.supported && !popout.isOpen) {
+          notices.toast({
+            id: "offer-popout",
+            kind: "info",
+            title: "Floating controls",
+            text: "Keep the timer, Pause and Stop & save on top of your slides.",
+            actions: [{ label: "Open floating controls", primary: true, run: () => popout.open() }],
+            timeoutMs: 12e3
+          });
+        }
+      }
+      if (!["countdown", "starting", "recording"].includes(st.phase)) offerPopoutOnStart = false;
+    }
+    let lastFocused = null;
+    document.addEventListener("focusin", (e) => {
+      if (e.target !== document.body) lastFocused = e.target;
+    });
+    function rescueFocus(st) {
+      const active = document.activeElement;
+      const lost = !active || active === document.body || !isShown(active);
+      if (!lost || !lastFocused || document.querySelector("dialog[open]")) return;
+      if (isShown(lastFocused)) {
+        if (active === document.body) return;
+        lastFocused.focus();
+        return;
+      }
+      const candidates = (FOCUS_NEXT[lastFocused.id] || []).map((id) => $(id));
+      const section = lastFocused.closest?.(".step, section, .card");
+      if (section && isShown(section)) candidates.push([...section.querySelectorAll(FOCUSABLE)].find(isShown), section.querySelector("h2, h3"));
+      candidates.push($(PHASE_FOCUS[st.phase]));
+      const target = candidates.find(isShown);
+      if (target) {
+        lastFocused = target;
+        focusEl(target);
+      }
+    }
     function renderAll(st) {
       const current = VIEW_FOR[st.phase] || "viewSetup";
       for (const id of new Set(Object.values(VIEW_FOR))) show($(id), id === current);
@@ -13416,12 +13859,17 @@ ${list(win10)}
           console.error("render failed in", p.constructor.name, e);
         }
       }
+      offerPopout(st);
+      prevPhase = st.phase;
+      requestAnimationFrame(() => rescueFocus(session.state));
     }
     session.on("change", renderAll);
     const gesture = () => {
       session.firstGesture();
     };
     for (const evt of ["pointerdown", "keydown"]) document.addEventListener(evt, gesture, { capture: true, passive: true });
+    $("screenVideo")?.setAttribute("aria-label", "Live preview of your screen");
+    text($("recTimer"), "00:00");
     renderAll(session.state);
     return { render, popout, notices };
   }

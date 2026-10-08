@@ -16,7 +16,13 @@
     border: 1px solid CanvasText;
   }
   .btn, .btn-link, .icon-btn, .chip-btn, .folder-chip, [data-actions] > button { border: 1px solid ButtonText; }
-  .btn-record[aria-disabled="true"], .btn[aria-disabled="true"] { color: GrayText; border-color: GrayText; }
+  .btn[aria-disabled="true"], .btn:is(.btn-secondary, .btn-quiet, .btn-primary, .btn-record)[aria-disabled="true"],
+  #btnStop[aria-disabled="true"], .chip-btn[aria-disabled="true"] { color: GrayText !important; border-color: GrayText !important; }
+  .take[aria-current="true"] { outline: 3px solid Highlight; outline-offset: -3px; }
+  html[data-phase="setup"] .mode[data-mode="setup"] .mode-num, html[data-phase="ready"] .mode[data-mode="setup"] .mode-num,
+  html[data-phase="countdown"] .mode[data-mode="setup"] .mode-num,
+  html:is([data-phase="recording"], [data-phase="paused"], [data-phase="stopping"]) .mode[data-mode="record"] .mode-num,
+  html[data-phase="review"] .mode[data-mode="review"] .mode-num { forced-color-adjust: none; background: Highlight; color: HighlightText; }
   .meter, .progress, .progress-seg {
     forced-color-adjust: none;
     background: Canvas;

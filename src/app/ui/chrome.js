@@ -29,10 +29,11 @@ function drawFavicon(kind) {
 }
 
 export class Chrome {
-  constructor(session, { settings, popout }) {
+  constructor(session, { settings, popout, startOrStop }) {
     this.session = session;
     this.settings = settings;
     this.popout = popout;
+    this.startOrStop = startOrStop;
     this.favKind = null;
     this.icons = {};
     this.prevCountdown = null;
@@ -56,24 +57,34 @@ export class Chrome {
   /** Shortcuts shared with the floating controls. Returns true if handled. */
   handleKey(e) {
     const st = this.session.state;
-    if (e.key === 'Escape' && st.phase === 'countdown') { this.session.cancelCountdown(); return true; }
+    if (e.key === 'Escape' && (st.phase === 'countdown' || st.phase === 'starting')) { this.session.cancelCountdown(); return true; }
     if (!st.prefs.shortcuts || !e.altKey || e.ctrlKey || e.metaKey) return false;
     const k = e.key.toLowerCase();
-    if (k === 'r') { this.session.toggleRecord(); return true; }
-    if (k === 'p') { this.session.togglePause(); return true; }
-    if (k === 'm') { this.session.addMarker(); return true; }
-    return false;
+    if (!['r', 'p', 'm'].includes(k)) return false;
+    // A held key repeats; act once per press.
+    if (e.repeat) return true;
+    if (k === 'r') this.startOrStop('keyboard');
+    if (k === 'p') this.session.togglePause();
+    if (k === 'm') this.session.addMarker();
+    return true;
   }
 
   #onKey(e) {
+    // An open dialog gets Escape (to close itself) and keeps the keyboard.
+    if (document.querySelector('dialog[open]')) return;
     const t = e.target;
-    const typing = t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) && t.type !== 'checkbox' && t.type !== 'radio' && t.type !== 'range';
+    // Alt+letter doesn't type into a <select>, so shortcuts still work there.
+    const typing = t && (t.isContentEditable || /^(INPUT|TEXTAREA)$/.test(t.tagName)) && !['checkbox', 'radio', 'range'].includes(t.type);
     if (typing && e.key !== 'Escape') return;
-    if (document.querySelector('dialog[open]') && e.key !== 'Escape') return;
     if (this.handleKey(e)) e.preventDefault();
   }
 
   render(st) {
+    // Shortcut hints only while shortcuts work.
+    for (const [id, keys] of [['btnStart', 'Alt+R'], ['btnStop', 'Alt+R'], ['btnPause', 'Alt+P'], ['btnMarker', 'Alt+M'], ['btnResumeBig', 'Alt+P']]) {
+      attr($(id), 'aria-keyshortcuts', st.prefs.shortcuts ? keys : null);
+    }
+
     // Theme.
     const theme = st.prefs.theme;
     attr(document.documentElement, 'data-theme', theme === 'light' || theme === 'dark' ? theme : null);
@@ -95,6 +106,7 @@ export class Chrome {
     const noSound = st.alerts.some(a => a.id === 'no-audio' || a.id === 'mic-lost');
     let title = this.baseTitle + suffix, fav = 'idle';
     if (st.phase === 'countdown') { title = `Starting in ${st.countdown}…${suffix}`; fav = 'live'; }
+    else if (st.phase === 'starting') { title = `Starting…${suffix}`; fav = 'live'; }
     else if ((st.phase === 'recording' || st.phase === 'paused') && noSound) { title = `⚠ No sound!${suffix}`; fav = 'alert'; }
     else if (st.phase === 'recording') { title = `● ${formatClock(st.take?.elapsedMs || 0)} Recording${suffix}`; fav = 'live'; }
     else if (st.phase === 'paused') { title = `❚❚ Paused${suffix}`; fav = 'paused'; }

@@ -125,7 +125,12 @@ html:has(#btnStart[aria-disabled="true"]) .steps > .step:is([data-status="todo"]
 
 /* Only when the browser blocked the mic: where to click, not the prompt that won't appear */
 .blocked-help { display: none; }
-#stepMic:has(#micMessage .message[data-kind="error"]):has(#micIntro[hidden]):has(#micControls[hidden]) .blocked-help { display: grid; }
+/* The address-bar picture only helps when permission is the problem */
+#stepMic[data-mic="blocked"] .blocked-help { display: grid; }
+/* Busy or missing mic: only the picker is useful (to choose another one) */
+#stepMic:is([data-mic="busy"], [data-mic="notfound"], [data-mic="error"]) :is(.mic-level, .noise-row, .soundcheck, .suggest) { display: none; }
+/* Bubble options only once the camera works */
+#stepCamera:not([data-cam="live"]) :is(.option-grid, .bubble-drag-hint) { display: none; }
 
 /* Collapsed microphone: summary line plus a slim live meter, so you see it's alive before Start */
 #stepMic[data-collapsed] :is(#micIntro, .blocked-help) { display: none; }
@@ -395,6 +400,8 @@ html:has(#takeList > .take) .screen-intro:has(.howto-check:checked) .share-howto
 }
 /* During the 10-second sound check the sentence matters more than Start */
 html:has(#scRun:not([hidden])) .start-bar { position: static; }
+/* Short windows (or high zoom): a pinned bar would hide most of the steps */
+@media (max-height: 480px) { .start-bar { position: static; } }
 /* Keyboard focus and scrollIntoView keep clear of the sticky bar */
 html:is([data-phase="setup"], [data-phase="ready"], [data-phase="countdown"]) { scroll-padding-bottom: 176px; }
 
@@ -408,10 +415,6 @@ html:is([data-phase="setup"], [data-phase="ready"], [data-phase="countdown"]) { 
   box-shadow: var(--shadow-lg);
 }
 .readiness {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
   font-size: var(--fs-sm);
   color: var(--text-2);
   text-align: center;

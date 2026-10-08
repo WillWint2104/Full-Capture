@@ -20,9 +20,9 @@ export function formatTimestamp(ms, forceHours = false) {
   return h > 0 || forceHours ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
 }
 
-/** Human duration: "45 s", "12 min 5 s", "1 h 2 min". */
+/** Human duration: "45 s", "12 min 5 s", "1 h 2 min". Rounds down, like the clock and video players. */
 export function formatDuration(ms) {
-  const total = Math.max(0, Math.round((ms || 0) / 1000));
+  const total = Math.max(0, Math.floor((ms || 0) / 1000));
   const h = Math.floor(total / 3600), m = Math.floor(total / 60) % 60, s = total % 60;
   if (h > 0) return m ? `${h} h ${m} min` : `${h} h`;
   if (m > 0) return s ? `${m} min ${s} s` : `${m} min`;

@@ -49,7 +49,9 @@
   .banner[data-kind="error"] .banner-text { font-size: var(--fs-sm); }
 
   /* Toasts drop in under the header (over the stage strip), never over the header or the main buttons */
-  .toasts { top: calc(var(--header-h) + var(--s2)); left: var(--s4); right: var(--s4); width: auto; }
+  /* Toasts sit at the bottom on phones, above the pinned main button, so they
+     never cover the recording pill and timer at the top. */
+  .toasts { top: auto; bottom: calc(var(--s4) + 96px); left: var(--s4); right: var(--s4); width: auto; }
   .toast { padding-block: 10px; }
 
   .workspace { gap: var(--s4); }
@@ -138,4 +140,12 @@
 @media (max-width: 359.98px) {
   .rec-actions-row { grid-template-columns: 1fr; }
   .folder-chip { max-width: 150px; }
+}
+
+/* Sticky alerts must not hide the control that has keyboard focus */
+html:has(.banners:not([hidden]) .banner[data-kind="error"]) { scroll-padding-top: calc(var(--banners-bottom, 0px) + var(--s3)); }
+
+/* Camera options stack on narrow screens so Shape never runs under Size */
+@media (max-width: 479.98px) {
+  #cameraControls .option-grid { grid-template-columns: minmax(0, 1fr) !important; }
 }

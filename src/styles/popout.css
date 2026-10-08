@@ -68,6 +68,16 @@ body.popout[data-phase="paused"] .pop-timer { color: var(--paused-text); }
 .pop-mic-label { min-height: 21px; font-size: var(--fs-sm); font-weight: var(--fw-strong); color: var(--muted); }
 .pop-level:has(.meter[data-zone="good"]) .pop-mic-label { color: var(--good); }
 .pop-level:has(.meter[data-zone="loud"]) .pop-mic-label { color: var(--bad); }
+/* Talking while paused: the main tab is probably hidden behind the slides */
+.pop-talking {
+  padding: 8px 12px;
+  border-radius: var(--r);
+  background: var(--warn-soft);
+  color: var(--warn);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-strong);
+  text-align: center;
+}
 .pop-stop { min-height: 48px; }
 .pop-stop .i { color: var(--stop-square); }
 body.popout[data-phase="paused"] .pop-stop { background: var(--surface); border-color: var(--line-strong); color: var(--text); }
@@ -86,9 +96,9 @@ body.popout[data-phase="paused"] .pop-stop .i { color: currentColor; }
   flex: none;
   background: linear-gradient(to right, currentColor 0 34%, transparent 34% 66%, currentColor 66%);
 }
-.pop-pause[aria-pressed="true"]::before { background: currentColor; clip-path: polygon(0 0, 100% 50%, 0 100%); }
+body[data-phase="paused"] .pop-pause::before { background: currentColor; clip-path: polygon(0 0, 100% 50%, 0 100%); }
 /* Paused: Resume is the button to press */
-.pop-pause[aria-pressed="true"] { background: var(--record-fill); border-color: var(--record-fill); color: var(--on-record); }
+body[data-phase="paused"] .pop-pause { background: var(--record-fill); border-color: var(--record-fill); color: var(--on-record); }
 
 /* Discard: Keep recording first and filled; Discard second and quieter */
 .pop-confirm { display: grid; gap: var(--s2); flex: none; padding-top: var(--s2); }

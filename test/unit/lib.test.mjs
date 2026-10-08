@@ -64,6 +64,15 @@ test('chapters: an early marker becomes the opening chapter; double taps merge',
   assert.equal(r.chapters[1].title, 'Chapter 2');
 });
 
+test('chapters: ids are carried, the added intro is marked and can be renamed', () => {
+  const r = buildChapters([{ id: 'a', atMs: 30_000, title: 'Key idea' }, { id: 'b', atMs: 3000, title: 'Hello' }], 100_000, { introTitle: 'Welcome' });
+  assert.deepEqual(r.chapters.map(c => [c.id, c.startMs, !!c.moved]), [['b', 0, true], ['a', 30_000, false]]);
+  const withIntro = buildChapters([{ id: 'a', atMs: 30_000 }], 100_000, { introTitle: 'Welcome' });
+  assert.equal(withIntro.chapters[0].id, 'intro');
+  assert.equal(withIntro.chapters[0].intro, true);
+  assert.match(withIntro.text, /^0:00 Welcome/);
+});
+
 test('chapters: problems are explained', () => {
   const few = buildChapters([{ atMs: 30_000 }], 100_000);
   assert.equal(few.youtubeReady, false);

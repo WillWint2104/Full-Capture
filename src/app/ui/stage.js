@@ -4,9 +4,24 @@
 import { $, show, text, attr } from './dom.js';
 import { bubbleRect } from '../video/compositor.js';
 
+// Where the camera bubble sits, in words a screen reader can say.
+function placeWords({ x, y }) {
+  const col = x < 0.34 ? 'left' : x > 0.66 ? 'right' : 'centre';
+  const row = y < 0.34 ? 'top' : y > 0.66 ? 'bottom' : 'middle';
+  if (row === 'middle' && col === 'centre') return 'centre';
+  return row === 'middle' ? `middle ${col}` : col === 'centre' ? `${row} centre` : `${row} ${col}`;
+}
+
+const RECORDED = {
+  monitor: 'Your whole screen is still being recorded.',
+  window: 'The window you chose is still being recorded.',
+  browser: 'The tab you chose is still being recorded.',
+};
+
 export class Stage {
-  constructor(session) {
+  constructor(session, { notices } = {}) {
     this.session = session;
+    this.notices = notices;
     this.el = $('stage');
     this.screenVideo = $('screenVideo');
     this.reviewVideo = $('reviewVideo');
@@ -17,6 +32,7 @@ export class Stage {
     for (const v of [this.screenVideo, this.cameraVideo]) { v.muted = true; v.playsInline = true; v.autoplay = true; }
     this.reviewVideo.playsInline = true;
     this.reviewVideo.controls = true;
+    attr(this.reviewVideo, 'aria-label', 'Playback of your take');
     this.#wireDrag();
     new ResizeObserver(() => this.#placeBubble()).observe(this.el);
   }
@@ -48,7 +64,18 @@ export class Stage {
 
     // Empty state.
     show($('stageEmpty'), !screenStream && !url && !recording);
-    text($('stageLabel'), url ? 'Playing back' : hideLive ? 'Recording – preview hidden' : screenStream ? (recording ? 'Live preview' : 'Live preview') : review ? 'This take can’t be played here' : 'Preview');
+    text($('stageLabel'), url ? 'Playing back'
+      : phase === 'starting' ? 'Starting…'
+      : hideLive ? 'Recording – preview hidden'
+      : screenStream ? 'Live preview'
+      : review ? 'This take can’t be played here'
+      : 'Preview');
+    text($('capRecording'), `The preview is hidden to save power. ${RECORDED[st.screen?.surface] || RECORDED.monitor}`);
+    if (review) {
+      text($('capReview'), review.savedTo === 'folder'
+        ? `Watch it back here, or open the file from your “${review.folderName || 'lessons'}” folder.`
+        : 'Watch it back here, or open the file from your Downloads folder.');
+    }
     attr(this.el, 'data-mode', url ? 'playback' : recording ? 'recording' : screenStream ? 'live' : 'empty');
 
     // Camera bubble preview (positioned like the recorded bubble).
@@ -77,7 +104,8 @@ export class Stage {
 
     // Hint under/over the stage.
     let hint = '';
-    if (st.screen && st.screen.surface !== 'monitor') hint = 'Only one window is being recorded';
+    if (st.screen?.surface === 'window') hint = 'Only this window is being recorded';
+    else if (st.screen?.surface === 'browser') hint = 'Only this tab is being recorded';
     else if (showBubble && phase !== 'countdown' && !recording) hint = 'Drag the camera bubble to move it';
     text($('stageHint'), hint);
     show($('stageHint'), !!hint);
@@ -137,15 +165,22 @@ export class Stage {
     this.bubble.addEventListener('pointercancel', end);
     // Keyboard: arrow keys nudge the bubble.
     attr(this.bubble, 'tabindex', '0');
-    attr(this.bubble, 'role', 'img');
+    attr(this.bubble, 'role', 'group');
+    attr(this.bubble, 'aria-roledescription', 'movable camera bubble');
     attr(this.bubble, 'aria-label', 'Camera bubble. Use the arrow keys to move it.');
+    let announceTimer = 0;
     this.bubble.addEventListener('keydown', e => {
       const step = e.shiftKey ? 0.1 : 0.02;
       const d = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key];
       if (!d || !this.bubbleState) return;
       e.preventDefault();
       const b = this.bubbleState;
-      this.session.setBubble({ x: Math.max(0, Math.min(1, b.x + d[0])), y: Math.max(0, Math.min(1, b.y + d[1])) });
+      const pos = { x: Math.max(0, Math.min(1, b.x + d[0])), y: Math.max(0, Math.min(1, b.y + d[1])) };
+      this.bubbleState = { ...b, ...pos };
+      this.session.setBubble(pos);
+      // Say where it ended up once the key presses settle.
+      clearTimeout(announceTimer);
+      announceTimer = setTimeout(() => this.notices?.announce(`Camera bubble: ${placeWords(this.bubbleState)}.`), 500);
     });
   }
 }

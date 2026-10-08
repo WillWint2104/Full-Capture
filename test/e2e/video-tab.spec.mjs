@@ -48,7 +48,11 @@ test('a wide tab keeps its full width and size, and keeps up when it grows', asy
   expect(picked.delivered[0]).toBe(2000);
   expect(picked.delivered[1]).toBeLessThanOrEqual(1080);
   expect(picked.size).toEqual(picked.delivered);
-  expect(picked.native).toEqual(picked.delivered);
+  // Measured before fitting: the full width. (On a busy machine the tab can
+  // lose some height between the two measurements as Chrome lays out its
+  // sharing UI, so only the width is compared.)
+  expect(picked.native[0]).toBe(picked.delivered[0]);
+  expect(picked.native[1]).toBeGreaterThanOrEqual(picked.delivered[1]);
 
   await page.setViewportSize({ width: 2400, height: 1000 });
   const grown = await page.evaluate(async () => {

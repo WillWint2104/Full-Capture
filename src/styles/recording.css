@@ -118,8 +118,8 @@ html[data-phase="paused"] #btnStop .stop-square { background: currentColor; }
 
 .rec-actions-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s2); margin-top: calc(var(--s2) * -1); }
 .ico-resume { display: none; }
-#btnPause[aria-pressed="true"] .ico-pause { display: none; }
-#btnPause[aria-pressed="true"] .ico-resume { display: block; }
+html[data-phase="paused"] #btnPause .ico-pause { display: none; }
+html[data-phase="paused"] #btnPause .ico-resume { display: block; }
 :is(#btnPause, #btnMarker)[aria-disabled="true"] { opacity: 1; }
 
 #btnPopout { margin-top: calc(var(--s2) * -1); }

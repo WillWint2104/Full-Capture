@@ -32,11 +32,12 @@ export class RecordingView {
       if ($('btnStop').getAttribute('aria-disabled') === 'true') return;
       session.stop();
     });
-    $('btnPause').addEventListener('click', () => session.togglePause());
+    const enabled = id => $(id).getAttribute('aria-disabled') !== 'true';
+    $('btnPause').addEventListener('click', () => { if (enabled('btnPause')) session.togglePause(); });
     $('btnResumeBig').addEventListener('click', () => session.togglePause());
-    $('btnMarker').addEventListener('click', () => session.addMarker());
+    $('btnMarker').addEventListener('click', () => { if (enabled('btnMarker')) session.addMarker(); });
     $('btnPopout').addEventListener('click', () => (this.popout.isOpen ? this.popout.close() : this.popout.open()));
-    $('btnDiscard').addEventListener('click', () => this.discard());
+    $('btnDiscard').addEventListener('click', () => { if (enabled('btnDiscard')) this.discard(); });
     attr($('btnStop'), 'aria-keyshortcuts', 'Alt+R');
     attr($('btnPause'), 'aria-keyshortcuts', 'Alt+P');
     attr($('btnMarker'), 'aria-keyshortcuts', 'Alt+M');
@@ -45,14 +46,17 @@ export class RecordingView {
   /** Confirm, then throw the take away. */
   async discard() {
     const st = this.session.state;
-    if (!st.take) return;
+    if (!st.take || !['recording', 'paused'].includes(st.phase)) return;
+    const id = st.take.id;
     const mins = Math.floor(st.take.elapsedMs / 60_000);
     const ok = await this.confirm({
       title: 'Discard this take?',
       text: mins >= 1 ? `${formatDuration(st.take.elapsedMs)} will be deleted. This can’t be undone.` : 'It won’t be saved. This can’t be undone.',
       ok: 'Discard take', cancel: 'Keep recording', danger: true,
     });
-    if (ok) this.session.cancelTake();
+    // The take may have ended while the question was open (Stop in the floating controls, sharing ended).
+    const now = this.session.state;
+    if (ok && now.take?.id === id && ['recording', 'paused'].includes(now.phase)) this.session.cancelTake();
   }
 
   #tickClock(now) {
@@ -76,7 +80,8 @@ export class RecordingView {
       const pill = $('recPill');
       text(pill, phase === 'paused' ? '❚❚ Paused' : phase === 'stopping' ? 'Saving…' : '● Recording');
       attr(pill, 'data-state', phase);
-      text($('recSafety'), st.take.safetyCopy ? 'Safety copy: on' : 'Safety copy: off');
+      const where = st.take.savingTo === 'folder' ? `Saving into “${st.take.folderName || 'your folder'}”` : 'Downloads when you stop';
+      text($('recSafety'), `${where} · safety copy ${st.take.safetyCopy ? 'on' : 'off'}`);
       attr($('recSafety'), 'data-on', st.take.safetyCopy ? 'true' : 'false');
       show($('recSysRow'), !!st.screen?.hasAudio && st.audio.systemAudio);
       if (st.prefs.noVoice) text($('recMicLabel'), 'Voice off');
@@ -85,7 +90,6 @@ export class RecordingView {
       attr($('btnStop'), 'aria-disabled', stopping ? 'true' : null);
       label($('btnStop'), stopping ? 'Saving…' : 'Stop & save');
       label($('btnPause'), phase === 'paused' ? 'Resume' : 'Pause');
-      attr($('btnPause'), 'aria-pressed', phase === 'paused' ? 'true' : 'false');
       attr($('btnPause'), 'aria-disabled', stopping ? 'true' : null);
       attr($('btnMarker'), 'aria-disabled', stopping ? 'true' : null);
       const n = st.take.markers.length;
@@ -107,11 +111,14 @@ export class RecordingView {
     // Announcements and focus.
     const prev = this.prevPhase;
     if (phase !== prev) {
-      if (phase === 'recording' && (prev === 'countdown' || prev === 'ready' || prev === 'setup' || prev === 'review')) {
+      if (phase === 'recording' && prev !== 'paused') {
         this.notices.announce('Recording started.');
         requestAnimationFrame(() => focusEl($('btnStop')));
       }
-      if (phase === 'paused') this.notices.announce('Paused. Not recording.');
+      if (phase === 'paused') {
+        this.notices.announce('Paused. Not recording.');
+        requestAnimationFrame(() => $('recBanner')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
+      }
       if (phase === 'recording' && prev === 'paused') this.notices.announce('Recording resumed.');
       if (phase === 'stopping') this.notices.announce('Saving…');
     }
