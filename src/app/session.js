@@ -834,13 +834,15 @@ export class Session extends Emitter {
     try {
       recorder = await begin(savingTo === 'folder' ? new FolderSink(this.#folder) : new MemorySink());
     } catch (e) {
-      if (savingTo === 'folder') {
+      if (savingTo === 'folder' && e?.code === 'sink') {
         // The folder may have lost permission; don't lose the take over it.
-        this.#notice({ kind: 'warning', title: 'Couldn’t write to your folder', text: `${e.message || e}. This take will download when you stop instead.` });
+        const why = String(e.message || e).replace(/\.?$/, '.');
+        this.#notice({ kind: 'warning', title: 'Couldn’t write to your folder', text: `${why} This take will download when you stop instead.` });
         savingTo = 'memory';
         try { recorder = await begin(new MemorySink()); } catch (e2) { e = e2; recorder = null; }
       }
       if (!recorder) {
+        if (e?.code === 'screen-gone') this.#releaseScreen();
         this.#compositor?.stop();
         this.#compositor = null;
         this.#notice({ kind: 'error', title: 'Recording couldn’t start', text: e.message || String(e) });
@@ -1086,6 +1088,8 @@ export class Session extends Emitter {
     }
     const url = this.#urls.get(id);
     if (url) { URL.revokeObjectURL(url); this.#urls.delete(id); }
+    // A downloaded take's safety copy is the whole lesson: delete it with the take.
+    if (this.#kept.delete(id)) await this.#journal?.discard(id).catch(() => {});
     if (this.#review === id) this.#review = null;
     try { await this.#library.remove(id); } catch { /* list refreshes on next change */ }
     this.#notice({ kind: 'info', title: 'Take deleted', text: `${t.filename} was removed.${fileNote}`, timeoutMs: 6000 });
@@ -1241,7 +1245,7 @@ export class Session extends Emitter {
         this.#kept.add(rowId);
       } else await this.#journal.discard(id);
       this.#recovery = this.#recovery.filter(r => r !== item);
-      this.#notice({ kind: 'success', title: 'Recording recovered', text: savedTo === 'folder' ? `${filename} is in “${folderName}”.` : `${filename} is in your Downloads folder.` });
+      this.#notice({ kind: 'success', title: 'Recording recovered', text: savedTo === 'folder' ? `${item.savedName || filename} is in “${folderName}”.` : `${filename} is in your Downloads folder.` });
     } catch (e) {
       this.#notice({ kind: 'error', title: 'Recovery failed', text: e.message || String(e) });
     }

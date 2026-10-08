@@ -256,6 +256,34 @@ test('downloaded takes keep a safety copy until the next take is saved (keep / p
   expect(r.againProbe.error).toBeNull();
 });
 
+test('two tabs saving downloads at the same time never delete each other’s fresh safety copy', async ({ page }) => {
+  const r = await page.evaluate(async () => {
+    // Two Journal instances stand in for two tabs sharing one database.
+    const a = await rec.Journal.open();
+    const b = await rec.Journal.open();
+    for (const id of ['old', 'x', 'y']) {
+      await a.begin({ id, lessonName: id, filename: `${id}.webm`, container: 'webm', mimeType: 'video/webm', startedAt: Date.now() });
+      await a.append(id, 0, new Blob([id]));
+    }
+    await a.complete('old', { keep: true });
+    await kit.sleep(5);
+    await a.complete('x', { keep: true });     // tab A saved take x as a download...
+    await kit.sleep(5);
+    await b.complete('y', { keep: true });     // ...and tab B saved take y a moment later,
+    const prunedByA = await a.prune({ exceptId: 'x' });   // before A got round to pruning.
+    const afterA = (await a.listKept()).map(m => m.id).sort();
+    const prunedByB = await b.prune({ exceptId: 'y' });
+    const afterB = (await b.listKept()).map(m => m.id);
+    const rows = await kit.journalRows();
+    return { prunedByA, afterA, prunedByB, afterB, chunkIds: [...new Set(rows.chunkKeys.map(k => k[0]))] };
+  });
+  expect(r.prunedByA).toEqual(['old']);
+  expect(r.afterA).toEqual(['x', 'y']);    // y is newer than x: A must not delete it
+  expect(r.prunedByB).toEqual(['x']);
+  expect(r.afterB).toEqual(['y']);
+  expect(r.chunkIds).toEqual(['y']);
+});
+
 test('FolderSink writes a playable WebM with the right Duration; a second take with the same name gets "(2)"', async ({ page }) => {
   const r = await page.evaluate(async () => {
     const dir = rec.createFakeDirectory({ name: 'Lessons' });
