@@ -825,7 +825,7 @@ export class Session extends Emitter {
     }
 
     this.#recorder = recorder;
-    this.#take = { id, filename, elapsedMs: 0, bytes: 0, markers: [], savingTo, startedAt, thumbnail: '', safetyCopy: !!this.#journal };
+    this.#take = { id, filename, elapsedMs: 0, bytes: 0, markers: [], savingTo: recorder.savingTo || savingTo, startedAt, thumbnail: '', safetyCopy: !!recorder.safetyCopy };
     this.#phase = 'recording';
     this.#review = null;
     this.#engine.setRecording(true);
@@ -842,11 +842,21 @@ export class Session extends Emitter {
       this.#changed();
     });
     recorder.on('warning', w => {
-      if (/crash protection|safety copy/i.test(w.message || '') && this.#take?.id === id) this.#take = { ...this.#take, safetyCopy: false };
+      if (['journal-failed', 'no-journal', 'no-data'].includes(w.code) && this.#take?.id === id) this.#take = { ...this.#take, safetyCopy: !!recorder.safetyCopy };
+      if (w.code === 'saved-elsewhere') return;   // reported with the saved take
       this.#notice({ kind: 'warning', title: 'Recording', text: w.message });
+      this.#changed();
     });
     recorder.on('error', err => {
-      this.#notice({ kind: 'error', title: err.fatal ? 'Recording stopped unexpectedly' : 'Recording problem', text: err.message });
+      if (err.code === 'folder-failed') {
+        // Recording carries on; the take will be saved from the safety copy.
+        if (this.#take?.id === id) this.#take = { ...this.#take, savingTo: 'memory' };
+        this.#notice({ kind: 'warning', title: 'Couldn’t keep writing to your folder', text: err.message });
+        this.#changed();
+        return;
+      }
+      if (err.code === 'share-ended' && this.#take?.id === id) this.#endedBy.set(id, 'share-ended');
+      else this.#notice({ kind: 'error', title: err.fatal ? 'Recording stopped unexpectedly' : 'Recording problem', text: err.message });
       if (err.fatal && this.#recorder === recorder && (this.#phase === 'recording' || this.#phase === 'paused')) this.stop();
     });
 
@@ -878,6 +888,7 @@ export class Session extends Emitter {
     const r = this.#recorder;
     if (!r || (this.#phase !== 'recording' && this.#phase !== 'paused')) return null;
     const m = r.addMarker(title || markerTitle(r.markers.length + 1));
+    if (!m) return null;   // the take stopped a moment ago
     this.#take = { ...this.#take, markers: [...r.markers] };
     this.#notice({ kind: 'info', title: `${m.title} marked`, text: `at ${formatClock(m.atMs)}`, timeoutMs: 2000 });
     this.#changed();
@@ -900,8 +911,7 @@ export class Session extends Emitter {
       if (e?.code === 'empty') {
         this.#notice({ kind: 'info', title: 'That take was too short to save', text: 'Nothing had been recorded yet. Press Start recording when you’re ready.', timeoutMs: 6000 });
       } else {
-        const why = String(e?.message || e).replace(/\.?$/, '.');
-        this.#notice({ kind: 'error', title: 'Saving failed', text: `${why} Reload this page: your recording will be offered for recovery.` });
+        this.#notice({ kind: 'error', title: 'Saving failed', text: String(e?.message || e) });
       }
     }
     this.#afterTake();
@@ -933,8 +943,10 @@ export class Session extends Emitter {
     if (!result.blob) await this.#ensureUrl(row).catch(() => {});
     if (row.savedTo === 'folder' && row.markers.length) this.saveChaptersFile(row.id, { quiet: true });
     this.#review = row.id;
+    if (result.endedBy === 'share-ended') this.#endedBy.set(row.id, 'share-ended');
     if (this.#endedBy.get(row.id) === 'share-ended') this.#releaseScreen();
-    this.#notice({
+    if (result.warning) this.#notice({ kind: 'warning', title: 'Take saved, with a problem', text: result.warning });
+    else this.#notice({
       kind: 'success',
       title: 'Take saved',
       text: row.savedTo === 'folder'
@@ -1151,12 +1163,12 @@ export class Session extends Emitter {
     const pending = this.#journal ? await this.#journal.listPending().catch(() => []) : [];
     this.#recovery = pending.map(p => ({
       id: p.meta.id, lessonName: p.meta.lessonName || '', filename: p.meta.filename || '',
-      elapsedMs: p.meta.elapsedMs || 0, bytes: p.bytes || 0, startedAt: p.meta.startedAt || 0, legacy: false,
+      elapsedMs: p.meta.elapsedMs || 0, bytes: p.bytes || 0, startedAt: p.meta.startedAt || 0, legacy: false, markers: p.meta.markers || [],
     }));
     this.#legacy = await findLegacyRecording().catch(() => null);
     if (this.#legacy) {
       const m = this.#legacy.meta || {};
-      this.#recovery.push({ id: 'legacy', lessonName: m.name || '', filename: '', elapsedMs: m.elapsedMs || 0, bytes: 0, startedAt: m.startTime || 0, legacy: true });
+      this.#recovery.push({ id: 'legacy', lessonName: m.name || '', filename: '', elapsedMs: m.elapsedMs || 0, bytes: this.#legacy.bytes || 0, startedAt: m.startTime || 0, legacy: true, markers: [] });
     }
   }
 
@@ -1165,19 +1177,27 @@ export class Session extends Emitter {
     const item = this.#recovery.find(r => r.id === id);
     if (!item) return;
     try {
-      const blob = item.legacy ? await this.#legacy.assemble() : await this.#journal.assemble(id);
+      const { blob, durationMs } = item.legacy ? await this.#legacy.assembleInfo() : await this.#journal.assembleInfo(id);
       const ext = /mp4/.test(blob.type) ? 'mp4' : 'webm';
       const base = item.filename ? item.filename.replace(/\.(mp4|webm)$/i, '') : makeFilename({ lessonName: item.lessonName, date: new Date(item.startedAt || Date.now()), ext }).replace(/\.\w+$/, '');
       const filename = `RECOVERED_${base}.${ext}`;
       let savedTo = 'download', folderName = '';
       if (this.#folder?.status === 'ready') {
+        let created = null;
         try {
-          const { writable, name } = await this.#folder.createFile(filename);
-          await writable.write(blob);
-          await writable.close();
+          created = await this.#folder.createFile(filename);
+          await created.writable.write(blob);
+          await created.writable.close();
           savedTo = 'folder'; folderName = this.#folder.name;
-          item.savedName = name;
-        } catch { savedTo = 'download'; }
+          item.savedName = created.name;
+        } catch {
+          // Leave no half-written file behind; fall back to a download.
+          savedTo = 'download';
+          if (created) {
+            await created.writable.abort?.().catch(() => {});
+            await this.#folder.remove(created.name).catch(() => {});
+          }
+        }
       }
       const rowId = item.legacy ? newId() : id;
       if (savedTo === 'download') {
@@ -1186,10 +1206,15 @@ export class Session extends Emitter {
       }
       await this.#library.add({
         id: rowId, lessonName: item.lessonName, filename: item.savedName || filename, container: ext, mimeType: blob.type,
-        durationMs: item.elapsedMs, size: blob.size, createdAt: item.startedAt || Date.now(), markers: [],
+        durationMs: durationMs || item.elapsedMs, size: blob.size, createdAt: item.startedAt || Date.now(), markers: item.markers || [],
         savedTo, folderName, thumbnail: '',
       });
-      if (item.legacy) await this.#legacy.discard(); else await this.#journal.discard(id);
+      if (item.legacy) await this.#legacy.discard();
+      else if (savedTo === 'download') {
+        // A download can't be confirmed: keep the chunks as a safety copy, like a normal take.
+        await this.#journal.complete(id, { keep: true });
+        this.#kept.add(rowId);
+      } else await this.#journal.discard(id);
       this.#recovery = this.#recovery.filter(r => r !== item);
       this.#notice({ kind: 'success', title: 'Recording recovered', text: savedTo === 'folder' ? `${filename} is in “${folderName}”.` : `${filename} is in your Downloads folder.` });
     } catch (e) {

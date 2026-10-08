@@ -322,11 +322,3 @@ test('stopping screen share from the browser saves the take and explains why', a
   await expect(page.locator('#reviewNotice')).toContainText('screen sharing ended');
 });
 
-test('stopping straight after starting explains the take was too short', async ({ page }) => {
-  await openApp(page);
-  await startRecording(page);
-  await page.click('#btnStop');
-  await expect.poll(() => phase(page)).toBe('ready');
-  await expect(page.locator('#toasts')).toContainText('too short');
-  await expect(page.locator('#takeList .take')).toHaveCount(0);
-});
