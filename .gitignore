@@ -10,3 +10,6 @@ __pycache__/
 test-results/
 playwright-report/
 .build/
+
+# UI design candidates and their screenshots (exploration only; the chosen design lives in src/)
+design/
