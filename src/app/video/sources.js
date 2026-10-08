@@ -127,6 +127,10 @@ function surfaceLabel(surface, trackLabel) {
  * a shared window or tab is resized. Limits worked out from the picture's size
  * would freeze the capture at that size, and Chrome reports its 16:9 limits as
  * the size until the first frame, which would squeeze wide screens.
+ * 'crop-and-scale' must be named: without it applyConstraints switches the
+ * track to 'none', and a capturer that keeps its old size (Chromium's fake
+ * screen does; some real ones may) then delivers full-size frames regardless.
+ * With it the track itself scales down to the limits, keeping the aspect ratio.
  * @returns {Promise<boolean>} whether the browser accepted the limits
  */
 async function fitToPreset(track, preset) {
@@ -136,6 +140,7 @@ async function fitToPreset(track, preset) {
       width: { max: MAX_CAPTURE.width },
       height: { max: Math.min(preset.maxHeight, MAX_CAPTURE.height) },
       frameRate: { ideal: preset.fps, max: preset.fps },
+      resizeMode: 'crop-and-scale',
     });
     return true;
   } catch {

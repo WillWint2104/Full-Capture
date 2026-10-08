@@ -628,6 +628,9 @@ export class Session extends Emitter {
   }
 
   async #startCamera() {
+    // Detach the old camera from a take first, so swapping cameras isn't
+    // reported as the camera stopping.
+    this.#compositor?.setCameraTrack(null);
     this.#stopCamera();
     this.#camera = { ...this.#camera, status: 'starting', error: '' };
     this.#changed();
@@ -797,7 +800,12 @@ export class Session extends Emitter {
     if (s.camera && camTrack && camTrack.readyState === 'live' && isCompositingSupported()) {
       try {
         this.#compositor = new Compositor({ screenTrack: screen.videoTrack, cameraTrack: camTrack, width, height, fps, bubble: s.bubble });
-        this.#compositor.on('warning', w => this.#notice({ kind: 'warning', title: 'Camera bubble', text: w.message }));
+        this.#compositor.on('warning', w => {
+          // A camera that was unplugged already has its own banner.
+          const cam = this.#camera.stream?.getVideoTracks()[0];
+          if (!cam || cam.readyState !== 'live') return;
+          this.#notice({ kind: 'warning', title: 'Camera bubble', text: w.message });
+        });
         videoTrack = this.#compositor.start();
       } catch (e) {
         this.#compositor = null;

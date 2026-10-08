@@ -301,6 +301,38 @@ test('frames keep flowing on the camera clock while the screen is static', async
   expectColor(r.pixels[1], 'red', 'bubble');
 });
 
+test('compositing needs no timers or animation frames, which stop or slow down in a hidden tab', async ({ page }) => {
+  const r = await page.evaluate(async () => {
+    // The synthetic sources paint on their own interval, so they start before the clocks are taken away.
+    const screen = kit.colorTrack('#00f', 1280, 720);
+    const camera = kit.colorTrack('#f00', 640, 360);
+    const realSetTimeout = setTimeout;
+    const wait = ms => new Promise(resolve => realSetTimeout(resolve, ms));
+    const names = ['setTimeout', 'setInterval', 'requestAnimationFrame', 'requestIdleCallback'];
+    const saved = Object.fromEntries(names.map(n => [n, window[n]]));
+    const calls = [];
+    for (const n of names) window[n] = () => { calls.push(n); return 0; };
+    try {
+      const comp = new video.Compositor({
+        screenTrack: screen.track, cameraTrack: camera.track, width: 1280, height: 720, fps: 30,
+      });
+      window.scene = { comp };
+      const tap = new kit.FrameTap(comp.start());
+      await wait(300);
+      const before = tap.count;
+      await wait(1000);
+      const rate = tap.count - before;
+      comp.stop();
+      tap.stop();
+      return { calls, rate };
+    } finally {
+      Object.assign(window, saved);
+    }
+  });
+  expect(r.calls).toEqual([]);
+  expect(r.rate).toBeGreaterThan(20);
+});
+
 test('a camera faster than the requested fps does not raise the output rate', async ({ page }) => {
   const r = await page.evaluate(async () => {
     const scene = window.scene = kit.scenario({ camera: null, screen: { animate: false } });

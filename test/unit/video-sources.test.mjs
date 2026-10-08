@@ -88,8 +88,11 @@ test('pickScreen sets the content hint and scales the capture to the preset', as
   const audio = { kind: 'audio', stop() {} };
   const { result } = await runPick(() => fakeStream(video, audio), { preset: QUALITY_PRESETS.standard });
   assert.equal(video.contentHint, 'detail');
-  // The preset's own limits, so the capture follows a shared window that is resized later.
-  assert.deepEqual(video.applied, [{ width: { max: 3840 }, height: { max: 1080 }, frameRate: { ideal: 30, max: 30 } }]);
+  // The preset's own limits, so the capture follows a shared window that is resized later, and
+  // 'crop-and-scale' so the track scales down even when the capturer keeps its old size.
+  assert.deepEqual(video.applied, [{
+    width: { max: 3840 }, height: { max: 1080 }, frameRate: { ideal: 30, max: 30 }, resizeMode: 'crop-and-scale',
+  }]);
   assert.equal(result.videoTrack, video);
   assert.equal(result.audioTrack, audio);
   assert.deepEqual(
