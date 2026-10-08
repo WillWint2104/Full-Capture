@@ -50,6 +50,14 @@ export function progress(el, fraction) {
   attr(el, 'aria-valuenow', Math.round(f * 100));
 }
 
+/**
+ * A file name for display: the "(2026-10-08 14.32)" stamp never breaks
+ * across lines (non-breaking hyphens and spaces inside the brackets).
+ */
+export function displayFilename(name) {
+  return String(name ?? '').replace(/\(([^)]*)\)/g, (_, inner) => `(${inner.replace(/-/g, '\u2011').replace(/ /g, '\u00a0')})`);
+}
+
 /** Set an attribute, or remove it when value is null/false. */
 export function attr(el, name, value) {
   if (!el) return;

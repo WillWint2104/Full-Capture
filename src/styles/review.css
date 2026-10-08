@@ -1,0 +1,87 @@
+/* Review: "Saved – nice work!", where the file went, the name, Record another
+   take, and chapters as visibly editable rows. */
+
+.review-hero { display: grid; gap: var(--s2); padding: var(--s1) 0 var(--s2); }
+.review-kicker { display: inline-flex; align-items: center; gap: var(--s3); color: var(--good); font-size: var(--fs-md); font-weight: var(--fw-strong); }
+.review-badge {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--good-fill);
+  color: #ffffff;
+  box-shadow: 0 0 0 5px var(--good-soft);
+}
+.review-badge .i { width: 18px; height: 18px; stroke-width: 2.5; }
+.review-heading { font-family: var(--font-display); font-size: var(--fs-xl); letter-spacing: -.015em; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.review-heading:focus-visible { outline-offset: 4px; border-radius: 4px; }
+.saved-line { display: flex; align-items: flex-start; gap: var(--s2); font-size: var(--fs-sm); color: var(--text-2); }
+.saved-line .i { width: 18px; height: 18px; margin-top: 1px; color: var(--good); }
+.saved-text { min-width: 0; text-wrap: balance; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.saved-line .ico-download { display: none; color: var(--muted); }
+.saved-line:has(#reviewSaved:not([data-saved="folder"])) .ico-folder { display: none; }
+.saved-line:has(#reviewSaved:not([data-saved="folder"])) .ico-download { display: block; }
+
+.notice {
+  padding: var(--s3) var(--s4);
+  border-radius: var(--r);
+  background: var(--warn-soft);
+  box-shadow: inset 3px 0 0 var(--warn-fill);
+  color: var(--text);
+  font-size: var(--fs-sm);
+}
+
+.review-card { display: grid; gap: var(--s4); padding: 20px; }
+#btnNewTake { margin-top: var(--s1); }
+.review-actions-row { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: calc(var(--s2) * -1); }
+.review-actions-row .btn { flex: 1 1 auto; white-space: normal; padding-block: 8px; }
+.review-foot { display: flex; padding-top: var(--s3); border-top: 1px solid var(--line); }
+
+/* Chapters: bordered inputs with a tinted time chip, so renaming is obvious without hover */
+.chapters-card { display: grid; gap: var(--s3); padding: 20px; }
+.chapter-list { list-style: none; padding: 0; display: grid; gap: var(--s2); }
+.chapter-list:empty { display: none; }
+.chapter { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--s2); }
+.chapter-time {
+  display: grid;
+  place-items: center;
+  min-width: 60px;
+  height: 40px;
+  padding: 0 var(--s2);
+  border-radius: var(--r);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-strong);
+  font-variant-numeric: tabular-nums;
+}
+.chapter-title {
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  padding: 0 var(--s3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--fs-md);
+  text-overflow: ellipsis;
+  transition: border-color .15s var(--ease);
+}
+.chapter-title:hover { border-color: var(--border); }
+.chapter-title:focus-visible { border-color: var(--focus); outline-offset: 1px; }
+.chapter-delete:hover { color: var(--bad); background: var(--bad-soft); }
+.empty-note { font-size: var(--fs-sm); color: var(--muted); }
+.chapter-issues {
+  padding: 10px var(--s3);
+  border-radius: var(--r);
+  background: var(--warn-soft);
+  box-shadow: inset 3px 0 0 var(--warn-fill);
+  color: var(--text);
+  font-size: var(--fs-sm);
+}
+.yt-ready { display: none; align-items: flex-start; gap: var(--s2); color: var(--good); font-size: var(--fs-sm); font-weight: var(--fw-strong); }
+.yt-ready .i { width: 18px; height: 18px; margin-top: 1px; }
+.chapters-card:has(#chapterIssues[hidden]):has(#chapterList > .chapter) .yt-ready { display: flex; }

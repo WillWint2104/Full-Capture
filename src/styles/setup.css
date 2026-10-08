@@ -1,0 +1,452 @@
+/* Set up: progress, the numbered checklist, the sound check and the Start bar. */
+
+/* ── Progress (computed from the steps' data-status) ───── */
+
+.setup-progress { display: grid; gap: var(--s2); }
+.progress-track { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s1); }
+.progress-seg { height: 6px; border-radius: 3px; background: var(--surface-3); transition: background-color .3s var(--ease); }
+.progress-text { font-size: var(--fs-sm); color: var(--muted); }
+.progress-count { color: var(--text); font-weight: var(--fw-strong); }
+
+.view-setup { --d1: 0; --d2: 0; --d3: 0; }
+.view-setup:has(#stepLesson[data-status="done"]) { --d1: 1; }
+.view-setup:has(#stepMic[data-status="done"]) { --d2: 1; }
+.view-setup:has(#stepScreen[data-status="done"]) { --d3: 1; }
+.view-setup:has(#stepLesson[data-status="done"]) .progress-seg[data-step="lesson"],
+.view-setup:has(#stepMic[data-status="done"]) .progress-seg[data-step="mic"],
+.view-setup:has(#stepScreen[data-status="done"]) .progress-seg[data-step="screen"] { background: var(--good-fill); }
+.view-setup:has(#stepMic[data-status="attention"]) .progress-seg[data-step="mic"],
+.view-setup:has(#stepScreen[data-status="attention"]) .progress-seg[data-step="screen"] { background: var(--warn-fill); }
+.progress-count { counter-reset: done calc(var(--d1) + var(--d2) + var(--d3)); }
+.progress-count::before { content: counter(done) " of 3 steps done"; }
+.view-setup:has(#stepLesson[data-status="done"]):has(#stepMic[data-status="done"]):has(#stepScreen[data-status="done"]) .progress-count::before { content: "All 3 steps done – you’re ready"; color: var(--good); }
+.view-setup:has(#stepLesson[data-status="done"]):has(#stepMic[data-status="done"]):has(#stepScreen[data-status="done"]) .progress-optional { display: none; }
+
+/* ── Steps ─────────────────────────────────────────────── */
+
+.steps { display: grid; gap: var(--s3); }
+
+.step {
+  position: relative;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  scroll-margin: 96px 0 200px;
+  transition: border-color .2s var(--ease), box-shadow .2s var(--ease);
+}
+.step-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px var(--s3);
+  min-height: 28px;
+}
+.step-num {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px var(--line-strong);
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-strong);
+  font-variant-numeric: tabular-nums;
+  transition: background-color .2s var(--ease), color .2s var(--ease);
+}
+.step-tick { display: none; width: 16px; height: 16px; stroke-width: 2.5; }
+.step-bang { display: none; font-weight: 700; }
+.step-title { flex: 1 1 auto; min-width: 0; font-size: var(--fs-md); }
+.step-head .chip { margin-left: auto; max-width: 100%; }
+.step-body { display: grid; gap: var(--s4); margin-top: var(--s4); padding-left: 40px; }
+
+/* The number badge and chip follow data-status */
+.step[data-status="done"] .step-num { background: var(--good-fill); color: #ffffff; box-shadow: none; }
+.step[data-status="done"] .step-n { display: none; }
+.step[data-status="done"] .step-tick { display: block; }
+.step[data-status="done"] > .step-head .chip { background: var(--good-soft); color: var(--good); }
+.step[data-status="attention"] { border-color: var(--warn-line); box-shadow: var(--shadow-sm), inset 3px 0 0 var(--warn-fill); }
+.step[data-status="attention"] .step-num { background: var(--warn-fill); color: #1c1d1f; box-shadow: none; }
+.step[data-status="attention"] .step-n { display: none; }
+.step[data-status="attention"] .step-bang { display: block; }
+.step[data-status="attention"] > .step-head .chip { background: var(--warn-soft); color: var(--warn); box-shadow: inset 0 0 0 1px var(--warn-line); }
+
+/* "You are here": the first required step that isn't done gets an ink ring and badge */
+.steps > .step[data-status="todo"]:not(#stepCamera):not(.step:is([data-status="todo"], [data-status="attention"]):not(#stepCamera) ~ .step) {
+  border-color: var(--ink);
+  box-shadow: var(--shadow-md), 0 0 0 1px var(--ink);
+}
+.steps > .step[data-status="todo"]:not(#stepCamera):not(.step:is([data-status="todo"], [data-status="attention"]):not(#stepCamera) ~ .step) .step-num {
+  background: var(--ink);
+  color: var(--on-ink);
+  box-shadow: none;
+}
+/* …and while Start can't run yet, that step's own button becomes the filled one */
+html:has(#btnStart[aria-disabled="true"]) .steps > .step:is([data-status="todo"], [data-status="attention"]):not(#stepCamera):not(.step:is([data-status="todo"], [data-status="attention"]):not(#stepCamera) ~ .step) .step-action:not([aria-disabled="true"]) {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--on-ink);
+}
+
+/* Collapsed: one summary line + Change */
+.step-summary { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 0 var(--s3); margin-top: 2px; padding-left: 40px; }
+.summary-text { flex: 1 1 200px; min-width: 0; color: var(--text-2); font-size: var(--fs-sm); line-height: 1.5; padding-top: 5px; overflow-wrap: anywhere; }
+.step-change { flex: none; }
+.step:not([data-collapsed]) .step-change { display: none; }
+.step[data-collapsed] { padding-block: var(--s4); }
+.step[data-collapsed] .step-body { margin-top: var(--s2); gap: var(--s2); }
+
+.intro { display: grid; gap: var(--s3); justify-items: start; }
+.intro-text { color: var(--text-2); }
+
+/* ── Step 1 · Lesson name ──────────────────────────────── */
+
+.suggest { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s2); margin-top: calc(var(--s2) * -1); font-size: var(--fs-sm); color: var(--muted); }
+.suggest:has(> .chip-btn[hidden]) { display: none; }
+.suggest-icon { width: 18px; height: 18px; color: var(--muted); }
+.file-preview { display: flex; align-items: flex-start; gap: var(--s2); min-width: 0; font-size: var(--fs-sm); color: var(--muted); }
+.file-preview > .i { width: 18px; height: 18px; margin-top: 1px; }
+/* Balanced lines keep "(2026-10-08 14.32)" in one piece */
+.file-name { flex: 1 1 auto; min-width: 0; font-variant-numeric: tabular-nums; text-wrap: balance; overflow-wrap: anywhere; }
+.file-preview .step-change { margin-top: -6px; }
+
+#stepLesson[data-collapsed] .step-body > :not(.file-preview) { display: none; }
+#stepLesson[data-collapsed] .step-body { margin-top: var(--s1); }
+#stepLesson[data-collapsed] .file-preview { color: var(--text-2); }
+
+/* ── Step 2 · Microphone ───────────────────────────────── */
+
+.mic-controls { display: grid; gap: var(--s4); }
+.mic-suggest { margin-top: calc(var(--s1) * -1); }
+.noise-row .muted { font-size: var(--fs-sm); }
+
+/* Only when the browser blocked the mic: where to click, not the prompt that won't appear */
+.blocked-help { display: none; }
+#stepMic:has(#micMessage .message[data-kind="error"]):has(#micIntro[hidden]):has(#micControls[hidden]) .blocked-help { display: grid; }
+
+/* Collapsed microphone: summary line plus a slim live meter, so you see it's alive before Start */
+#stepMic[data-collapsed] :is(#micIntro, .blocked-help) { display: none; }
+#stepMic[data-collapsed] .mic-controls > :not(.mic-level) { display: none; }
+#stepMic[data-collapsed] .mic-controls { gap: 0; }
+#stepMic[data-collapsed] .mic-level { grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: var(--s3); gap: 0 var(--s3); }
+#stepMic[data-collapsed] .mic-level .meter-head { display: contents; }
+#stepMic[data-collapsed] .mic-level .meter-name { display: none; }
+#stepMic[data-collapsed] .mic-level .meter { grid-column: 1; grid-row: 1; height: 8px; }
+#stepMic[data-collapsed] .mic-level .meter-label { grid-column: 2; grid-row: 1; min-width: 72px; }
+#stepMic[data-collapsed] .mic-level .meter-zones { display: none; }
+
+/* Sound check */
+.soundcheck { display: grid; gap: var(--s3); }
+.soundcheck-start { display: grid; gap: 6px; }
+.soundcheck-start .help-text { text-align: center; }
+.soundcheck:has(#scRun:not([hidden])) .soundcheck-start,
+.soundcheck:has(#scResult:not([hidden])) .soundcheck-start { display: none; }
+
+.sc-run {
+  display: grid;
+  gap: var(--s3);
+  padding: var(--s4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface-2);
+}
+/* Get ready · Stay quiet · Read aloud */
+.sc-phases { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s1); }
+.sc-phases li {
+  padding-top: var(--s2);
+  border-top: 4px solid var(--line-strong);
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-strong);
+  line-height: 1.25;
+}
+.sc-run:has(#scStep[data-phase="countdown"]) [data-p="countdown"],
+.sc-run:has(#scStep[data-phase="background"]) [data-p="background"],
+.sc-run:has(#scStep[data-phase="voice"]) [data-p="voice"] { border-top-color: var(--ink); color: var(--text); }
+.sc-run:has(#scStep[data-phase="background"]) [data-p="countdown"],
+.sc-run:has(#scStep[data-phase="voice"]) :is([data-p="countdown"], [data-p="background"]) { border-top-color: var(--good-fill); color: var(--good); }
+.sc-run-head { display: flex; justify-content: space-between; align-items: center; gap: var(--s3); }
+.sc-step { font-size: var(--fs-sm); font-weight: var(--fw-strong); color: var(--muted); font-variant-numeric: tabular-nums; }
+.sc-instruction { font-weight: var(--fw-strong); }
+.sc-line {
+  padding: var(--s4);
+  border-radius: var(--r);
+  background: var(--surface);
+  box-shadow: var(--shadow-xs), inset 4px 0 0 var(--good-fill);
+  font-family: var(--font-display);
+  font-size: var(--fs-xl);
+  font-weight: var(--fw-strong);
+  line-height: 1.3;
+  letter-spacing: -.01em;
+}
+
+.sc-result {
+  display: grid;
+  gap: var(--s3);
+  padding: var(--s4);
+  border: 1px solid var(--good-line);
+  border-radius: var(--r-lg);
+  background: var(--good-soft);
+}
+.sc-head { display: flex; align-items: flex-start; gap: var(--s2); }
+.sc-icon { display: grid; margin-top: 1px; color: var(--good); }
+.sc-icon .i { display: none; width: 26px; height: 26px; }
+.sc-headline { font-size: var(--fs-lg); color: var(--good); letter-spacing: -.01em; }
+.sc-headline:focus-visible { outline-offset: 4px; border-radius: 4px; }
+.sc-text { color: var(--text); }
+.sc-text:empty { display: none; }
+.sc-tips { display: grid; gap: var(--s2); }
+.sc-tips .message { background: var(--surface); }
+.sc-applied { display: flex; gap: 6px; font-size: var(--fs-sm); color: var(--text-2); }
+.sc-applied::before { content: "✓"; color: var(--good); font-weight: var(--fw-strong); }
+.sc-applied:empty { display: none; }
+.sc-actions { display: flex; flex-wrap: wrap; gap: var(--s2); }
+
+.sc-result:has(#scHeadline[data-status="ideal"]) .sc-icon-good { display: block; }
+.sc-result:has(#scHeadline[data-status="usable"]) { background: var(--warn-soft); border-color: var(--warn-line); }
+.sc-result:has(#scHeadline[data-status="usable"]) :is(.sc-icon, .sc-headline) { color: var(--warn); }
+.sc-result:has(#scHeadline[data-status="usable"]) .sc-icon-warn { display: block; }
+.sc-result:has(#scHeadline[data-status="usable"]) .sc-applied::before { color: var(--warn); }
+.sc-result:has(#scHeadline:is([data-status="notready"], [data-status="novoice"], [data-status="clipping"])) { background: var(--bad-soft); border-color: var(--bad-line); }
+.sc-result:has(#scHeadline:is([data-status="notready"], [data-status="novoice"], [data-status="clipping"])) :is(.sc-icon, .sc-headline) { color: var(--bad); }
+.sc-result:has(#scHeadline:is([data-status="notready"], [data-status="novoice"], [data-status="clipping"])) .sc-icon-bad { display: block; }
+
+/* How to fix this in Windows: Windows 11 / Windows 10 tabs (pure CSS radios) */
+.fix { border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); }
+.fix-summary { min-height: 48px; padding: 0 var(--s4); color: var(--text); font-size: var(--fs-md); }
+.fix-summary > span { flex: 1 1 auto; }
+.fix-win { width: 18px; height: 18px; color: var(--info); }
+.fix-summary:hover { background: var(--surface-2); border-radius: var(--r-lg); }
+.fix[open] .fix-summary { border-bottom: 1px solid var(--line); border-radius: var(--r-lg) var(--r-lg) 0 0; }
+.fix-body { display: grid; gap: var(--s3); padding: var(--s4); }
+.fix-tabs { justify-self: start; }
+.fix:has(input[name="fixWinVersion"][value="10"]:checked) #scFixWin11,
+.fix:has(input[name="fixWinVersion"][value="11"]:checked) #scFixWin10 { display: none; }
+.fix-steps ol { list-style: none; padding: 0; display: grid; gap: var(--s3); counter-reset: fix; }
+.fix-steps li { position: relative; padding-left: 34px; counter-increment: fix; font-size: var(--fs-sm); line-height: 1.5; color: var(--text); }
+.fix-steps li::before {
+  content: counter(fix);
+  position: absolute;
+  left: 0;
+  top: -1px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--surface-3);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: var(--fw-strong);
+}
+.fix-actions { display: flex; flex-wrap: wrap; gap: var(--s2); }
+
+/* ── Step 3 · Screen ───────────────────────────────────── */
+
+.screen-intro { gap: var(--s3); }
+/* First use: the picture is open. Once there are takes, it folds behind "Show me how". */
+.howto-toggle {
+  position: relative;
+  display: none;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 var(--s1);
+  border-radius: 4px;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-strong);
+  cursor: pointer;
+}
+.howto-toggle:hover { color: var(--text); }
+.howto-check { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
+.howto-toggle:has(.howto-check:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
+.howto-toggle:has(.howto-check:checked) .disclosure-chevron { rotate: 0deg; }
+html:has(#takeList > .take) .howto-toggle { display: inline-flex; }
+html:has(#takeList > .take) .share-howto { display: none; }
+html:has(#takeList > .take) .screen-intro:has(.howto-check:checked) .share-howto { display: grid; }
+
+.screen-picked { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s3); }
+.screen-picked:not(:has(> :not([hidden]))) { display: none; }
+.screen-summary { display: flex; align-items: center; gap: var(--s3); flex: 1 1 200px; min-width: 0; }
+.screen-summary-text { min-width: 0; }
+.screen-label { font-weight: var(--fw-strong); }
+.screen-detail { font-size: var(--fs-sm); color: var(--muted); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.screen-detail:empty { display: none; }
+
+.audio-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 3px 12px;
+  border-radius: 14px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-strong);
+  line-height: 1.35;
+}
+.audio-chip[data-status="done"] { background: var(--good-soft); color: var(--good); }
+.audio-chip[data-status="todo"] { background: var(--warn-soft); color: var(--warn); box-shadow: inset 0 0 0 1px var(--warn-line); }
+
+.tip {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  padding: var(--s3);
+  border-radius: var(--r);
+  background: var(--info-soft);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+.tip-illus { width: 56px; height: 35px; flex: none; }
+
+.step-actions { display: flex; flex-wrap: wrap; gap: var(--s2); }
+
+#stepScreen[data-collapsed] .screen-intro { display: none; }
+#stepScreen[data-collapsed] .step-body { grid-template-columns: minmax(0, 1fr) auto; align-items: start; margin-top: var(--s1); }
+#stepScreen[data-collapsed] .step-body > * { grid-column: 1 / -1; }
+#stepScreen[data-collapsed] .screen-picked { grid-column: 1; grid-row: 1; gap: 6px var(--s2); }
+#stepScreen[data-collapsed] .step-actions { grid-column: 2; grid-row: 1; }
+#stepScreen[data-collapsed] .tile-icon { display: none; }
+#stepScreen[data-collapsed] .screen-summary { flex: 0 1 auto; gap: var(--s2); }
+#stepScreen[data-collapsed] :is(.screen-label, .screen-detail) { display: inline; font-size: var(--fs-sm); color: var(--text-2); }
+#stepScreen[data-collapsed] .screen-label { font-weight: var(--fw); }
+#stepScreen[data-collapsed] .screen-detail::before { content: " · "; }
+#stepScreen[data-collapsed] .audio-chip { min-height: 24px; padding: 2px 10px; }
+#stepScreen[data-collapsed] #btnChooseScreen {
+  min-height: 32px;
+  padding: 0 var(--s1);
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 4px;
+}
+#stepScreen[data-collapsed] #btnChooseScreen:hover { color: var(--text); text-decoration-color: currentColor; }
+#stepScreen[data-collapsed] #btnChooseScreen .i { display: none; }
+
+/* ── Step 4 · Camera bubble ────────────────────────────── */
+
+.step-optional .chip { background: transparent; box-shadow: inset 0 0 0 1px var(--line-strong); }
+.step-optional[data-status="done"] > .step-head .chip { box-shadow: none; }
+.step-optional[data-status="todo"] .step-num { background: transparent; color: var(--muted); box-shadow: inset 0 0 0 1.5px var(--line-strong); }
+.camera-controls { display: grid; gap: var(--s4); }
+.option-grid { display: grid; grid-template-columns: repeat(2, minmax(0, max-content)); gap: var(--s4) var(--s6); }
+.mirror-field { display: grid; gap: 6px; align-content: start; }
+.mirror-field .check-row { min-height: 36px; }
+
+.shape-swatch { display: inline-block; width: 12px; height: 12px; border: 1.5px solid currentColor; }
+.shape-circle { border-radius: 50%; }
+.shape-rounded { border-radius: 3px; }
+
+.corner-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 40px);
+  gap: 4px;
+  width: max-content;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--surface-2);
+}
+.corner-btn {
+  position: relative;
+  width: 40px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--line);
+  cursor: pointer;
+}
+.corner-btn::after {
+  content: "";
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--border);
+  transition: background-color .15s var(--ease);
+}
+.corner-btn[data-corner="tl"]::after { top: 4px; left: 6px; }
+.corner-btn[data-corner="tr"]::after { top: 4px; right: 6px; }
+.corner-btn[data-corner="bl"]::after { bottom: 4px; left: 6px; }
+.corner-btn[data-corner="br"]::after { bottom: 4px; right: 6px; }
+.corner-btn:hover::after { background: var(--ink); }
+.corner-btn:active { transform: translateY(1px); }
+
+/* ── Start: sticky, so it is always in reach ───────────── */
+
+.start-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 6;
+  margin-top: var(--s1);
+  padding: var(--s4) 0;
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--bg) 0%, transparent), var(--bg) var(--s4));
+}
+/* During the 10-second sound check the sentence matters more than Start */
+html:has(#scRun:not([hidden])) .start-bar { position: static; }
+/* Keyboard focus and scrollIntoView keep clear of the sticky bar */
+html:is([data-phase="setup"], [data-phase="ready"], [data-phase="countdown"]) { scroll-padding-bottom: 176px; }
+
+.start-card {
+  display: grid;
+  gap: var(--s2);
+  padding: var(--s3) var(--s4) var(--s4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+}
+.readiness {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+  text-align: center;
+  text-wrap: balance;
+}
+.readiness[data-ready="true"] { color: var(--good); font-weight: var(--fw-strong); }
+
+#btnStart { font-size: var(--fs-md); }
+.rec-dot {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 28%, transparent);
+}
+.keys-cancel { display: none; }
+#btnStart[aria-disabled="true"] .btn-keys { display: none; }
+.start-hint {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-strong);
+  color: var(--warn);
+  text-align: center;
+  text-wrap: balance;
+}
+
+/* Countdown: Start becomes a calm "Cancel (3)" with Esc */
+html[data-phase="countdown"] #btnStart,
+#btnStart[data-state="countdown"] {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+  box-shadow: var(--shadow-xs);
+}
+html[data-phase="countdown"] #btnStart:hover { background: var(--surface-2); }
+html[data-phase="countdown"] #btnStart .rec-dot { background: var(--record); box-shadow: none; animation: pulse 1s ease-in-out infinite; }
+html[data-phase="countdown"] #btnStart .keys-start { display: none; }
+html[data-phase="countdown"] #btnStart .keys-cancel { display: inline-flex; }

@@ -1,7 +1,7 @@
 // The Set up view: numbered steps (lesson, microphone + sound check, screen,
 // camera), the readiness line and the Start recording button.
 
-import { $, show, text, attr, value, clone, fill, onAction, focusEl, label, showWithWrapper, progress } from './dom.js';
+import { $, show, text, attr, value, clone, fill, onAction, focusEl, label, showWithWrapper, progress, displayFilename } from './dom.js';
 import { Meter } from './meters.js';
 import { makeFilename, suggestNextName } from '../lib/names.js';
 import { fixSteps } from '../audio/fixsteps.js';
@@ -27,6 +27,8 @@ function setOptions(select, items, selected, labelOf) {
     select.replaceChildren(...items.map(i => new Option(labelOf(i), i.deviceId)));
   }
   value(select, selected);
+  // An id from an earlier visit (or none yet) shows the device actually in use, never a blank box.
+  if (select.selectedIndex < 0 && select.options.length) select.selectedIndex = 0;
 }
 
 function message(container, msg, onAct) {
@@ -63,6 +65,7 @@ export class SetupView {
     this.settingsDialog = settingsDialog;
     this.expanded = new Set();     // steps the teacher re-opened with "Change"
     this.freshResult = false;      // a new sound-check verdict the teacher hasn't moved past
+    this.lessonDone = false;       // the teacher confirmed the name this visit (then the step may fold)
     this.prevPhase = null;
     this.prevScPhase = null;
     this.prevResult = null;
@@ -78,9 +81,18 @@ export class SetupView {
   #wire() {
     const s = this.session;
     $('lessonName').addEventListener('input', e => s.setLessonName(e.target.value));
+    // Fold the lesson step once the teacher has settled on a name this visit
+    // (a name remembered from last time stays open, so it gets a second look).
+    $('lessonName').addEventListener('change', e => {
+      if (!e.target.value.trim()) return;
+      this.lessonDone = true;
+      this.expanded.delete('stepLesson');
+      requestAnimationFrame(() => this.render(s.state));
+    });
+    $('lessonName').addEventListener('keydown', e => { if (e.key === 'Enter') e.target.blur(); });
     $('lessonSuggest').addEventListener('click', () => {
       const next = suggestNextName(s.state.lesson.name);
-      if (next) { s.setLessonName(next); $('lessonName').value = next; }
+      if (next) { s.setLessonName(next); $('lessonName').value = next; this.lessonDone = true; this.expanded.delete('stepLesson'); }
     });
     $('notes').addEventListener('input', e => s.setNotes(e.target.value));
 
@@ -182,14 +194,15 @@ export class SetupView {
     const name = st.lesson.name;
     value($('lessonName'), name);
     value($('notes'), st.lesson.notes);
-    this.#step('stepLesson', name.trim() ? 'done' : 'todo', false);
+    const editing = $('stepLesson').contains(document.activeElement) && document.activeElement !== document.body;
+    this.#step('stepLesson', name.trim() ? 'done' : 'todo', !!name.trim() && this.lessonDone && !editing && !this.expanded.has('stepLesson'));
     text($('lessonChip'), name.trim() ? 'Done ✓' : 'To do');
     // Suggest the next lesson in a series once this one has been recorded.
     const next = suggestNextName(name);
     const recorded = next && st.library.some(t => (t.lessonName || '').trim() === name.trim());
     showWithWrapper($('lessonSuggest'), !!recorded);
     if (recorded) label($('lessonSuggest'), `${next}?`);
-    text($('fileNamePreview'), `Will save as: ${makeFilename({ lessonName: name, ext: st.estimate?.container || 'mp4' })}`);
+    text($('fileNamePreview'), `Will save as: ${displayFilename(makeFilename({ lessonName: name, ext: st.estimate?.container || 'mp4' }))}`);
   }
 
   #renderMic(st) {
@@ -260,7 +273,7 @@ export class SetupView {
     // Step status, chip and collapsed summary.
     const cal = audio.calibration;
     let status = 'todo', chip = 'To do', summary = '';
-    if (noVoice) { status = 'done'; chip = 'Voice off'; summary = 'Microphone · off (recording without your voice)'; }
+    if (noVoice) { status = 'done'; chip = 'Voice off'; summary = 'Off – recording without your voice'; }
     else if (['blocked', 'notfound', 'busy', 'error', 'lost'].includes(mic.status)) { status = 'attention'; chip = 'Needs attention'; }
     else if (live) {
       const label = shortLabel(mic.label);
@@ -268,9 +281,9 @@ export class SetupView {
       else if (cal && (cal.status === 'ideal' || cal.status === 'usable')) {
         status = 'done'; chip = cal.status === 'ideal' ? 'Sounds great ✓' : 'Usable ✓';
         const at = cal.at ? new Date(cal.at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : '';
-        summary = `Microphone · ${label} · ${cal.status === 'ideal' ? 'Sounds great' : 'Usable'}${at ? ` · checked ${at}` : ''}`;
+        summary = `${label} · ${cal.status === 'ideal' ? 'Sounds great' : 'Usable'}${at ? ` · checked ${at}` : ''}`;
       } else if (cal) { status = 'attention'; chip = 'Needs attention'; }
-      else { status = 'todo'; chip = 'On · check your sound'; summary = `Microphone · ${label}`; }
+      else { status = 'todo'; chip = 'On · check your sound'; summary = label; }
     } else if (mic.status === 'starting') chip = 'Starting…';
     const collapsed = status === 'done' && !this.expanded.has('stepMic') && !sc.running && !this.freshResult;
     this.#step('stepMic', status, collapsed);
@@ -386,6 +399,8 @@ export class SetupView {
 
   #announce(st, inSetup) {
     const sc = st.soundCheck;
+    // Keep the test sentence on screen when a check starts.
+    if (sc.running && !this.prevScPhase) requestAnimationFrame(() => $('scRun').scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
     if (sc.running && sc.phase !== this.prevScPhase) {
       const say = { background: 'Stay quiet for 3 seconds.', voice: 'Now read the sentence aloud.' }[sc.phase];
       if (say) this.notices.announce(say);

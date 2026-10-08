@@ -1,14 +1,15 @@
 // The Review view (the take you just recorded, or one opened from the list)
 // and the "Your takes" library.
 
-import { $, show, text, attr, value, clone, fill, onAction, focusEl, label } from './dom.js';
+import { $, show, text, attr, value, clone, fill, onAction, focusEl, label, displayFilename } from './dom.js';
 import { formatDuration, formatBytes, formatTimestamp, formatClock } from '../lib/time.js';
 
 const takeNumber = t => Number((t.filename || '').match(/take (\d+)\)/)?.[1] || 1);
 
 function savedLine(t) {
-  if (t.savedTo === 'folder') return `Saved to ${t.folderName || 'your folder'} › ${t.filename} ✓`;
-  return `Downloaded to your Downloads folder as ${t.filename}`;
+  const name = displayFilename(t.filename);
+  if (t.savedTo === 'folder') return `Saved to ${t.folderName || 'your folder'} › ${name} ✓`;
+  return `Downloaded to your Downloads folder as ${name}`;
 }
 
 export class ReviewView {
@@ -83,6 +84,8 @@ export class ReviewView {
     value($('reviewName'), r.lessonName || '');
     attr($('reviewName'), 'placeholder', 'Untitled lesson');
     text($('reviewSaved'), savedLine(r));
+    const help = $('reviewNameHelp');
+    if (help) text(help, r.savedTo === 'folder' ? 'Changing the name also renames the file in your folder.' : 'Changes the name in this list. The downloaded file keeps its name.');
     attr($('reviewSaved'), 'data-saved', r.savedTo);
 
     const notes = [];

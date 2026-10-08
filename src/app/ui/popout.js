@@ -96,7 +96,12 @@ export class Popout {
       case 'stop': s.stop(); break;
       case 'pause': s.togglePause(); break;
       case 'marker': s.addMarker(); break;
-      case 'more': this.confirming = true; this.render(s.state); break;
+      case 'more':
+        this.confirming = true;
+        this.render(s.state);
+        // The safe choice gets focus.
+        this.root?.querySelector('[data-action="discard-no"]')?.focus();
+        break;
       case 'discard-no': this.confirming = false; this.render(s.state); break;
       case 'discard-yes': this.confirming = false; s.cancelTake(); break;
     }
@@ -129,7 +134,7 @@ export class Popout {
     attr(body, 'data-alert', noSound ? 'nosound' : null);
     attr(this.win.document.documentElement, 'data-theme', document.documentElement.getAttribute('data-theme'));
 
-    const pill = phase === 'paused' ? '❚❚ PAUSED' : phase === 'stopping' ? 'SAVING…' : active ? (noSound ? '⚠ NO SOUND' : '● REC') : counting ? 'STARTING…' : st.screen ? 'READY' : 'CHOOSE A SCREEN';
+    const pill = phase === 'paused' ? '❚❚ Paused' : phase === 'stopping' ? 'Saving…' : active ? (noSound ? '⚠ No sound' : '● Recording') : counting ? 'Starting…' : st.screen ? 'Ready' : 'Choose a screen';
     fill(root, {
       pill,
       lesson: st.lesson.name.trim() || 'Untitled lesson',

@@ -1,0 +1,58 @@
+/* Reduced motion and Windows high-contrast (forced colours). */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .step, .card, .banner, .toast, .message, .sc-run, .sc-result, .fix, .dialog, .take-list, .rec-meters, .tip, .notice,
+  .chapter-issues, .rec-banner, .chip, .audio-chip, .pill, .pop-pill, .size-estimate, .count, .start-card, .howto, .chapter-time,
+  .talking-hint, .veil-pill, .stage-label, .take-duration {
+    border: 1px solid CanvasText;
+  }
+  .btn, .btn-link, .icon-btn, .chip-btn, .folder-chip, [data-actions] > button { border: 1px solid ButtonText; }
+  .btn-record[aria-disabled="true"], .btn[aria-disabled="true"] { color: GrayText; border-color: GrayText; }
+  .meter, .progress, .progress-seg {
+    forced-color-adjust: none;
+    background: Canvas;
+    border: 1px solid CanvasText;
+  }
+  .meter::before { background: Highlight !important; }
+  .meter::after { background: CanvasText; opacity: 1; }
+  .progress::-webkit-progress-value { background: Highlight; }
+  .view-setup:has(#stepLesson[data-status="done"]) .progress-seg[data-step="lesson"],
+  .view-setup:has(#stepMic[data-status="done"]) .progress-seg[data-step="mic"],
+  .view-setup:has(#stepScreen[data-status="done"]) .progress-seg[data-step="screen"] { background: Highlight; }
+  .switch { forced-color-adjust: none; background: Canvas; border: 1px solid ButtonText; }
+  .switch::before { background: ButtonText; }
+  .switch:checked { background: Highlight; border-color: Highlight; }
+  .switch:checked::before { background: HighlightText; }
+  .step-num, .how-num, .mode-num, .review-badge { border: 1px solid CanvasText; }
+  .steps > .step[data-status="todo"]:not(#stepCamera):not(.step:is([data-status="todo"], [data-status="attention"]):not(#stepCamera) ~ .step) { outline: 2px solid Highlight; }
+  .seg-opt input:checked + span { forced-color-adjust: none; background: Highlight; color: HighlightText; }
+  .corner-btn::after, .rec-dot, .stop-square, .talking-hint::before, .stage-label::before, .veil-pill::before, .brand-mark::after,
+  .mini-steps li::before, .fix-steps li::before, .sc-phases li {
+    forced-color-adjust: none;
+    background: ButtonText;
+    color: ButtonFace;
+  }
+  .sc-phases li { background: none; color: CanvasText; border-top-color: CanvasText; }
+  /* Illustrations: redrawn in system colours so they stay legible */
+  .illus, .tip-illus, .stage-empty-illus, .library-empty-illus { forced-color-adjust: none; }
+  :is(.il-win, .il-pop, .il-field, .il-btn, .il-thumb, .il-thumb-in, .il-mon, .il-hot, .il-bar, .il-knob, .il-thumb-pie, .se-mon, .se-screen, .le-card) { fill: Canvas; stroke: CanvasText; }
+  :is(.il-t, .il-t-muted, .il-t-sel) { fill: CanvasText; }
+  :is(.il-btn-blue, .il-toggle-on, .il-thumb-sel, .il-callout circle, .se-dot, .il-rec, .il-mini-win, .il-mon-hi, .il-thumb-slice, .il-knob-ink, .il-thumb-bar, .le-play) { fill: Highlight; }
+  :is(.il-t-on, .il-t-callout, .se-play) { fill: HighlightText; }
+  :is(.il-ring, .il-sel-line, .il-stroke, .il-line, .il-thumb-lines, .se-stand, .il-cursor) { stroke: CanvasText; }
+  .il-cursor { fill: CanvasText; stroke: Canvas; }
+  .il-shadow { fill: transparent; }
+  .brand-mark { box-shadow: none; border: 2px solid CanvasText; }
+  .brand-mark::after { inset: 4px; }
+  .stage, .stage-empty { border: 1px solid CanvasText; }
+  :focus-visible { outline: 2px solid Highlight; }
+}

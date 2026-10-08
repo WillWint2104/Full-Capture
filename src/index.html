@@ -1,0 +1,1087 @@
+<!doctype html>
+<html lang="en" data-phase="setup">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Full Capture</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='6' y='12' width='52' height='36' rx='8' fill='%235b6b7f'/%3E%3Ccircle cx='32' cy='30' r='7' fill='%23fff'/%3E%3Crect x='24' y='50' width='16' height='5' rx='2' fill='%235b6b7f'/%3E%3C/svg%3E">
+<style>/*@inline-css*/</style>
+</head>
+<body>
+
+<!-- One icon set: 24 px grid, 1.75 px round strokes, currentColor. The page uses <use>;
+     the floating-controls template carries full inline SVG because it renders in another document. -->
+<svg class="icon-sprite" aria-hidden="true" focusable="false">
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3.5 7.5A1.5 1.5 0 0 1 5 6h4l2 2h8a1.5 1.5 0 0 1 1.5 1.5v8A1.5 1.5 0 0 1 19 19H5a1.5 1.5 0 0 1-1.5-1.5z"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h9.5M17.5 7H20M4 17h3.5M11.5 17H20"/><circle cx="15.5" cy="7" r="2"/><circle cx="9.5" cy="17" r="2"/></symbol>
+  <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.6a2.5 2.5 0 1 1 3.6 2.25c-.75.36-1.2.9-1.2 1.65v.5"/><circle cx="12" cy="16.9" r="1" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3.5" width="6" height="10.5" rx="3"/><path d="M5.75 11a6.25 6.25 0 0 0 12.5 0M12 17.25V20.5M9 20.5h6"/></symbol>
+  <symbol id="i-mic-off" viewBox="0 0 24 24"><path d="M15 10.5V6.5a3 3 0 0 0-5.6-1.5M9 9.5v1.5a3 3 0 0 0 4.6 2.5M5.75 11a6.25 6.25 0 0 0 10.4 4.7M18.25 11c0 .7-.1 1.4-.3 2M12 17.25V20.5M9 20.5h6M4 4l16 16"/></symbol>
+  <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="12" rx="1.75"/><path d="M8.5 20h7M12 16.5V20"/></symbol>
+  <symbol id="i-screens" viewBox="0 0 24 24"><rect x="2.5" y="4.5" width="11" height="8" rx="1.25"/><rect x="10.5" y="9.5" width="11" height="8" rx="1.25"/><path d="M14 20.5h4"/></symbol>
+  <symbol id="i-camera" viewBox="0 0 24 24"><rect x="3" y="6.5" width="12.5" height="11" rx="2"/><path d="m15.5 10.5 5-3v9l-5-3"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-check-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="m8.25 12.25 2.6 2.6 4.9-5.35"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.3 4.5 3.1 17a2 2 0 0 0 1.7 3h14.4a2 2 0 0 0 1.7-3L13.7 4.5a2 2 0 0 0-3.4 0z"/><path d="M12 9.5v4"/><circle cx="12" cy="16.75" r="1" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.25"/><circle cx="12" cy="7.9" r="1" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-error" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v5.25"/><circle cx="12" cy="16.25" r="1" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.75v12.5a.75.75 0 0 0 1.14.64l10.1-6.25a.75.75 0 0 0 0-1.28L9.14 5.11A.75.75 0 0 0 8 5.75z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6.5" y="5" width="3.75" height="14" rx="1" fill="currentColor" stroke="none"/><rect x="13.75" y="5" width="3.75" height="14" rx="1" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-record" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-record-ring" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6.5" y="6.5" width="11" height="11" rx="2" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5.5 20.5V4M5.5 4.5h11.75l-2.5 4.25 2.5 4.25H5.5"/></symbol>
+  <symbol id="i-pip" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><rect x="12" y="11" width="6.5" height="5.5" rx="1" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4.5 7h15M9.5 7V5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2M6.5 7l.9 12a1.5 1.5 0 0 0 1.5 1.4h6.2a1.5 1.5 0 0 0 1.5-1.4l.9-12M10 11v5.5M14 11v5.5"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7.5 10.75 12 15.25l4.5-4.5M5 19.5h14"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6.25c0-.97-.78-1.75-1.75-1.75h-7.5c-.97 0-1.75.78-1.75 1.75v7.5c0 .97.78 1.75 1.75 1.75H8.5"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M7 3.5h7l4.5 4.5v11A1.5 1.5 0 0 1 17 20.5H7A1.5 1.5 0 0 1 5.5 19V5A1.5 1.5 0 0 1 7 3.5z"/><path d="M13.5 3.75V8.5h4.75M9 13h6M9 16.5h4"/></symbol>
+  <symbol id="i-speaker" viewBox="0 0 24 24"><path d="M4 9.5h3.25L11.5 6v12l-4.25-3.5H4z"/><path d="M15 9.25a4 4 0 0 1 0 5.5M17.75 6.75a7.5 7.5 0 0 1 0 10.5"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3.5 5.5 6v5.25c0 4.1 2.75 7.4 6.5 8.75 3.75-1.35 6.5-4.65 6.5-8.75V6z"/><path d="m9.25 12 2 2 3.75-4"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M19.25 12a7.25 7.25 0 1 1-2.12-5.13M19.25 4.75v4.5h-4.5"/></symbol>
+  <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m7 9.5 5 5 5-5"/></symbol>
+  <symbol id="i-wave" viewBox="0 0 24 24"><path d="M3.5 12h1.5M7.5 8.5v7M11 5.5v13M14.5 8v8M18 10.25v3.5M20.5 12h0"/></symbol>
+  <symbol id="i-keyboard" viewBox="0 0 24 24"><rect x="2.75" y="6" width="18.5" height="12" rx="2"/><path d="M6.5 9.75h.01M10 9.75h.01M13.5 9.75h.01M17 9.75h.01M7.5 14.25h9"/></symbol>
+  <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3.5 13.8 9a1.5 1.5 0 0 0 1 1l5.7 1.9-5.7 1.9a1.5 1.5 0 0 0-1 1L12 20.5l-1.8-5.7a1.5 1.5 0 0 0-1-1L3.5 12l5.7-1.9a1.5 1.5 0 0 0 1-1z"/></symbol>
+  <symbol id="i-terminal" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="15" rx="2"/><path d="m7 9.5 3 2.5-3 2.5M12.5 15h4.5"/></symbol>
+  <symbol id="i-stop-share" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="12" rx="1.75"/><path d="M8.5 20h7M12 16.5V20M9.5 8l5 5M14.5 8l-5 5"/></symbol>
+  <symbol id="i-headphones" viewBox="0 0 24 24"><path d="M4.5 16.5V13a7.5 7.5 0 0 1 15 0v3.5"/><rect x="3.5" y="13.5" width="4" height="6.5" rx="1.5"/><rect x="16.5" y="13.5" width="4" height="6.5" rx="1.5"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="9.5" rx="2"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
+  <symbol id="i-film" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="15" rx="2.5"/><path d="m10 9 5 3-5 3z"/></symbol>
+  <symbol id="i-windows" viewBox="0 0 24 24"><path d="M4 5.5 10.75 4.6v6.65H4zM12.25 4.4 20 3.3v7.95h-7.75zM4 12.75h6.75v6.65L4 18.5zM12.25 12.75H20v7.95l-7.75-1.1z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-bulb" viewBox="0 0 24 24"><path d="M9.5 17.5h5M10 20.5h4M12 3.5a5.75 5.75 0 0 0-3.4 10.4c.6.45.9 1.15.9 1.9v.2h5v-.2c0-.75.3-1.45.9-1.9A5.75 5.75 0 0 0 12 3.5z"/></symbol>
+</svg>
+
+<a class="skip-link" href="#main">Skip to the recorder</a>
+
+<header class="app-header">
+  <div class="app-header-inner">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span class="brand-name">Full Capture</span>
+    </div>
+
+    <ol class="modes" aria-hidden="true">
+      <li class="mode" data-mode="setup"><span class="mode-num">1</span>Set up</li>
+      <li class="mode" data-mode="record"><span class="mode-num">2</span>Record</li>
+      <li class="mode" data-mode="review"><span class="mode-num">3</span>Review</li>
+    </ol>
+
+    <nav class="header-actions" aria-label="Save location, help and settings">
+      <button id="btnFolder" class="folder-chip" type="button" data-status="none" title="Where new takes are saved">
+        <svg class="i folder-ico" aria-hidden="true"><use href="#i-folder"/></svg>
+        <svg class="i folder-ico-warn" aria-hidden="true"><use href="#i-alert"/></svg>
+        <span class="folder-chip-label" data-field="label">Choose a folder</span>
+      </button>
+      <button id="btnHelp" class="btn btn-quiet btn-sm header-btn" type="button" aria-label="Help and keyboard shortcuts">
+        <svg class="i" aria-hidden="true"><use href="#i-help"/></svg><span class="hide-narrow" aria-hidden="true">Help</span>
+      </button>
+      <button id="btnSettings" class="btn btn-quiet btn-sm header-btn" type="button">
+        <svg class="i" aria-hidden="true"><use href="#i-sliders"/></svg><span class="hide-narrow">Settings</span>
+      </button>
+    </nav>
+  </div>
+</header>
+
+<div id="srStatus" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
+<div id="srAlert" class="sr-only" role="alert" aria-atomic="true"></div>
+
+<div id="banners" class="banners" hidden></div>
+<div id="toasts" class="toasts"></div>
+
+<main id="main" class="app-main" tabindex="-1">
+
+  <!-- Paused: full width above both columns, impossible to miss -->
+  <section id="recBanner" class="rec-banner" aria-labelledby="recBannerTitle" hidden>
+    <span class="rec-banner-icon" aria-hidden="true"><svg class="i"><use href="#i-pause"/></svg></span>
+    <div class="rec-banner-text">
+      <h2 id="recBannerTitle" class="rec-banner-title">Paused – not recording</h2>
+      <p class="rec-banner-sub">Your take so far is safe. Press Resume when you’re ready to carry on.</p>
+    </div>
+    <div class="rec-banner-actions">
+      <p id="recTalkingHint" class="talking-hint" hidden>You’re talking, but recording is paused – Resume?</p>
+      <button id="btnResumeBig" class="btn btn-record btn-xl rec-banner-btn" type="button" aria-keyshortcuts="Alt+P">
+        <svg class="i" aria-hidden="true"><use href="#i-record"/></svg>Resume
+      </button>
+    </div>
+  </section>
+
+  <div class="workspace">
+
+    <div class="panel">
+
+      <!-- ============ MODE 1 · SET UP ============ -->
+      <section id="viewSetup" class="view view-setup" aria-labelledby="setupHeading">
+        <div class="view-head">
+          <h1 id="setupHeading" class="view-title">Get ready to record</h1>
+          <div class="setup-progress" aria-hidden="true">
+            <div class="progress-track">
+              <span class="progress-seg" data-step="lesson"></span>
+              <span class="progress-seg" data-step="mic"></span>
+              <span class="progress-seg" data-step="screen"></span>
+            </div>
+            <p class="progress-text"><span class="progress-count"></span><span class="progress-optional"> · Camera is optional</span></p>
+          </div>
+        </div>
+
+        <div class="steps">
+
+          <!-- Step 1 · Lesson name -->
+          <section id="stepLesson" class="step" data-status="todo" aria-labelledby="stepLessonTitle">
+            <div class="step-head">
+              <span class="step-num" aria-hidden="true"><span class="step-n">1</span><svg class="i step-tick"><use href="#i-check"/></svg><span class="step-bang">!</span></span>
+              <h2 id="stepLessonTitle" class="step-title">Lesson name</h2>
+              <span id="lessonChip" class="chip">To do</span>
+            </div>
+            <div class="step-body">
+              <div class="field lesson-field">
+                <label class="field-label" for="lessonName">What’s this lesson called?</label>
+                <input id="lessonName" class="input input-lg" type="text" autocomplete="off" spellcheck="true" maxlength="80" placeholder="e.g. Fractions – Week 3" aria-describedby="fileNamePreview">
+              </div>
+              <p class="suggest lesson-suggest">
+                <svg class="i suggest-icon" aria-hidden="true"><use href="#i-sparkle"/></svg>
+                <span class="suggest-label">Next lesson?</span>
+                <button id="lessonSuggest" class="chip-btn" type="button" hidden><span data-field="label">Fractions – Week 4?</span></button>
+              </p>
+              <p class="file-preview">
+                <svg class="i" aria-hidden="true"><use href="#i-file"/></svg>
+                <span id="fileNamePreview" class="file-name">Will save as: Lesson (date and time).mp4</span>
+                <button class="btn-link step-change" type="button" data-action="change">Change</button>
+              </p>
+              <details class="disclosure lesson-notes">
+                <summary class="disclosure-summary">
+                  <svg class="i disclosure-chevron" aria-hidden="true"><use href="#i-chevron"/></svg>
+                  <span>Notes for yourself <span class="muted">(shown while recording)</span></span>
+                </summary>
+                <div class="disclosure-body">
+                  <label class="sr-only" for="notes">Notes for yourself</label>
+                  <textarea id="notes" class="input textarea" rows="3" placeholder="e.g. Start with the pizza example. Remind them about Friday’s quiz."></textarea>
+                </div>
+              </details>
+            </div>
+          </section>
+
+          <!-- Step 2 · Microphone -->
+          <section id="stepMic" class="step" data-status="todo" aria-labelledby="stepMicTitle">
+            <div class="step-head">
+              <span class="step-num" aria-hidden="true"><span class="step-n">2</span><svg class="i step-tick"><use href="#i-check"/></svg><span class="step-bang">!</span></span>
+              <h2 id="stepMicTitle" class="step-title">Microphone</h2>
+              <span id="micChip" class="chip">To do</span>
+            </div>
+
+            <p id="micSummary" class="step-summary" hidden>
+              <span class="summary-text" data-field="summary">Microphone</span>
+              <button class="btn-link step-change" type="button" data-action="change">Change</button>
+            </p>
+
+            <div class="step-body">
+              <div id="micMessage" class="message-slot" hidden></div>
+
+              <!-- Shown only when the browser has blocked the microphone: where to click instead of a prompt -->
+              <figure class="howto blocked-help">
+                <svg class="illus" viewBox="0 -8 360 164" aria-hidden="true" focusable="false">
+                  <rect class="il-win" x="1" y="1" width="358" height="154" rx="10"/>
+                  <path class="il-bar" d="M1 11A10 10 0 0 1 11 1h338a10 10 0 0 1 10 10v28H1z"/>
+                  <path class="il-stroke" d="M18 20h-6M14.5 16.5 11 20l3.5 3.5"/>
+                  <rect class="il-field" x="30" y="8" width="320" height="24" rx="12"/>
+                  <g transform="translate(46 20)"><circle class="il-hot" r="9"/><path class="il-stroke il-ink-stroke" d="M-4.5-2.5h5M3-2.5h1.5M-4.5 2.5H-3M0.5 2.5h4"/><circle class="il-knob-ink" cx="1.75" cy="-2.5" r="1.6"/><circle class="il-knob-ink" cx="-1.25" cy="2.5" r="1.6"/></g>
+                  <text class="il-t il-t-sm il-t-muted" x="62" y="24.5">file:///C:/Users/…/full-capture.html</text>
+                  <g transform="translate(330 20)"><path class="il-stroke il-bad-stroke" d="M0-5.5a2.2 2.2 0 0 1 2.2 2.2v3.3a2.2 2.2 0 0 1-4.4 0v-3.3A2.2 2.2 0 0 1 0-5.5zM-4 0a4 4 0 0 0 8 0M0 4v2.5M-5.5-5.5l11 11"/></g>
+                  <rect class="il-shadow" x="28" y="46" width="236" height="100" rx="9"/>
+                  <rect class="il-pop" x="24" y="42" width="236" height="100" rx="9"/>
+                  <text class="il-t il-t-sm il-t-muted" x="40" y="62">Site settings</text>
+                  <path class="il-stroke" d="M44 75.5a2.5 2.5 0 0 1 2.5 2.5v4.5a2.5 2.5 0 0 1-5 0V78a2.5 2.5 0 0 1 2.5-2.5zM39.75 81.5a4.25 4.25 0 0 0 8.5 0M44 86v2.5"/>
+                  <text class="il-t" x="58" y="86">Microphone</text>
+                  <rect class="il-toggle-on" x="198" y="74" width="32" height="18" rx="9"/>
+                  <circle class="il-knob" cx="221" cy="83" r="6"/>
+                  <path class="il-line" d="M24 102h236"/>
+                  <text class="il-t il-t-sm il-t-muted" x="40" y="126">Reload to apply</text>
+                  <rect class="il-btn-blue" x="168" y="111" width="74" height="24" rx="12"/>
+                  <text class="il-t il-t-sm il-t-on" x="205" y="127.5" text-anchor="middle">Reload</text>
+                  <circle class="il-ring" cx="46" cy="20" r="14"/>
+                  <g class="il-callout" transform="translate(62 3)"><circle r="9"/><text class="il-t il-t-callout" y="4" text-anchor="middle">1</text></g>
+                  <g class="il-callout" transform="translate(246 70)"><circle r="9"/><text class="il-t il-t-callout" y="4" text-anchor="middle">2</text></g>
+                  <g class="il-callout" transform="translate(252 112)"><circle r="9"/><text class="il-t il-t-callout" y="4" text-anchor="middle">3</text></g>
+                </svg>
+                <figcaption>
+                  <ol class="mini-steps">
+                    <li>Click the icon at the left of the address bar.</li>
+                    <li>Switch <strong>Microphone</strong> on (Allow).</li>
+                    <li>Click <strong>Reload</strong>, then come back to this step.</li>
+                  </ol>
+                </figcaption>
+              </figure>
+
+              <div id="micIntro" class="intro">
+                <p class="intro-text">Full Capture records your voice through your microphone. Nothing is uploaded.</p>
+                <figure class="howto">
+                  <svg class="illus" viewBox="0 0 360 150" aria-hidden="true" focusable="false">
+                    <rect class="il-win" x="1" y="1" width="358" height="148" rx="10"/>
+                    <path class="il-bar" d="M1 11A10 10 0 0 1 11 1h338a10 10 0 0 1 10 10v26H1z"/>
+                    <path class="il-stroke" d="M18 19h-6M14.5 15.5 11 19l3.5 3.5"/>
+                    <rect class="il-field" x="30" y="8" width="320" height="22" rx="11"/>
+                    <text class="il-t il-t-sm il-t-muted" x="46" y="23">file:///C:/Users/…/full-capture.html</text>
+                    <rect class="il-shadow" x="44" y="44" width="236" height="96" rx="9"/>
+                    <rect class="il-pop" x="40" y="40" width="236" height="96" rx="9"/>
+                    <text class="il-t il-t-sm il-t-muted" x="56" y="61">full-capture.html wants to</text>
+                    <path class="il-stroke" d="M60 70.5a2.6 2.6 0 0 1 2.6 2.6v4.8a2.6 2.6 0 0 1-5.2 0v-4.8a2.6 2.6 0 0 1 2.6-2.6zM55.5 77a4.5 4.5 0 0 0 9 0M60 81.5v2.5"/>
+                    <text class="il-t" x="72" y="82">Use your microphones</text>
+                    <rect class="il-btn-blue" x="56" y="98" width="96" height="28" rx="14"/>
+                    <text class="il-t il-t-on" x="104" y="117" text-anchor="middle">Allow</text>
+                    <rect class="il-btn" x="160" y="98" width="96" height="28" rx="14"/>
+                    <text class="il-t" x="208" y="117" text-anchor="middle">Block</text>
+                    <rect class="il-ring" x="51" y="93" width="106" height="38" rx="19"/>
+                    <path class="il-cursor" d="M136 112v21l5-5 3.6 8 3.4-1.5-3.6-7.8 7-.2z"/>
+                  </svg>
+                  <figcaption class="illus-caption">Your browser asks once. Click <strong>Allow</strong>.</figcaption>
+                </figure>
+                <button id="btnMicOn" class="btn btn-secondary btn-lg step-action" type="button">
+                  <svg class="i" aria-hidden="true"><use href="#i-mic"/></svg><span data-field="label">Turn on microphone</span>
+                </button>
+              </div>
+
+              <div id="micControls" class="mic-controls" hidden>
+                <div class="field mic-device">
+                  <label class="field-label" for="micSelect">Which microphone?</label>
+                  <div class="select-wrap">
+                    <select id="micSelect" class="select">
+                      <option value="default">Microphone (Windows default)</option>
+                    </select>
+                    <svg class="i select-chevron" aria-hidden="true"><use href="#i-chevron"/></svg>
+                  </div>
+                </div>
+                <p class="suggest mic-suggest">
+                  <svg class="i suggest-icon" aria-hidden="true"><use href="#i-headphones"/></svg>
+                  <span class="suggest-label">Headset found:</span>
+                  <button id="micSuggest" class="chip-btn" type="button" hidden><span data-field="label">Use the headset</span></button>
+                </p>
+
+                <div class="meter-block mic-level">
+                  <div class="meter-head">
+                    <span class="meter-name" id="micMeterName">Mic level</span>
+                    <span id="micMeterLabel" class="meter-label">Say something…</span>
+                  </div>
+                  <div id="micMeter" class="meter" role="meter" aria-labelledby="micMeterName" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="Silent"></div>
+                  <div class="meter-zones" aria-hidden="true"><span>Too quiet</span><span>Good</span><span>Too loud</span></div>
+                </div>
+
+                <label class="switch-row noise-row">
+                  <span class="switch-text">
+                    <span class="switch-title">Reduce background noise</span>
+                    <span class="switch-note">Recommended. Softens fans, traffic and keyboard clicks.</span>
+                  </span>
+                  <input id="noiseToggle" class="switch" type="checkbox" role="switch" checked>
+                </label>
+
+                <div class="soundcheck">
+                  <div class="soundcheck-start">
+                    <button id="btnSoundCheck" class="btn btn-secondary btn-lg btn-block step-action" type="button">
+                      <svg class="i" aria-hidden="true"><use href="#i-wave"/></svg><span data-field="label">Check my sound</span>
+                    </button>
+                    <p class="help-text">About 10 seconds: stay quiet, then read one sentence aloud.</p>
+                  </div>
+
+                  <div id="scRun" class="sc-run" hidden>
+                    <ol class="sc-phases" aria-hidden="true">
+                      <li data-p="countdown">Get ready</li>
+                      <li data-p="background">Stay quiet</li>
+                      <li data-p="voice">Read aloud</li>
+                    </ol>
+                    <div class="sc-run-head">
+                      <p id="scStep" class="sc-step">Get ready</p>
+                      <button class="btn-link" type="button" data-action="cancel-sound-check">Cancel</button>
+                    </div>
+                    <p id="scInstruction" class="sc-instruction">Sit as you will when you teach.</p>
+                    <p id="scLine" class="sc-line" hidden>“Testing, one two three — today we’re learning about…”</p>
+                    <progress id="scProgress" class="progress" max="1" value="0" aria-label="Sound check progress"></progress>
+                  </div>
+
+                  <div id="scResult" class="sc-result" hidden>
+                    <div class="sc-head">
+                      <span class="sc-icon" aria-hidden="true">
+                        <svg class="i sc-icon-good"><use href="#i-check-circle"/></svg>
+                        <svg class="i sc-icon-warn"><use href="#i-alert"/></svg>
+                        <svg class="i sc-icon-bad"><use href="#i-error"/></svg>
+                      </span>
+                      <h3 id="scHeadline" class="sc-headline" data-status="ideal" tabindex="-1">Sounds great – you’re ready</h3>
+                    </div>
+                    <p id="scText" class="sc-text"></p>
+                    <div id="scTips" class="sc-tips" hidden></div>
+                    <p id="scApplied" class="sc-applied" hidden></p>
+                    <div class="sc-actions">
+                      <button id="btnScPlay" class="btn btn-secondary btn-sm" type="button" hidden>
+                        <svg class="i" aria-hidden="true"><use href="#i-play"/></svg><span data-field="label">Hear it back</span>
+                      </button>
+                      <audio id="scAudio" class="sc-audio" hidden></audio>
+                      <button id="btnScAgain" class="btn btn-secondary btn-sm" type="button">
+                        <svg class="i" aria-hidden="true"><use href="#i-refresh"/></svg>Check again
+                      </button>
+                    </div>
+                  </div>
+
+                  <details id="scFix" class="fix" hidden>
+                    <summary class="fix-summary">
+                      <svg class="i fix-win" aria-hidden="true"><use href="#i-windows"/></svg>
+                      <span>How to fix this in Windows</span>
+                      <svg class="i disclosure-chevron" aria-hidden="true"><use href="#i-chevron"/></svg>
+                    </summary>
+                    <div class="fix-body">
+                      <div class="seg-track fix-tabs" role="radiogroup" aria-label="Your version of Windows">
+                        <label class="seg-opt"><input type="radio" name="fixWinVersion" value="11" checked><span>Windows 11</span></label>
+                        <label class="seg-opt"><input type="radio" name="fixWinVersion" value="10"><span>Windows 10</span></label>
+                      </div>
+                      <div id="scFixWin11" class="fix-os" aria-label="Windows 11 steps"><div class="fix-steps" data-field="steps"></div></div>
+                      <div id="scFixWin10" class="fix-os" aria-label="Windows 10 steps"><div class="fix-steps" data-field="steps"></div></div>
+                      <p class="help-text">Then come back here and press <strong>Check again</strong>.</p>
+                      <div class="fix-actions">
+                        <button id="btnScCopySteps" class="btn btn-secondary btn-sm" type="button">
+                          <svg class="i" aria-hidden="true"><use href="#i-copy"/></svg>Copy these steps
+                        </button>
+                        <button id="btnScCopyPrompt" class="btn btn-secondary btn-sm" type="button" aria-describedby="scPromptHelp">
+                          <svg class="i" aria-hidden="true"><use href="#i-terminal"/></svg>Copy a prompt for Claude Code
+                        </button>
+                      </div>
+                      <p id="scPromptHelp" class="help-text">The prompt asks Claude Code to check your Windows microphone settings with you, one safe change at a time.</p>
+                    </div>
+                  </details>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Step 3 · Screen -->
+          <section id="stepScreen" class="step" data-status="todo" aria-labelledby="stepScreenTitle">
+            <div class="step-head">
+              <span class="step-num" aria-hidden="true"><span class="step-n">3</span><svg class="i step-tick"><use href="#i-check"/></svg><span class="step-bang">!</span></span>
+              <h2 id="stepScreenTitle" class="step-title">Screen</h2>
+              <span id="screenChip" class="chip">To do</span>
+            </div>
+            <div class="step-body">
+              <div id="screenMessage" class="message-slot" hidden></div>
+              <div id="screenIntro" class="intro screen-intro">
+                <p class="intro-text">If you’ll play videos or sounds, switch on <strong>Share system audio</strong> in the next window.</p>
+                <!-- First use: the picture is open. Once takes exist, it folds behind "Show me how". -->
+                <label class="howto-toggle">
+                  <input type="checkbox" class="howto-check">
+                  <svg class="i disclosure-chevron" aria-hidden="true"><use href="#i-chevron"/></svg>
+                  <span>Show me how</span>
+                </label>
+                <figure class="howto share-howto">
+                  <svg class="illus" viewBox="0 0 360 200" aria-hidden="true" focusable="false">
+                    <rect class="il-shadow" x="5" y="5" width="354" height="194" rx="10"/>
+                    <rect class="il-pop" x="1" y="1" width="354" height="194" rx="10"/>
+                    <text class="il-t il-t-strong" x="18" y="28">Choose what to share</text>
+                    <text class="il-t il-t-sm il-t-muted" x="18" y="56">Chrome tab</text>
+                    <text class="il-t il-t-sm il-t-muted" x="98" y="56">Window</text>
+                    <text class="il-t il-t-sm il-t-sel" x="160" y="56">Entire screen</text>
+                    <path class="il-line" d="M1 66h354"/>
+                    <path class="il-sel-line" d="M158 65h80"/>
+                    <rect class="il-thumb-sel" x="18" y="78" width="126" height="72" rx="5"/>
+                    <rect class="il-thumb-in" x="24" y="84" width="114" height="60" rx="2"/>
+                    <rect class="il-thumb-bar" x="24" y="136" width="114" height="8"/>
+                    <circle class="il-thumb-pie" cx="58" cy="108" r="13"/>
+                    <path class="il-thumb-slice" d="M58 108V95a13 13 0 0 1 12.4 9z"/>
+                    <path class="il-thumb-lines" d="M80 100h44M80 108h36M80 116h40"/>
+                    <rect class="il-thumb" x="160" y="78" width="126" height="72" rx="5"/>
+                    <text class="il-t il-t-xs il-t-muted" x="81" y="164" text-anchor="middle">Screen 1</text>
+                    <text class="il-t il-t-xs il-t-muted" x="223" y="164" text-anchor="middle">Screen 2</text>
+                    <rect class="il-toggle-on" x="32" y="174" width="26" height="14" rx="7"/>
+                    <circle class="il-knob" cx="51" cy="181" r="5"/>
+                    <text class="il-t il-t-sm" x="66" y="186">Share system audio</text>
+                    <rect class="il-btn" x="214" y="170" width="62" height="22" rx="11"/>
+                    <text class="il-t il-t-sm" x="245" y="185" text-anchor="middle">Cancel</text>
+                    <rect class="il-btn-blue" x="282" y="170" width="62" height="22" rx="11"/>
+                    <text class="il-t il-t-sm il-t-on" x="313" y="185" text-anchor="middle">Share</text>
+                    <g class="il-callout" transform="translate(252 42)"><circle r="10"/><text class="il-t il-t-callout" y="4.5" text-anchor="middle">1</text></g>
+                    <g class="il-callout" transform="translate(144 78)"><circle r="10"/><text class="il-t il-t-callout" y="4.5" text-anchor="middle">2</text></g>
+                    <g class="il-callout" transform="translate(16 181)"><circle r="10"/><text class="il-t il-t-callout" y="4.5" text-anchor="middle">3</text></g>
+                    <g class="il-callout" transform="translate(344 170)"><circle r="10"/><text class="il-t il-t-callout" y="4.5" text-anchor="middle">4</text></g>
+                  </svg>
+                  <figcaption>
+                    <ol class="mini-steps">
+                      <li>Click the <strong>Entire screen</strong> tab.</li>
+                      <li>Click the screen you’ll teach from.</li>
+                      <li>Switch on <strong>Share system audio</strong> if you’ll play videos or sounds.</li>
+                      <li>Click <strong>Share</strong>.</li>
+                    </ol>
+                  </figcaption>
+                </figure>
+              </div>
+              <div class="screen-picked">
+                <div id="screenSummary" class="screen-summary" hidden>
+                  <span class="tile-icon" aria-hidden="true"><svg class="i"><use href="#i-monitor"/></svg></span>
+                  <div class="screen-summary-text">
+                    <p id="screenLabel" class="screen-label">Whole screen</p>
+                    <p id="screenDetail" class="screen-detail"></p>
+                  </div>
+                </div>
+                <p id="sysAudioChip" class="audio-chip" hidden>Computer sound: included ✓</p>
+              </div>
+              <p id="screenTip" class="tip" hidden>
+                <svg class="tip-illus" viewBox="0 0 64 40" aria-hidden="true" focusable="false">
+                  <rect class="il-mon" x="1" y="4" width="28" height="19" rx="2.5"/><path class="il-stroke" d="M11 29h8M15 23v6"/>
+                  <circle class="il-rec" cx="7" cy="10" r="2.5"/>
+                  <rect class="il-mon il-mon-hi" x="35" y="4" width="28" height="19" rx="2.5"/><path class="il-stroke" d="M45 29h8M49 23v6"/>
+                  <rect class="il-mini-win" x="40" y="8" width="18" height="11" rx="1.5"/>
+                </svg>
+                <span>Move this window to your other screen – anything on the recorded screen appears in the video.</span>
+              </p>
+              <div class="step-actions">
+                <button id="btnChooseScreen" class="btn btn-secondary btn-lg step-action" type="button">
+                  <svg class="i" aria-hidden="true"><use href="#i-monitor"/></svg><span data-field="label">Choose screen</span>
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <!-- Step 4 · Camera bubble (optional) -->
+          <section id="stepCamera" class="step step-optional" data-status="todo" aria-labelledby="stepCameraTitle">
+            <div class="step-head">
+              <span class="step-num" aria-hidden="true"><span class="step-n">4</span><svg class="i step-tick"><use href="#i-check"/></svg><span class="step-bang">!</span></span>
+              <h2 id="stepCameraTitle" class="step-title">Camera bubble</h2>
+              <span id="cameraChip" class="chip">Optional</span>
+            </div>
+            <div class="step-body">
+              <label class="switch-row">
+                <span class="switch-text">
+                  <span class="switch-title">Show me in a bubble</span>
+                  <span class="switch-note">Your camera appears in a corner of the video.</span>
+                </span>
+                <input id="cameraToggle" class="switch" type="checkbox" role="switch">
+              </label>
+              <div id="cameraMessage" class="message-slot" hidden></div>
+              <div id="cameraControls" class="camera-controls" hidden>
+                <div class="field">
+                  <label class="field-label" for="cameraSelect">Camera</label>
+                  <div class="select-wrap">
+                    <select id="cameraSelect" class="select">
+                      <option value="">Camera</option>
+                    </select>
+                    <svg class="i select-chevron" aria-hidden="true"><use href="#i-chevron"/></svg>
+                  </div>
+                </div>
+                <div class="option-grid">
+                  <fieldset class="seg">
+                    <legend class="field-label">Shape</legend>
+                    <div class="seg-track">
+                      <label class="seg-opt"><input type="radio" name="bubbleShape" value="circle" checked><span><i class="shape-swatch shape-circle" aria-hidden="true"></i>Circle</span></label>
+                      <label class="seg-opt"><input type="radio" name="bubbleShape" value="rounded"><span><i class="shape-swatch shape-rounded" aria-hidden="true"></i>Rounded</span></label>
+                    </div>
+                  </fieldset>
+                  <fieldset class="seg">
+                    <legend class="field-label">Size</legend>
+                    <div class="seg-track">
+                      <label class="seg-opt"><input type="radio" name="bubbleSize" value="s" aria-label="Small"><span aria-hidden="true">S</span></label>
+                      <label class="seg-opt"><input type="radio" name="bubbleSize" value="m" aria-label="Medium" checked><span aria-hidden="true">M</span></label>
+                      <label class="seg-opt"><input type="radio" name="bubbleSize" value="l" aria-label="Large"><span aria-hidden="true">L</span></label>
+                    </div>
+                  </fieldset>
+                  <fieldset class="corners">
+                    <legend class="field-label">Move to a corner</legend>
+                    <div class="corner-grid">
+                      <button id="btnCornerTL" class="corner-btn" type="button" data-corner="tl" aria-label="Top left" title="Top left"></button>
+                      <button id="btnCornerTR" class="corner-btn" type="button" data-corner="tr" aria-label="Top right" title="Top right"></button>
+                      <button id="btnCornerBL" class="corner-btn" type="button" data-corner="bl" aria-label="Bottom left" title="Bottom left"></button>
+                      <button id="btnCornerBR" class="corner-btn" type="button" data-corner="br" aria-label="Bottom right" title="Bottom right"></button>
+                    </div>
+                  </fieldset>
+                  <div class="mirror-field">
+                    <span class="field-label" aria-hidden="true">Mirror</span>
+                    <label class="check-row">
+                      <input id="bubbleMirror" class="switch" type="checkbox" role="switch" checked>
+                      <span>Flip like a mirror</span>
+                    </label>
+                  </div>
+                </div>
+                <p class="help-text with-icon"><svg class="i" aria-hidden="true"><use href="#i-bulb"/></svg>You can also drag the bubble on the preview.</p>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <!-- Sticky at the bottom of the column (and of the phone screen), so Start is always in reach -->
+        <div class="start-bar">
+          <div class="start-card">
+            <p id="readiness" class="readiness" data-ready="false">Still to do: microphone · screen</p>
+            <button id="btnStart" class="btn btn-record btn-xl btn-block" type="button" aria-keyshortcuts="Alt+R" aria-describedby="readiness startHint" data-state="idle">
+              <span class="rec-dot" aria-hidden="true"></span><span data-field="label">Start recording</span>
+              <span class="btn-keys keys-start" aria-hidden="true"><kbd>Alt</kbd><kbd>R</kbd></span>
+              <span class="btn-keys keys-cancel" aria-hidden="true"><kbd>Esc</kbd></span>
+            </button>
+            <p id="startHint" class="start-hint" hidden></p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ MODE 2 · RECORDING ============ -->
+      <section id="viewRecording" class="view view-recording" aria-labelledby="recLesson" hidden>
+        <div class="card rec-card">
+          <div class="rec-top">
+            <span id="recPill" class="pill" data-state="recording">● Recording</span>
+            <span class="rec-safety" title="Your take is saved as you go. If the browser closes, you can get it back.">
+              <svg class="i" aria-hidden="true"><use href="#i-shield"/></svg><span id="recSafety" data-on="true">Safety copy: on</span>
+            </span>
+          </div>
+          <p id="recTimer" class="rec-timer" role="timer" aria-label="Time recorded">00:00</p>
+          <h1 id="recLesson" class="rec-lesson">Lesson</h1>
+
+          <div class="rec-meters">
+            <div class="meter-block">
+              <div class="meter-head">
+                <span class="meter-name" id="recMicName"><svg class="i" aria-hidden="true"><use href="#i-mic"/></svg>Microphone</span>
+                <span id="recMicLabel" class="meter-label">We can hear you ✓</span>
+                <span class="meter-label meter-label-paused" aria-hidden="true">You’re talking – press Resume</span>
+              </div>
+              <div id="recMicMeter" class="meter meter-lg" role="meter" aria-labelledby="recMicName" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="Silent"></div>
+              <div class="meter-zones" aria-hidden="true"><span>Too quiet</span><span>Good</span><span>Too loud</span></div>
+            </div>
+            <div id="recSysRow" class="meter-block" hidden>
+              <div class="meter-head">
+                <span class="meter-name" id="recSysName"><svg class="i" aria-hidden="true"><use href="#i-speaker"/></svg>Computer sound</span>
+                <span class="meter-label meter-label-plain">Included</span>
+              </div>
+              <div id="recSysMeter" class="meter meter-sys" role="meter" aria-labelledby="recSysName" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="Silent"></div>
+            </div>
+          </div>
+
+          <button id="btnStop" class="btn btn-primary btn-xl btn-block view-primary" type="button" aria-keyshortcuts="Alt+R">
+            <span class="stop-square" aria-hidden="true"></span><span data-field="label">Stop &amp; save</span>
+            <span class="btn-keys" aria-hidden="true"><kbd>Alt</kbd><kbd>R</kbd></span>
+          </button>
+          <div class="rec-actions-row">
+            <button id="btnPause" class="btn btn-secondary btn-lg" type="button" aria-pressed="false" aria-keyshortcuts="Alt+P">
+              <svg class="i ico-pause" aria-hidden="true"><use href="#i-pause"/></svg><svg class="i ico-resume" aria-hidden="true"><use href="#i-play"/></svg><span data-field="label">Pause</span>
+            </button>
+            <button id="btnMarker" class="btn btn-secondary btn-lg" type="button" aria-keyshortcuts="Alt+M">
+              <svg class="i" aria-hidden="true"><use href="#i-flag"/></svg>Add chapter<span id="markerCount" class="count" hidden></span>
+            </button>
+          </div>
+          <button id="btnPopout" class="btn btn-quiet btn-block" type="button" aria-pressed="false">
+            <svg class="i" aria-hidden="true"><use href="#i-pip"/></svg>Floating controls<span class="on-tag" aria-hidden="true">On</span>
+          </button>
+
+          <div class="rec-foot">
+            <button id="btnDiscard" class="btn-link btn-link-danger" type="button">
+              <svg class="i" aria-hidden="true"><use href="#i-trash"/></svg>Discard take
+            </button>
+            <span class="rec-keys" aria-hidden="true"><kbd>Alt</kbd>+<kbd>P</kbd> pause · <kbd>Alt</kbd>+<kbd>M</kbd> chapter</span>
+          </div>
+        </div>
+
+        <section class="card notes-card" aria-labelledby="recNotesTitle">
+          <h2 id="recNotesTitle" class="card-title">Your notes</h2>
+          <p id="recNotes" class="rec-notes" hidden></p>
+        </section>
+      </section>
+
+      <!-- ============ MODE 3 · REVIEW ============ -->
+      <section id="viewReview" class="view view-review" aria-labelledby="reviewHeading" hidden>
+        <div class="review-hero">
+          <p class="review-kicker"><span class="review-badge" aria-hidden="true"><svg class="i"><use href="#i-check"/></svg></span>Saved – nice work!</p>
+          <h1 id="reviewHeading" class="review-heading" tabindex="-1">Take 1</h1>
+          <p class="saved-line">
+            <svg class="i ico-folder" aria-hidden="true"><use href="#i-folder"/></svg>
+            <svg class="i ico-download" aria-hidden="true"><use href="#i-download"/></svg>
+            <span id="reviewSaved" class="saved-text" data-saved="folder"></span>
+          </p>
+        </div>
+        <p id="reviewNotice" class="notice" hidden></p>
+
+        <div class="card review-card">
+          <div class="field">
+            <label class="field-label" for="reviewName">Lesson name</label>
+            <input id="reviewName" class="input input-lg" type="text" autocomplete="off" aria-describedby="reviewNameHelp">
+            <p id="reviewNameHelp" class="help-text">Changing the name also renames the file in your folder.</p>
+          </div>
+          <button id="btnNewTake" class="btn btn-primary btn-xl btn-block view-primary" type="button">
+            <svg class="i" aria-hidden="true"><use href="#i-record-ring"/></svg>Record another take
+          </button>
+          <div class="review-actions-row">
+            <button id="btnDownloadTake" class="btn btn-secondary" type="button">
+              <svg class="i" aria-hidden="true"><use href="#i-download"/></svg><span data-field="label">Download a copy</span>
+            </button>
+            <button id="btnFinish" class="btn btn-secondary" type="button">
+              <svg class="i" aria-hidden="true"><use href="#i-stop-share"/></svg>Finish – stop sharing my screen
+            </button>
+          </div>
+          <div class="review-foot">
+            <button id="btnDeleteTake" class="btn-link btn-link-danger" type="button">
+              <svg class="i" aria-hidden="true"><use href="#i-trash"/></svg>Delete take
+            </button>
+          </div>
+        </div>
+
+        <section class="card chapters-card" aria-labelledby="chaptersTitle">
+          <div class="card-head">
+            <h2 id="chaptersTitle" class="card-title"><svg class="i" aria-hidden="true"><use href="#i-flag"/></svg>Chapters</h2>
+            <span class="card-head-note">Click a title to rename it</span>
+          </div>
+          <ol id="chapterList" class="chapter-list"></ol>
+          <p id="chapterEmpty" class="empty-note" hidden>No chapters in this take. Next time, press <strong>Add chapter</strong> (<kbd>Alt</kbd>+<kbd>M</kbd>) whenever you start a new topic.</p>
+          <p id="chapterIssues" class="chapter-issues" hidden></p>
+          <p class="yt-ready"><svg class="i" aria-hidden="true"><use href="#i-check-circle"/></svg><span>Ready for YouTube – paste the chapters into your video’s description.</span></p>
+          <div class="card-actions">
+            <button id="btnCopyChapters" class="btn btn-secondary btn-sm" type="button">
+              <svg class="i" aria-hidden="true"><use href="#i-copy"/></svg>Copy YouTube chapters
+            </button>
+            <button id="btnSaveChapters" class="btn btn-secondary btn-sm" type="button">
+              <svg class="i" aria-hidden="true"><use href="#i-file"/></svg>Save chapters file
+            </button>
+          </div>
+        </section>
+      </section>
+    </div>
+
+    <!-- ============ STAGE ============ -->
+    <div class="stage-col">
+      <section class="stage-wrap" aria-labelledby="stageLabel">
+        <p id="stageLabel" class="stage-label">Preview</p>
+        <div id="stage" class="stage" data-mode="empty">
+          <video id="screenVideo" class="stage-media" muted playsinline autoplay hidden></video>
+          <video id="reviewVideo" class="stage-media" controls playsinline hidden></video>
+          <img id="stageThumb" class="stage-media stage-thumb" alt="" hidden>
+          <div class="stage-veil" aria-hidden="true">
+            <span class="veil-pill veil-recording">Recording · preview hidden</span>
+            <span class="veil-pill veil-paused">Paused · preview hidden</span>
+            <span class="veil-pill veil-stopping">Saving your take…</span>
+          </div>
+          <div id="stageEmpty" class="stage-empty">
+            <svg class="stage-empty-illus" viewBox="0 0 160 100" aria-hidden="true" focusable="false">
+              <rect class="se-mon" x="20" y="6" width="120" height="74" rx="8"/>
+              <rect class="se-screen" x="28" y="14" width="104" height="58" rx="3"/>
+              <path class="se-stand" d="M64 94h32M80 80v14"/>
+              <circle class="se-dot" cx="80" cy="43" r="11"/>
+              <path class="se-play" d="m77 37.5 8 5.5-8 5.5z"/>
+            </svg>
+            <p class="stage-empty-title">Your screen will appear here</p>
+            <p class="stage-empty-text">Pick the screen you’ll teach from. You’ll see exactly what your class will see.</p>
+            <button id="btnChooseScreenBig" class="btn btn-secondary" type="button">
+              <svg class="i" aria-hidden="true"><use href="#i-monitor"/></svg>Choose screen
+            </button>
+          </div>
+          <div id="bubblePreview" class="bubble" data-shape="circle" data-size="m" data-mirror="true" hidden>
+            <video id="cameraVideo" muted playsinline autoplay></video>
+          </div>
+          <div id="countdown" class="countdown" hidden>
+            <p class="cd-kicker">Recording starts in</p>
+            <span id="countdownNum" class="countdown-num">3</span>
+            <p class="cd-hint">Press <kbd>Esc</kbd> to cancel</p>
+          </div>
+        </div>
+        <p id="stageHint" class="stage-hint" hidden></p>
+        <p class="stage-caption">
+          <span class="cap cap-setup">Nothing is recorded until you press <strong>Start recording</strong>.</span>
+          <span class="cap cap-recording">The preview is hidden to save power. Your whole screen is still being recorded.</span>
+          <span class="cap cap-paused">Paused – nothing is being recorded until you press <strong>Resume</strong>.</span>
+          <span class="cap cap-review">Watch it back here, or open the file from your folder.</span>
+        </p>
+      </section>
+
+      <aside class="card tips tips-setup" aria-labelledby="tipsSetupTitle">
+        <h2 id="tipsSetupTitle" class="card-title">What happens when you press Start recording</h2>
+        <ol class="tip-list tip-list-steps">
+          <li><span class="tip-icon" aria-hidden="true"><svg class="i"><use href="#i-clock"/></svg></span>
+            <span><strong>A 3-2-1 countdown</strong> gives you a moment to get ready. Press <kbd>Esc</kbd> to cancel.</span></li>
+          <li><span class="tip-icon" aria-hidden="true"><svg class="i"><use href="#i-pip"/></svg></span>
+            <span><strong>Floating controls</strong> stay on top of your slides: the timer, Pause, Add chapter and Stop &amp; save.</span></li>
+          <li><span class="tip-icon" aria-hidden="true"><svg class="i"><use href="#i-shield"/></svg></span>
+            <span><strong>A safety copy</strong> is kept while you teach. If the browser closes, you can get the lesson back.</span></li>
+        </ol>
+        <p class="tip-keys"><svg class="i" aria-hidden="true"><use href="#i-keyboard"/></svg><span><kbd>Alt</kbd>+<kbd>R</kbd> start or stop · <kbd>Alt</kbd>+<kbd>P</kbd> pause · <kbd>Alt</kbd>+<kbd>M</kbd> add a chapter</span></p>
+      </aside>
+
+      <aside class="card tips tips-recording" aria-labelledby="tipsRecTitle">
+        <h2 id="tipsRecTitle" class="card-title">While you teach</h2>
+        <ul class="tip-list">
+          <li><span class="tip-icon" aria-hidden="true"><svg class="i"><use href="#i-flag"/></svg></span>
+            <span>Press <strong>Add chapter</strong> when you move to a new topic – chapters become YouTube chapters.</span></li>
+          <li><span class="tip-icon" aria-hidden="true"><svg class="i"><use href="#i-lock"/></svg></span>
+            <span>You can switch windows or close this preview. Recording carries on, and a safety copy is kept.</span></li>
+        </ul>
+      </aside>
+    </div>
+  </div>
+
+  <!-- ============ YOUR TAKES ============ -->
+  <section id="library" class="library" aria-labelledby="libraryTitle">
+    <div class="library-head">
+      <h2 id="libraryTitle" class="section-title">Your takes</h2>
+      <p class="library-sub">From this session and earlier ones on this computer.</p>
+    </div>
+    <ul id="takeList" class="take-list"></ul>
+    <div id="libraryEmpty" class="library-empty">
+      <svg class="library-empty-illus" viewBox="0 0 120 80" aria-hidden="true" focusable="false">
+        <rect class="le-card le-back" x="30" y="6" width="72" height="44" rx="6"/>
+        <rect class="le-card le-mid" x="22" y="14" width="72" height="44" rx="6"/>
+        <rect class="le-card le-front" x="14" y="22" width="72" height="44" rx="6"/>
+        <path class="le-play" d="m45 36 12 8-12 8z"/>
+      </svg>
+      <div>
+        <p class="library-empty-title">No takes yet</p>
+        <p class="library-empty-text">When you press <strong>Stop &amp; save</strong>, your recording appears here, ready to play, download or share.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer class="app-foot">
+    <p><svg class="i" aria-hidden="true"><use href="#i-lock"/></svg>Works offline. Your recordings never leave this computer.</p>
+  </footer>
+</main>
+
+<!-- ============ SETTINGS ============ -->
+<dialog id="settingsDialog" class="dialog dialog-settings" aria-labelledby="settingsTitle">
+  <div class="dialog-head">
+    <div>
+      <h2 id="settingsTitle" class="dialog-title" tabindex="-1" autofocus>Settings</h2>
+      <p class="dialog-sub">Changes are saved straight away.</p>
+    </div>
+    <button id="btnSettingsClose" class="icon-btn dialog-close" type="button" aria-label="Close settings" title="Close">
+      <svg class="i" aria-hidden="true"><use href="#i-x"/></svg>
+    </button>
+  </div>
+  <div class="dialog-body">
+    <section class="set-group" aria-labelledby="setRecTitle">
+      <h3 id="setRecTitle" class="set-title">Recording</h3>
+      <div class="set-field">
+        <label class="field-label" for="formatSelect">File type</label>
+        <div class="select-wrap">
+          <select id="formatSelect" class="select" aria-describedby="formatNote">
+            <option value="auto">Automatic – MP4 when possible</option>
+            <option value="mp4">MP4 – recommended, plays everywhere</option>
+            <option value="webm">WebM – smaller files</option>
+          </select>
+          <svg class="i select-chevron" aria-hidden="true"><use href="#i-chevron"/></svg>
+        </div>
+        <p id="formatNote" class="help-text">MP4 plays almost everywhere and imports cleanly into video editors.</p>
+      </div>
+      <div class="set-field">
+        <label class="field-label" for="qualitySelect">Quality</label>
+        <div class="select-wrap">
+          <select id="qualitySelect" class="select" aria-describedby="qualityNote sizeEstimate">
+            <option value="standard">Standard (1080p)</option>
+            <option value="high">High (full resolution)</option>
+            <option value="smooth">Smooth motion (1080p, 60 fps)</option>
+            <option value="small">Small file (720p)</option>
+          </select>
+          <svg class="i select-chevron" aria-hidden="true"><use href="#i-chevron"/></svg>
+        </div>
+        <p id="qualityNote" class="help-text">Sharp text and smaller files. Right for most lessons.</p>
+        <p id="sizeEstimate" class="size-estimate"></p>
+      </div>
+      <label class="switch-row">
+        <span class="switch-text"><span class="switch-title">3-2-1 countdown</span><span class="switch-note">A moment to get ready before recording starts.</span></span>
+        <input id="countdownToggle" class="switch" type="checkbox" role="switch" checked>
+      </label>
+      <label class="switch-row">
+        <span class="switch-text"><span class="switch-title">Countdown beeps</span><span class="switch-note">Soft beeps in your headset. They aren’t recorded.</span></span>
+        <input id="beepsToggle" class="switch" type="checkbox" role="switch" checked>
+      </label>
+    </section>
+
+    <section class="set-group" aria-labelledby="setWhileTitle">
+      <h3 id="setWhileTitle" class="set-title">While recording</h3>
+      <label class="switch-row">
+        <span class="switch-text"><span class="switch-title">Show floating controls while recording</span><span class="switch-note">A small window that stays on top, for your other screen.</span></span>
+        <input id="floatingToggle" class="switch" type="checkbox" role="switch" checked>
+      </label>
+      <label class="switch-row">
+        <span class="switch-text"><span class="switch-title">Hide preview while recording</span><span class="switch-note">Saves power and avoids a mirror-in-a-mirror effect.</span></span>
+        <input id="hidePreviewToggle" class="switch" type="checkbox" role="switch" checked>
+      </label>
+      <label class="switch-row">
+        <span class="switch-text">
+          <span class="switch-title">Keyboard shortcuts</span>
+          <span class="switch-note kbd-list"><span><kbd>Alt</kbd>+<kbd>R</kbd> start / stop</span><span><kbd>Alt</kbd>+<kbd>P</kbd> pause</span><span><kbd>Alt</kbd>+<kbd>M</kbd> chapter</span></span>
+        </span>
+        <input id="shortcutsToggle" class="switch" type="checkbox" role="switch" checked>
+      </label>
+    </section>
+
+    <section class="set-group" aria-labelledby="setLookTitle">
+      <h3 id="setLookTitle" class="set-title">Appearance</h3>
+      <div class="set-field set-field-inline">
+        <label class="field-label" for="themeSelect">Theme</label>
+        <div class="select-wrap">
+          <select id="themeSelect" class="select">
+            <option value="system">Same as Windows</option>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+          <svg class="i select-chevron" aria-hidden="true"><use href="#i-chevron"/></svg>
+        </div>
+      </div>
+    </section>
+
+    <section class="set-group" aria-labelledby="setSaveTitle">
+      <h3 id="setSaveTitle" class="set-title">Save location</h3>
+      <div class="folder-row">
+        <span class="tile-icon" aria-hidden="true"><svg class="i"><use href="#i-folder"/></svg></span>
+        <p id="folderStatus" class="folder-status">Recordings go to your Downloads folder.</p>
+      </div>
+      <div class="button-row">
+        <button id="btnChooseFolder" class="btn btn-secondary btn-sm" type="button"><svg class="i" aria-hidden="true"><use href="#i-folder"/></svg><span data-field="label">Choose a folder</span></button>
+        <button id="btnForgetFolder" class="btn btn-quiet btn-sm" type="button" hidden>Stop using this folder</button>
+      </div>
+    </section>
+
+    <details id="advancedAudio" class="set-details">
+      <summary class="set-details-summary">
+        <svg class="i disclosure-chevron" aria-hidden="true"><use href="#i-chevron"/></svg>
+        <span><span class="set-details-title">Advanced sound settings</span><span class="switch-note">Only if the sound check suggests it.</span></span>
+      </summary>
+      <div class="set-details-body">
+        <label class="switch-row">
+          <span class="switch-text"><span class="switch-title">Use my mic’s unprocessed sound (Studio)</span><span class="switch-note">For good mics in quiet rooms. Turns off noise reduction.</span></span>
+          <input id="rawMicToggle" class="switch" type="checkbox" role="switch">
+        </label>
+        <label class="switch-row">
+          <span class="switch-text"><span class="switch-title">I’m using speakers, not a headset</span><span class="switch-note">Stops your speakers echoing into the recording.</span></span>
+          <input id="speakersToggle" class="switch" type="checkbox" role="switch">
+        </label>
+        <label class="switch-row">
+          <span class="switch-text"><span class="switch-title">Mute the mic between sentences</span><span class="switch-note">Keeps hallway noise out. Only works after a sound check.</span></span>
+          <input id="gateToggle" class="switch" type="checkbox" role="switch">
+        </label>
+        <label class="switch-row">
+          <span class="switch-text"><span class="switch-title">Adjust my mic level automatically</span><span class="switch-note">Evens out a voice that gets louder and softer.</span></span>
+          <input id="autoLevelToggle" class="switch" type="checkbox" role="switch">
+        </label>
+        <div class="range-field">
+          <div class="range-head"><label class="field-label" for="gainSlider">Mic level</label><output id="gainLabel" class="range-value" for="gainSlider">100%</output></div>
+          <input id="gainSlider" class="range" type="range" min="25" max="1600" step="5" value="100">
+        </div>
+        <div class="range-field">
+          <div class="range-head"><label class="field-label" for="sysAudioLevel">Computer sound volume</label></div>
+          <input id="sysAudioLevel" class="range" type="range" min="0" max="150" step="5" value="70">
+        </div>
+        <label class="switch-row">
+          <span class="switch-text"><span class="switch-title">Record without my voice</span><span class="switch-note">Only the screen and computer sound.</span></span>
+          <input id="noVoiceToggle" class="switch" type="checkbox" role="switch">
+        </label>
+
+        <details id="detailMeters" class="set-details set-details-nested">
+          <summary class="set-details-summary">
+            <svg class="i disclosure-chevron" aria-hidden="true"><use href="#i-chevron"/></svg>
+            <span class="set-details-title">Detailed meters</span>
+          </summary>
+          <div class="set-details-body">
+            <canvas id="spectrum" class="spectrum" width="520" height="96" aria-label="Live frequency spectrum of your microphone"></canvas>
+            <p class="help-text">Steady bars while you’re silent are background noise.</p>
+            <dl class="stats">
+              <div class="stat"><dt>Room noise</dt><dd id="statFloor">—</dd></div>
+              <div class="stat"><dt>Your voice</dt><dd id="statVoice">—</dd></div>
+              <div class="stat"><dt>Voice over noise</dt><dd id="statSnr">—</dd></div>
+              <div class="stat"><dt>Loudest peak</dt><dd id="statPeak">—</dd></div>
+            </dl>
+          </div>
+        </details>
+      </div>
+    </details>
+  </div>
+  <div class="dialog-foot">
+    <button id="btnResetSettings" class="btn-link btn-link-danger" type="button">Reset all settings</button>
+    <form method="dialog"><button class="btn btn-primary" type="submit">Done</button></form>
+  </div>
+</dialog>
+
+<!-- ============ HELP ============ -->
+<dialog id="helpDialog" class="dialog dialog-help" aria-labelledby="helpTitle">
+  <div class="dialog-head">
+    <div>
+      <h2 id="helpTitle" class="dialog-title" tabindex="-1" autofocus>How Full Capture works</h2>
+      <p class="dialog-sub">Everything happens on this computer. No account, no upload.</p>
+    </div>
+    <button id="btnHelpClose" class="icon-btn dialog-close" type="button" aria-label="Close help" title="Close">
+      <svg class="i" aria-hidden="true"><use href="#i-x"/></svg>
+    </button>
+  </div>
+  <div class="dialog-body">
+    <ol class="how">
+      <li><span class="how-num">1</span><div><strong>Set up.</strong> Name the lesson, turn on your microphone and choose the screen you’ll teach from. <em>Check my sound</em> sets your mic level for you.</div></li>
+      <li><span class="how-num">2</span><div><strong>Record.</strong> The floating controls stay on top of your slides. Pause whenever you need to, and add a chapter at each new topic.</div></li>
+      <li><span class="how-num">3</span><div><strong>Review.</strong> Play the take back, fix the name, copy chapters for YouTube, or record another take.</div></li>
+    </ol>
+
+    <h3 class="set-title">Keyboard shortcuts</h3>
+    <table class="kbd-table">
+      <tbody>
+        <tr><th scope="row"><kbd>Alt</kbd> + <kbd>R</kbd></th><td>Start recording · Stop &amp; save</td></tr>
+        <tr><th scope="row"><kbd>Alt</kbd> + <kbd>P</kbd></th><td>Pause · Resume</td></tr>
+        <tr><th scope="row"><kbd>Alt</kbd> + <kbd>M</kbd></th><td>Add chapter</td></tr>
+        <tr><th scope="row"><kbd>Esc</kbd></th><td>Cancel the countdown · close a window like this one</td></tr>
+      </tbody>
+    </table>
+    <p class="help-text">Shortcuts work here and in the floating controls, but not while you’re typing.</p>
+
+    <h3 class="set-title">If something goes wrong</h3>
+    <p class="help-body">A safety copy is kept while you record. If the browser or computer closes mid-lesson, open Full Capture again and choose <strong>Save it</strong> on the card at the top.</p>
+  </div>
+  <div class="dialog-foot dialog-foot-end">
+    <form method="dialog"><button class="btn btn-primary" type="submit">Close</button></form>
+  </div>
+</dialog>
+
+<!-- ============ CONFIRM ============ -->
+<dialog id="confirmDialog" class="dialog dialog-confirm" aria-labelledby="confirmTitle" aria-describedby="confirmText">
+  <div class="confirm-body">
+    <span class="confirm-icon" aria-hidden="true"><svg class="i"><use href="#i-alert"/></svg></span>
+    <h2 id="confirmTitle" class="dialog-title">Are you sure?</h2>
+    <p id="confirmText" class="confirm-text"></p>
+  </div>
+  <div class="dialog-foot dialog-foot-end">
+    <button id="btnConfirmCancel" class="btn btn-secondary" type="button" autofocus>Cancel</button>
+    <button id="btnConfirmOk" class="btn btn-primary" type="button">OK</button>
+  </div>
+</dialog>
+
+<!-- ============ TEMPLATES ============ -->
+<template id="tplToast">
+  <div class="toast" data-kind="info" role="status">
+    <span class="kind-icon" aria-hidden="true">
+      <svg class="i k-info"><use href="#i-info"/></svg>
+      <svg class="i k-success"><use href="#i-check-circle"/></svg>
+      <svg class="i k-warning"><use href="#i-alert"/></svg>
+      <svg class="i k-error"><use href="#i-error"/></svg>
+    </span>
+    <div class="toast-body">
+      <p class="toast-title" data-field="title"></p>
+      <p class="toast-text" data-field="text"></p>
+      <div class="toast-actions" data-actions></div>
+    </div>
+    <button class="icon-btn icon-btn-sm toast-close" type="button" data-action="dismiss" aria-label="Dismiss">
+      <svg class="i" aria-hidden="true"><use href="#i-x"/></svg>
+    </button>
+  </div>
+</template>
+
+<template id="tplBanner">
+  <div class="banner" data-kind="warning" role="alert" tabindex="-1">
+    <span class="kind-icon" aria-hidden="true">
+      <svg class="i k-info"><use href="#i-info"/></svg>
+      <svg class="i k-success"><use href="#i-check-circle"/></svg>
+      <svg class="i k-warning"><use href="#i-alert"/></svg>
+      <svg class="i k-error"><use href="#i-mic-off"/></svg>
+      <svg class="i k-recovery"><use href="#i-shield"/></svg>
+    </span>
+    <div class="banner-body">
+      <p class="banner-title" data-field="title"></p>
+      <p class="banner-text" data-field="text"></p>
+    </div>
+    <div class="banner-actions" data-actions></div>
+    <button class="icon-btn icon-btn-sm banner-close" type="button" data-action="dismiss" aria-label="Dismiss">
+      <svg class="i" aria-hidden="true"><use href="#i-x"/></svg>
+    </button>
+  </div>
+</template>
+
+<template id="tplMessage">
+  <div class="message" data-kind="warning">
+    <span class="kind-icon" aria-hidden="true">
+      <svg class="i k-info"><use href="#i-info"/></svg>
+      <svg class="i k-success"><use href="#i-check-circle"/></svg>
+      <svg class="i k-warning"><use href="#i-alert"/></svg>
+      <svg class="i k-error"><use href="#i-error"/></svg>
+    </span>
+    <div class="message-body">
+      <p class="message-title" data-field="title"></p>
+      <p class="message-text" data-field="text"></p>
+      <div class="message-actions" data-actions></div>
+    </div>
+  </div>
+</template>
+
+<template id="tplTake">
+  <li class="take">
+    <div class="take-thumb">
+      <span class="take-thumb-empty" aria-hidden="true"><svg class="i"><use href="#i-film"/></svg></span>
+      <img data-field="thumb" alt="" decoding="async" hidden>
+      <span class="take-duration" data-field="duration"></span>
+    </div>
+    <div class="take-info">
+      <p class="take-name" data-field="name"></p>
+      <p class="take-meta"><span class="take-meta-row"><span data-field="date"></span><span data-field="size"></span><span data-field="chapters"></span></span></p>
+      <p class="take-saved"><svg class="i" aria-hidden="true"><use href="#i-folder"/></svg><span data-field="saved"></span></p>
+    </div>
+    <div class="take-actions">
+      <button class="btn btn-secondary btn-sm take-play" type="button" data-action="open"><svg class="i" aria-hidden="true"><use href="#i-play"/></svg>Play</button>
+      <button class="btn btn-quiet btn-sm take-dl" type="button" data-action="download"><svg class="i" aria-hidden="true"><use href="#i-download"/></svg>Download</button>
+      <button class="btn btn-quiet btn-sm take-copy" type="button" data-action="copy-chapters"><svg class="i" aria-hidden="true"><use href="#i-copy"/></svg>Copy chapters</button>
+      <button class="icon-btn take-delete" type="button" data-action="delete" aria-label="Delete take" title="Delete take"><svg class="i" aria-hidden="true"><use href="#i-trash"/></svg></button>
+    </div>
+  </li>
+</template>
+
+<template id="tplChapter">
+  <li class="chapter">
+    <span class="chapter-time" data-field="time">00:00</span>
+    <input class="chapter-title" data-field="title" type="text" aria-label="Chapter title" maxlength="100">
+    <button class="icon-btn icon-btn-sm chapter-delete" type="button" data-action="delete" aria-label="Delete chapter" title="Delete chapter"><svg class="i" aria-hidden="true"><use href="#i-x"/></svg></button>
+  </li>
+</template>
+
+<!-- Floating controls (Document Picture-in-Picture). Rendered in another document,
+     so icons are full inline SVG here, not <use>. -->
+<template id="tplPopout">
+  <div class="pop">
+    <div class="pop-nosound" data-part="nosound" hidden>
+      <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 10.5V6.5a3 3 0 0 0-5.6-1.5M9 9.5v1.5a3 3 0 0 0 4.6 2.5M5.75 11a6.25 6.25 0 0 0 10.4 4.7M18.25 11c0 .7-.1 1.4-.3 2M12 17.25V20.5M9 20.5h6M4 4l16 16"/></svg>
+      <div>
+        <p class="pop-nosound-title">No sound!</p>
+        <p class="pop-nosound-text">We can’t hear your microphone. Check it’s plugged in and not muted.</p>
+      </div>
+    </div>
+
+    <div class="pop-head">
+      <span class="pop-pill" data-field="pill">Ready</span>
+      <p class="pop-lesson" data-field="lesson"></p>
+    </div>
+
+    <div class="pop-idle" data-part="idle" hidden>
+      <p class="pop-ready-title">Ready when you are</p>
+      <p class="pop-ready-text">Start from here and keep teaching – this window stays on top.</p>
+    </div>
+    <p class="pop-countdown" data-field="countdown" hidden></p>
+    <button class="btn btn-record btn-xl btn-block pop-start" type="button" data-action="start" aria-keyshortcuts="Alt+R">
+      <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="6" fill="currentColor" stroke="none"/></svg><span data-field="label">Start recording</span>
+    </button>
+
+    <div class="pop-active" data-part="active">
+      <p class="pop-timer" data-field="timer" role="timer">00:00</p>
+      <div class="pop-level">
+        <div class="meter" data-field="meter" role="meter" aria-label="Mic level" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
+        <p class="pop-mic-label" data-field="micLabel"></p>
+      </div>
+      <button class="btn btn-primary btn-block pop-stop" type="button" data-action="stop" aria-keyshortcuts="Alt+R">
+        <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="6.5" width="11" height="11" rx="2" fill="currentColor" stroke="none"/></svg>Stop &amp; save
+      </button>
+      <div class="pop-row">
+        <button class="btn btn-secondary pop-pause" type="button" data-action="pause" aria-pressed="false" aria-keyshortcuts="Alt+P"><span data-field="label">Pause</span></button>
+        <button class="btn btn-secondary pop-marker" type="button" data-action="marker" aria-keyshortcuts="Alt+M">
+          <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 20.5V4M5.5 4.5h11.75l-2.5 4.25 2.5 4.25H5.5"/></svg>Add chapter<span class="count" data-field="markerCount" hidden></span>
+        </button>
+        <button class="icon-btn pop-more" type="button" data-action="more" aria-label="More: discard take" title="More">
+          <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="18" cy="12" r="1.5" fill="currentColor" stroke="none"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="pop-confirm" data-part="confirm" hidden>
+      <p class="pop-confirm-title">Discard this take?</p>
+      <p class="pop-confirm-text" data-field="confirmText">Nothing from this take will be saved. This can’t be undone.</p>
+      <button class="btn btn-primary btn-block" type="button" data-action="discard-no">Keep recording</button>
+      <button class="btn btn-danger-outline btn-block" type="button" data-action="discard-yes">Discard take</button>
+    </div>
+
+    <div class="pop-notes">
+      <p class="pop-notes-label">Your notes</p>
+      <p class="pop-notes-text" data-field="notes"></p>
+    </div>
+  </div>
+</template>
+
+<script>/*@inline-js*/</script>
+</body>
+</html>

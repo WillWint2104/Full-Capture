@@ -1,0 +1,195 @@
+/* The stage: live preview, the dimmed still while recording, playback in
+   review, the camera bubble and the 3-2-1 countdown. stage.js measures #stage
+   itself to place the bubble, so #stage is exactly the 16:9 frame. */
+
+.stage-wrap {
+  position: relative;
+  display: grid;
+  gap: var(--s3);
+  width: min(100%, calc(55vh * 16 / 9));
+  margin: 0 auto;
+}
+
+.stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: var(--r-lg);
+  background: var(--stage);
+  box-shadow: var(--shadow-md), 0 0 0 1px rgba(0, 0, 0, .04);
+  isolation: isolate;
+  transition: box-shadow .3s var(--ease);
+}
+.stage[data-mode="empty"] { background: transparent; box-shadow: none; }
+.stage-media { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: var(--stage); }
+
+/* Label: over the frame's corner on wide screens, above the strip on phones */
+.stage-label {
+  position: absolute;
+  top: var(--s3);
+  left: var(--s3);
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  max-width: calc(100% - 24px);
+  padding: 4px 12px 4px 10px;
+  border-radius: var(--r-pill);
+  background: rgba(12, 12, 14, .66);
+  color: #ffffff;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-strong);
+  white-space: nowrap;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  pointer-events: none;
+}
+.stage-label::before { content: ""; width: 8px; height: 8px; flex: none; border-radius: 50%; background: #7ee2a8; }
+.stage-wrap:has(#stage[data-mode="empty"]) .stage-label,
+html[data-phase="countdown"] .stage-label { display: none; }
+.stage-wrap:has(#stage[data-mode="playback"]) .stage-label::before { width: 9px; height: 10px; border-radius: 0; background: #ffffff; clip-path: polygon(0 0, 100% 50%, 0 100%); }
+html:is([data-phase="recording"], [data-phase="stopping"]) .stage-label::before { background: #ff5b4d; animation: pulse 1.6s ease-in-out infinite; }
+
+/* Recording with the preview hidden: a dimmed, desaturated still that can't pass for a live feed */
+.stage-thumb { filter: grayscale(.85) brightness(.45) contrast(.9); }
+.stage-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: none;
+  place-items: center;
+  pointer-events: none;
+}
+.stage:has(#stageThumb:not([hidden])) .stage-veil { display: grid; }
+.stage-wrap:has(#stageThumb:not([hidden])) .stage-label { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.veil-pill {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px 10px 14px;
+  border-radius: var(--r-pill);
+  background: rgba(12, 12, 14, .72);
+  color: #ffffff;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-strong);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, .14);
+}
+.veil-pill::before { content: ""; width: 12px; height: 12px; flex: none; border-radius: 50%; }
+html[data-phase="recording"] .veil-recording { display: inline-flex; }
+html[data-phase="recording"] .veil-recording::before { background: #ff5b4d; animation: pulse 1.6s ease-in-out infinite; }
+html[data-phase="paused"] .veil-paused { display: inline-flex; }
+html[data-phase="paused"] .veil-paused::before { width: 12px; height: 13px; border-radius: 1px; background: linear-gradient(to right, var(--paused) 0 34%, transparent 34% 66%, var(--paused) 66%); }
+html[data-phase="stopping"] .veil-stopping { display: inline-flex; }
+html[data-phase="stopping"] .veil-stopping::before { border: 2px solid #ffffff; border-right-color: transparent; animation: spin .9s linear infinite; }
+
+html:is([data-phase="recording"], [data-phase="stopping"]) .stage { box-shadow: 0 0 0 3px var(--record-fill), var(--shadow-md); }
+html[data-phase="paused"] .stage { box-shadow: 0 0 0 3px var(--paused), var(--shadow-md); }
+html[data-phase="paused"] .stage-thumb { filter: grayscale(1) brightness(.4) contrast(.85); }
+
+/* Empty: a light dashed placeholder, never a black slab */
+.stage-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--s2);
+  padding: var(--s5);
+  border: 1.5px dashed var(--line-strong);
+  border-radius: inherit;
+  background: var(--surface-2);
+  color: var(--muted);
+  text-align: center;
+}
+.stage-empty-illus { width: 128px; height: auto; margin-bottom: var(--s1); }
+.se-mon { fill: var(--surface); stroke: var(--line-strong); stroke-width: 2; }
+.se-screen { fill: var(--surface-2); }
+.se-stand { fill: none; stroke: var(--line-strong); stroke-width: 3; stroke-linecap: round; }
+.se-dot { fill: var(--ink); }
+.se-play { fill: var(--on-ink); }
+.stage-empty-title { color: var(--text); font-size: var(--fs-lg); font-weight: var(--fw-strong); }
+.stage-empty-text { max-width: 38ch; margin-bottom: var(--s2); font-size: var(--fs-sm); color: var(--muted); }
+
+/* Camera bubble: stage.js sets left/top/width/height; shape and mirror come from data attributes */
+.bubble {
+  position: absolute;
+  left: 76%;
+  top: 62%;
+  z-index: 2;
+  width: 27%;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 50%;
+  background: #2a2b2f;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, .92), 0 8px 24px rgba(0, 0, 0, .35);
+  cursor: grab;
+  touch-action: none;
+  transition: border-radius .2s var(--ease);
+}
+.bubble[data-shape="rounded"] { border-radius: 22%; }
+.bubble.dragging { cursor: grabbing; box-shadow: 0 0 0 2px #ffffff, 0 12px 32px rgba(0, 0, 0, .45); }
+.bubble:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+.bubble video { width: 100%; height: 100%; object-fit: cover; }
+.bubble[data-mirror="true"] video { scale: -1 1; }
+
+/* 3-2-1 */
+.countdown {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--s3);
+  background: rgba(12, 12, 14, .7);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  color: #ffffff;
+  text-align: center;
+}
+.cd-kicker { font-size: var(--fs-lg); font-weight: var(--fw-strong); }
+.countdown-num {
+  display: grid;
+  place-items: center;
+  width: 136px;
+  height: 136px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 4px var(--record-fill), 0 0 0 6px rgba(192, 57, 43, .25);
+  font-family: var(--font-display);
+  font-size: 72px;
+  font-weight: var(--fw-strong);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  animation: count-pop 1s var(--ease) both;
+}
+.cd-hint { font-size: var(--fs-md); color: rgba(255, 255, 255, .88); }
+.cd-hint kbd { background: transparent; border-color: rgba(255, 255, 255, .55); color: #ffffff; }
+@keyframes count-pop { 0% { transform: scale(.7); opacity: 0; } 30% { transform: scale(1.04); opacity: 1; } 100% { transform: scale(1); } }
+
+/* Under the stage */
+.stage-hint, .stage-caption { font-size: var(--fs-sm); color: var(--muted); text-align: center; text-wrap: balance; }
+.stage-hint { font-weight: var(--fw-strong); color: var(--text-2); }
+.stage-caption strong { color: var(--text-2); }
+.cap, .stage-caption { display: none; }
+html:is([data-phase="setup"], [data-phase="ready"], [data-phase="countdown"]) :is(.stage-caption, .cap-setup),
+html[data-phase="recording"] .stage-wrap:has(#stageThumb:not([hidden])) :is(.stage-caption, .cap-recording),
+html[data-phase="paused"] :is(.stage-caption, .cap-paused),
+html[data-phase="review"] .stage-wrap:has(#stage[data-mode="playback"]) :is(.stage-caption, .cap-review) { display: block; }
+html[data-phase="paused"] .cap-paused { color: var(--paused-text); font-weight: var(--fw-strong); }
+.stage-wrap:has(#stageHint:not([hidden])) .stage-caption { display: none; }
+
+/* Panels under the stage */
+.tips { display: grid; gap: var(--s4); padding: 20px var(--s5) var(--s5); background: color-mix(in srgb, var(--surface-2) 70%, transparent); border-color: transparent; box-shadow: none; }
+.tips .card-title { font-size: var(--fs-sm); color: var(--muted); }
+.tip-list { list-style: none; padding: 0; display: grid; gap: var(--s3); }
+.tip-list li { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: var(--s3); align-items: start; font-size: var(--fs-sm); color: var(--text-2); }
+.tip-list li > span:last-child { padding-top: 5px; }
+.tip-list strong { color: var(--text); }
+.tip-list-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s4); }
+.tip-list-steps li { grid-template-columns: minmax(0, 1fr); gap: var(--s2); }
+.tip-list-steps li > span:last-child { padding-top: 0; }
+.tip-icon { display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--r); background: var(--surface); color: var(--text-2); box-shadow: var(--shadow-xs); }
+.tip-icon .i { width: 18px; height: 18px; }
+.tip-keys { display: flex; align-items: center; gap: var(--s3); padding-top: var(--s3); border-top: 1px solid var(--line); font-size: var(--fs-sm); color: var(--text-2); }
+.tip-keys .i { color: var(--muted); }

@@ -644,7 +644,7 @@ export class Session extends Emitter {
         this.#alert('camera-lost', 'warning', 'Camera disconnected', 'The camera stopped. The recording continues without the bubble; turn the camera off and on again once it is reconnected.');
         this.#changed();
       });
-      this.#camera = { ...this.#camera, status: 'live', stream, label: track.label };
+      this.#camera = { ...this.#camera, status: 'live', stream, label: track.label, activeId: track.getSettings().deviceId || '' };
       this.#clearAlert('camera-lost');
       if (this.#compositor) {
         this.#compositor.setCameraTrack(track);
@@ -1365,7 +1365,7 @@ export class Session extends Emitter {
       micError: this.#micError,
       testClip: { state: this.#testClip.state, remainingMs: this.#testClip.remainingMs, url: this.#testClip.url, size: this.#testClip.size },
       camera: {
-        enabled: s.camera, status: s.camera ? this.#camera.status : 'off', deviceId: s.cameraDeviceId, label: this.#camera.label,
+        enabled: s.camera, status: s.camera ? this.#camera.status : 'off', deviceId: this.#camera.activeId || s.cameraDeviceId, label: this.#camera.label,
         devices: this.#camera.devices, bubble: { ...s.bubble }, supported: isCompositingSupported(), previewStream: this.#camera.stream, error: this.#camera.error || '',
         inTake: !!this.#compositor,
       },
