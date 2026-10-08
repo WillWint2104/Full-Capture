@@ -1,7 +1,7 @@
 // The Recording view: state pill, big timer, meters, Stop & save, Pause,
 // Add chapter, floating controls, Discard take, notes, paused banner.
 
-import { $, show, text, attr, focusEl } from './dom.js';
+import { $, show, text, attr, focusEl, label } from './dom.js';
 import { Meter } from './meters.js';
 import { formatClock, formatDuration } from '../lib/time.js';
 
@@ -83,8 +83,8 @@ export class RecordingView {
 
       const stopping = phase === 'stopping';
       attr($('btnStop'), 'aria-disabled', stopping ? 'true' : null);
-      text($('btnStop').querySelector('[data-field="label"]') || $('btnStop'), stopping ? 'Saving…' : 'Stop & save');
-      text($('btnPause').querySelector('[data-field="label"]') || $('btnPause'), phase === 'paused' ? 'Resume' : 'Pause');
+      label($('btnStop'), stopping ? 'Saving…' : 'Stop & save');
+      label($('btnPause'), phase === 'paused' ? 'Resume' : 'Pause');
       attr($('btnPause'), 'aria-pressed', phase === 'paused' ? 'true' : 'false');
       attr($('btnPause'), 'aria-disabled', stopping ? 'true' : null);
       attr($('btnMarker'), 'aria-disabled', stopping ? 'true' : null);

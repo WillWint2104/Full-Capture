@@ -1,7 +1,7 @@
 // The Review view (the take you just recorded, or one opened from the list)
 // and the "Your takes" library.
 
-import { $, show, text, attr, value, clone, fill, onAction, focusEl } from './dom.js';
+import { $, show, text, attr, value, clone, fill, onAction, focusEl, label } from './dom.js';
 import { formatDuration, formatBytes, formatTimestamp, formatClock } from '../lib/time.js';
 
 const takeNumber = t => Number((t.filename || '').match(/take (\d+)\)/)?.[1] || 1);
@@ -116,7 +116,7 @@ export class ReviewView {
     attr($('btnSaveChapters'), 'aria-disabled', markers.length ? null : 'true');
 
     show($('btnDownloadTake'), !!r.playable);
-    text($('btnDownloadTake').querySelector('[data-field="label"]') || $('btnDownloadTake'), r.savedTo === 'folder' ? 'Download a copy' : 'Download again');
+    label($('btnDownloadTake'), r.savedTo === 'folder' ? 'Download a copy' : 'Download again');
     show($('btnFinish'), !!st.screen);
 
     if (r.id !== this.prevReviewId) {

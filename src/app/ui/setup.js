@@ -1,7 +1,7 @@
 // The Set up view: numbered steps (lesson, microphone + sound check, screen,
 // camera), the readiness line and the Start recording button.
 
-import { $, show, text, attr, value, clone, fill, onAction, focusEl } from './dom.js';
+import { $, show, text, attr, value, clone, fill, onAction, focusEl, label, showWithWrapper, progress } from './dom.js';
 import { Meter } from './meters.js';
 import { makeFilename, suggestNextName } from '../lib/names.js';
 import { fixSteps } from '../audio/fixsteps.js';
@@ -95,9 +95,9 @@ export class SetupView {
       if (!a.src) return;
       if (a.paused) { a.currentTime = 0; a.play().catch(() => {}); } else a.pause();
     });
-    $('scAudio').addEventListener('play', () => text($('btnScPlay'), 'Stop'));
-    $('scAudio').addEventListener('pause', () => text($('btnScPlay'), 'Hear it back'));
-    $('scAudio').addEventListener('ended', () => text($('btnScPlay'), 'Hear it back'));
+    $('scAudio').addEventListener('play', () => label($('btnScPlay'), 'Stop'));
+    $('scAudio').addEventListener('pause', () => label($('btnScPlay'), 'Hear it back'));
+    $('scAudio').addEventListener('ended', () => label($('btnScPlay'), 'Hear it back'));
     $('btnScCopySteps').addEventListener('click', () => s.copyFixSteps());
     $('btnScCopyPrompt').addEventListener('click', () => s.copyDesktopPrompt());
     this.#wireSummary('micSummary', 'stepMic');
@@ -114,14 +114,25 @@ export class SetupView {
     for (const [id, pos] of Object.entries(CORNERS)) $(id).addEventListener('click', () => s.setBubble(pos));
 
     $('btnStart').addEventListener('click', () => this.#onStart());
+
+    // Helper buttons a design may add: "Change" on a collapsed step, "Cancel" on the sound check.
+    document.addEventListener('click', e => {
+      const btn = e.target.closest('[data-action="expand-step"], [data-action="change"], [data-action="cancel-sound-check"]');
+      if (!btn || btn.closest('template')) return;
+      if (btn.dataset.action === 'cancel-sound-check') { s.cancelSoundCheck(); return; }
+      const step = btn.closest('section.step, .step');
+      if (!step?.id) return;
+      this.expanded.add(step.id);
+      this.render(s.state);
+      focusEl(step.querySelector('h2'));
+    });
   }
 
-  /** A collapsed step's summary line: clicking "Change" (or the line) re-opens the step. */
+  /** A collapsed step's summary line without its own "Change" button re-opens the step when clicked. */
   #wireSummary(summaryId, stepId) {
     const el = $(summaryId);
     el.addEventListener('click', e => {
-      const btn = e.target.closest('[data-action="change"], button');
-      if (!btn && el.querySelector('button, [data-action="change"]')) return;
+      if (e.target.closest('button, a, [data-action]') || el.querySelector('button, [data-action]')) return;
       this.expanded.add(stepId);
       this.render(this.session.state);
       focusEl($(stepId).querySelector('h2'));
@@ -176,8 +187,8 @@ export class SetupView {
     // Suggest the next lesson in a series once this one has been recorded.
     const next = suggestNextName(name);
     const recorded = next && st.library.some(t => (t.lessonName || '').trim() === name.trim());
-    show($('lessonSuggest'), !!recorded);
-    if (recorded) text($('lessonSuggest'), `${next}?`);
+    showWithWrapper($('lessonSuggest'), !!recorded);
+    if (recorded) label($('lessonSuggest'), `${next}?`);
     text($('fileNamePreview'), `Will save as: ${makeFilename({ lessonName: name, ext: st.estimate?.container || 'mp4' })}`);
   }
 
@@ -189,14 +200,14 @@ export class SetupView {
 
     show($('micIntro'), !noVoice && (mic.status === 'needs-permission' || mic.status === 'starting'));
     attr($('btnMicOn'), 'aria-disabled', mic.status === 'starting' ? 'true' : null);
-    text($('btnMicOn'), mic.status === 'starting' ? 'Starting…' : 'Turn on microphone');
+    label($('btnMicOn'), mic.status === 'starting' ? 'Starting…' : 'Turn on microphone');
     show($('micControls'), live || mic.status === 'lost' || mic.status === 'notfound' || mic.status === 'busy');
 
     setOptions($('micSelect'), mic.devices.length ? mic.devices : [{ deviceId: 'default', label: mic.label || '' }], mic.deviceId, friendlyMicLabel);
     const headset = mic.devices.find(d => HEADSET.test(d.label) && d.deviceId !== 'default' && d.deviceId !== 'communications');
     const usingHeadset = HEADSET.test(mic.label || '');
-    show($('micSuggest'), live && !!headset && !usingHeadset);
-    if (headset) { $('micSuggest').dataset.deviceId = headset.deviceId; text($('micSuggest'), `Use your headset? It usually sounds clearer.`); }
+    showWithWrapper($('micSuggest'), live && !!headset && !usingHeadset);
+    if (headset) { $('micSuggest').dataset.deviceId = headset.deviceId; label($('micSuggest'), `Use ${shortLabel(headset.label)}`); attr($('micSuggest'), 'title', 'A headset usually sounds clearer'); }
     value($('noiseToggle'), audio.mode === 'clean');
 
     // Inline problem card.
@@ -209,7 +220,7 @@ export class SetupView {
 
     // Sound check: running panel and verdict card.
     show($('btnSoundCheck'), live && !sc.running);
-    text($('btnSoundCheck'), sc.result || audio.calibrated ? 'Check again' : 'Check my sound');
+    label($('btnSoundCheck'), sc.result || audio.calibrated ? 'Check again' : 'Check my sound');
     show($('scRun'), sc.running);
     if (sc.running) {
       const steps = { countdown: 'Get ready', background: 'Step 1 of 2 · Stay quiet', voice: 'Step 2 of 2 · Read this aloud' };
@@ -217,12 +228,11 @@ export class SetupView {
       attr($('scStep'), 'data-phase', sc.phase);
       const secs = Math.max(0, Math.ceil((sc.remainingMs || 0) / 1000));
       const fallback = { countdown: 'Starting… stay quiet', background: `Stay quiet… measuring your room (${secs})`, voice: `Read aloud in your normal teaching voice (${secs})` };
-      text($('scInstruction'), sc.instruction || fallback[sc.phase] || '');
+      // The sentence itself is shown once, in large type, in #scLine.
+      text($('scInstruction'), fallback[sc.phase] || '');
       text($('scLine'), TEST_LINE);
       show($('scLine'), sc.phase === 'voice');
-      const prog = $('scProgress');
-      prog.style.setProperty('--level', String(Math.max(0, Math.min(1, sc.fraction || 0))));
-      attr(prog, 'aria-valuenow', Math.round((sc.fraction || 0) * 100));
+      progress($('scProgress'), sc.fraction);
     }
     const r = sc.result;
     if (r && r !== this.prevResult) { this.freshResult = true; this.expanded.add('stepMic'); }
@@ -232,8 +242,9 @@ export class SetupView {
       attr($('scHeadline'), 'data-status', r.status);
       attr($('scResult'), 'data-status', r.status);
       const worst = [r.voice, r.background].filter(Boolean).sort((a, b) => rank(b.level) - rank(a.level))[0];
-      text($('scText'), r.status === 'ideal' ? (r.voice?.advice || '') : (worst?.advice || ''));
-      this.#renderTips(r);
+      const lead = r.status === 'ideal' ? r.voice : worst;
+      text($('scText'), lead?.advice || '');
+      this.#renderTips(r, lead);
       text($('scApplied'), r.applied || '');
       show($('scApplied'), !!r.applied);
       const audioEl = $('scAudio');
@@ -269,14 +280,15 @@ export class SetupView {
     if (summaryText) text(summaryText, summary); else if (!$('micSummary').querySelector('button')) text($('micSummary'), summary);
   }
 
-  #renderTips(r) {
+  /** The other findings, below the one sentence the card leads with. */
+  #renderTips(r, lead) {
     const box = $('scTips');
-    const sig = JSON.stringify([r.background, r.voice]);
+    const sig = JSON.stringify([r.background, r.voice, lead?.advice]);
     if (box.dataset.sig === sig) return;
     box.dataset.sig = sig;
     box.replaceChildren();
     for (const row of [r.voice, r.background].filter(Boolean)) {
-      if (r.status === 'ideal' && row.level === 'good') continue;
+      if (row === lead || (r.status === 'ideal' && row.level === 'good')) continue;
       const el = fill(clone('tplMessage'), { title: row.title, text: row.advice });
       el.dataset.kind = row.level === 'good' ? 'success' : row.level === 'warn' ? 'warning' : 'error';
       el.querySelector('[data-actions]')?.setAttribute('hidden', '');
@@ -302,7 +314,7 @@ export class SetupView {
   #renderScreen(st) {
     const sc = st.screen;
     show($('screenIntro'), !sc);
-    text($('btnChooseScreen'), sc ? 'Change' : 'Choose screen');
+    label($('btnChooseScreen'), sc ? 'Change' : 'Choose screen');
     show($('screenSummary'), !!sc);
     let status = 'todo', chip = 'To do', msg = null;
     if (sc) {
@@ -365,7 +377,7 @@ export class SetupView {
 
     const btn = $('btnStart');
     const counting = st.phase === 'countdown';
-    text(btn.querySelector('[data-field="label"]') || btn, counting ? `Cancel (${st.countdown})` : 'Start recording');
+    label(btn, counting ? `Cancel (${st.countdown})` : 'Start recording');
     attr(btn, 'aria-disabled', !counting && !micReady ? 'true' : null);
     attr(btn, 'data-state', counting ? 'countdown' : 'idle');
     attr(btn, 'aria-keyshortcuts', 'Alt+R');

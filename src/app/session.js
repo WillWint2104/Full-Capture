@@ -41,6 +41,12 @@ const MIC_ERRORS = {
   OverconstrainedError: { status: 'notfound', title: 'Your saved microphone isn’t connected', text: 'Plug it in and press Try again, or pick another microphone.' },
 };
 
+// The engine's error kinds, mapped onto the cards above.
+const MIC_ERROR_FOR_KIND = { blocked: MIC_ERRORS.NotAllowedError, missing: MIC_ERRORS.NotFoundError, busy: MIC_ERRORS.NotReadableError };
+// Exact digital silence this long means a dead or muted device, not a pause
+// (some headsets and noise-cancelling apps send exact zeros between phrases).
+const DEAD_MIC_ALERT_MS = 6000;
+
 const newId = () => (globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`);
 
 export class Session extends Emitter {
@@ -72,6 +78,7 @@ export class Session extends Emitter {
   #lastMeterT = null;
   #endedBy = new Map();       // take id -> 'share-ended'
   #wakeLock = null;
+  #deadMicTimer = null;
   #testClip = { state: 'idle', remainingMs: 0, url: null, size: 0, abort: null, timer: null };
   #camera = { status: 'off', stream: null, label: '', devices: [] };
   #take = null;               // { id, filename, elapsedMs, bytes, markers, savingTo }
@@ -215,8 +222,10 @@ export class Session extends Emitter {
       }
       if (m.status === 'live') this.#micError = null;
       else if (m.status === 'blocked' || m.status === 'error') {
-        const err = MIC_ERRORS[m.errorName] || (m.status === 'blocked' ? MIC_ERRORS.NotAllowedError : null);
-        this.#micError = err || { status: 'error', title: 'The microphone didn’t start', text: m.message || 'Press Try again, or pick another microphone.' };
+        const err = MIC_ERROR_FOR_KIND[m.errorKind] || (m.status === 'blocked' ? MIC_ERRORS.NotAllowedError : null);
+        this.#micError = err
+          ? { ...err, text: m.message || err.text }
+          : { status: 'error', title: 'The microphone didn’t start', text: m.message || 'Press Try again, or pick another microphone.' };
         this.#mic = { ...this.#mic, status: this.#micError.status };
       }
       this.#changed();
@@ -228,9 +237,13 @@ export class Session extends Emitter {
     e.on('health', h => {
       this.#silent = !!h.digitalSilence;
       this.#clipping = !!h.clipping;
+      clearTimeout(this.#deadMicTimer);
       if (h.digitalSilence && this.#settings.micEnabled) {
-        this.#alert('no-audio', 'error', 'No sound from your microphone',
-          'The microphone is sending pure silence. Check it is not muted (headset switch or Windows sound settings), or pick another microphone.');
+        this.#deadMicTimer = setTimeout(() => {
+          if (!this.#silent || !this.#settings.micEnabled) return;
+          this.#alert('no-audio', 'error', 'No sound from your microphone',
+            'The microphone is sending pure silence. Check it is not muted (headset switch or Windows sound settings), or pick another microphone.');
+        }, DEAD_MIC_ALERT_MS);
       } else {
         this.#clearAlert('no-audio');
       }
@@ -488,8 +501,11 @@ export class Session extends Emitter {
     this.#soundCheck = null;
     // The check's own summary assumes it switches room-noise blocking on; the
     // session leaves that switch as the teacher set it, so describe what changed.
+    // The recommended level assumes room noise is turned down between
+    // sentences (as v13 did), so a good check switches that on and says so.
+    const gateOn = !!(result.calibration && result.gateEnabled);
     const applied = result.calibration && Number.isFinite(result.recommendedGain)
-      ? `Mic level set to ${Math.round(result.recommendedGain * 100)}% for your voice.${this.#settings.gate && result.gateEnabled ? ' Muting between sentences is tuned to your room.' : ''}`
+      ? `Mic level set to ${Math.round(result.recommendedGain * 100)}% for your voice.${gateOn ? ' Room noise between sentences is turned down (Settings › Advanced).' : ''}`
       : '';
     result = { ...result, applied };
     this.#sc = { ...this.#sc, running: false, phase: null, remainingMs: 0, fraction: 1, instruction: '', result };
@@ -502,7 +518,8 @@ export class Session extends Emitter {
         ...result.calibration, gain: result.recommendedGain, status: result.status, headline: result.headline,
         label: this.#engine.micInfo?.label || '', at: Date.now(),
       };
-      this.#settings = saveSettings({ calibrations, micGain: result.recommendedGain, autoLevel: false });
+      if (gateOn) this.#engine.setGate(true);
+      this.#settings = saveSettings({ calibrations, micGain: result.recommendedGain, autoLevel: false, ...(gateOn ? { gate: true } : {}) });
     }
     this.#changed();
   }

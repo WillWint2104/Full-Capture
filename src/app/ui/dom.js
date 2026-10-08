@@ -16,6 +16,40 @@ export function text(el, value) {
   if (el.textContent !== v) el.textContent = v;
 }
 
+/**
+ * Set a button's (or chip's) visible words without wiping icons inside it:
+ * uses a [data-field="label"] child when there is one, otherwise the last
+ * non-empty text node, otherwise appends one.
+ */
+export function label(el, value) {
+  if (!el) return;
+  const field = el.querySelector('[data-field="label"]');
+  if (field) return text(field, value);
+  if (!el.children.length) return text(el, value);
+  const v = value == null ? '' : String(value);
+  const nodes = [...el.childNodes].filter(n => n.nodeType === Node.TEXT_NODE && n.nodeValue.trim());
+  const node = nodes[nodes.length - 1];
+  if (node) { if (node.nodeValue.trim() !== v) node.nodeValue = v; }
+  else el.append(document.createTextNode(v));
+}
+
+/** Show/hide an optional chip together with a wrapper that only exists for it (e.g. "Headset found: [Use it]"). */
+export function showWithWrapper(el, visible) {
+  if (!el) return;
+  show(el, visible);
+  const parent = el.parentElement;
+  if (parent && !parent.id && !parent.querySelector('[id]:not(#' + CSS.escape(el.id) + ')')) show(parent, visible);
+}
+
+/** A 0..1 progress value on either a <progress> or a styled element. */
+export function progress(el, fraction) {
+  if (!el) return;
+  const f = Math.max(0, Math.min(1, Number(fraction) || 0));
+  if (el.tagName === 'PROGRESS') { if (!el.max || el.max === 1) el.max = 1; el.value = f * (el.max || 1); }
+  el.style.setProperty('--level', String(f));
+  attr(el, 'aria-valuenow', Math.round(f * 100));
+}
+
 /** Set an attribute, or remove it when value is null/false. */
 export function attr(el, name, value) {
   if (!el) return;

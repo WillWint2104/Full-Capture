@@ -3,7 +3,7 @@
 // add chapters or stop without coming back to this tab. Its markup comes
 // from <template id="tplPopout">; its styles are copied from this page.
 
-import { clone, fill, show, text, attr, onAction } from './dom.js';
+import { clone, fill, show, text, attr, onAction, label } from './dom.js';
 import { Meter } from './meters.js';
 import { formatClock, formatDuration } from '../lib/time.js';
 
@@ -148,11 +148,11 @@ export class Popout {
     }
 
     for (const b of root.querySelectorAll('[data-action="pause"]')) {
-      text(b.querySelector('[data-field="label"]') || b, phase === 'paused' ? 'Resume' : 'Pause');
+      label(b, phase === 'paused' ? 'Resume' : 'Pause');
       attr(b, 'aria-pressed', phase === 'paused' ? 'true' : 'false');
     }
     for (const b of root.querySelectorAll('[data-action="start"]')) {
-      text(b.querySelector('[data-field="label"]') || b, counting ? `Cancel (${st.countdown})` : 'Start recording');
+      label(b, counting ? `Cancel (${st.countdown})` : 'Start recording');
       attr(b, 'aria-disabled', !counting && !st.screen ? 'true' : null);
     }
     for (const b of root.querySelectorAll('[data-action="stop"], [data-action="marker"], [data-action="more"]')) attr(b, 'aria-disabled', phase === 'stopping' ? 'true' : null);

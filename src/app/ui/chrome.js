@@ -2,7 +2,7 @@
 // and favicon (so the state is visible from other windows), keyboard
 // shortcuts, countdown beeps and the leave-page warning.
 
-import { $, text, attr } from './dom.js';
+import { $, text, attr, label as setLabel } from './dom.js';
 import { formatClock } from '../lib/time.js';
 
 const ICON_COLORS = { idle: '#5b6b7f', live: '#c0392b', paused: '#d99a1f', alert: '#c0392b' };
@@ -86,7 +86,7 @@ export class Chrome {
       : f.status === 'ready' ? `Saving to “${f.name}”`
       : f.status === 'needs-permission' ? `Reconnect “${f.name}”`
       : 'Choose a folder';
-    text(chip.querySelector('[data-field="label"]') || chip, label);
+    setLabel(chip, label);
     attr(chip, 'data-status', f.supported ? f.status : 'unsupported');
 
     // Tab title and favicon.

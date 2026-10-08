@@ -393,7 +393,7 @@ export class AudioEngine extends Emitter {
       return;
     }
     this.#rampMute(0);
-    this.#setMicStatus(kind === 'blocked' ? 'blocked' : 'error', { deviceId, label: '', message: MSG[kind] });
+    this.#setMicStatus(kind === 'blocked' ? 'blocked' : 'error', { deviceId, label: '', message: MSG[kind], errorKind: kind });
   }
 
   /** Wire a freshly opened microphone in and let go of the previous one. */
@@ -454,7 +454,7 @@ export class AudioEngine extends Emitter {
     } catch { g.value = value; }
   }
 
-  #setMicStatus(status, { deviceId, label, message } = {}) {
+  #setMicStatus(status, { deviceId, label, message, errorKind } = {}) {
     this.#micStatus = status;
     if (status !== 'live') this.#silentSince = null;
     if (status !== 'live' && this.#health.digitalSilence) this.#setHealth({ digitalSilence: false });
@@ -465,6 +465,7 @@ export class AudioEngine extends Emitter {
       label: label ?? this.#mic?.label ?? '',
     };
     if (message) detail.message = message;
+    if (errorKind) detail.errorKind = errorKind;   // 'blocked' | 'missing' | 'busy' | 'failed'
     this.emit('mic', detail);
   }
 
@@ -508,7 +509,7 @@ export class AudioEngine extends Emitter {
       if (this.#stopped) return;
       if (micErrorKind(e) === 'blocked') {
         this.#lost = false;
-        this.#setMicStatus('blocked', { message: MSG.blocked });
+        this.#setMicStatus('blocked', { message: MSG.blocked, errorKind: 'blocked' });
         return;
       }
       this.#scheduleRetry(RETRY_EVERY_MS);

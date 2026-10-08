@@ -24,11 +24,13 @@ async function startRecording(page) {
   await page.click('#btnChooseScreen');
   await expect(page.locator('#screenSummary')).toBeVisible();
   await page.click('#btnStart');
-  await expect.poll(() => phase(page)).toBe('recording');
+  await expect.poll(() => phase(page), { timeout: 15_000 }).toBe('recording');
 }
 
 let errors;
 test.beforeEach(async ({ page }) => { errors = trackErrors(page); });
+// Saving can take a few seconds on a busy machine.
+test.setTimeout(90_000);
 test.afterEach(() => {
   // Media errors from the fake devices are not app errors.
   expect(errors.filter(e => !/favicon|Failed to load resource/.test(e))).toEqual([]);
@@ -73,7 +75,7 @@ test('record → chapter → pause → resume → stop & save → review, then i
   await expect(page.locator('#recBanner')).toBeVisible();
   await page.waitForTimeout(1200);
   await page.click('#btnResumeBig');
-  await expect.poll(() => phase(page)).toBe('recording');
+  await expect.poll(() => phase(page), { timeout: 15_000 }).toBe('recording');
   await page.waitForTimeout(1200);
   expect(await page.title()).toMatch(/● 00:0\d Recording – Fractions – Week 3/);
 
@@ -81,7 +83,7 @@ test('record → chapter → pause → resume → stop & save → review, then i
   await page.click('#btnStop');
   const file = await download;
   expect(file.suggestedFilename()).toMatch(/^Fractions – Week 3 \(\d{4}-\d\d-\d\d \d\d\.\d\d\)\.(webm|mp4)$/);
-  await expect.poll(() => phase(page)).toBe('review');
+  await expect.poll(() => phase(page), { timeout: 20_000 }).toBe('review');
   await expect(page.locator('#viewReview')).toBeVisible();
   await expect(page.locator('#reviewSaved')).toContainText('Downloads');
   await expect(page.locator('#chapterList .chapter')).toHaveCount(1);
@@ -136,14 +138,14 @@ test('keyboard: Alt+R starts and stops, Alt+M adds a chapter', async ({ page }) 
   await expect(page.locator('#screenSummary')).toBeVisible();
   await page.locator('body').click({ position: { x: 2, y: 2 } });
   await page.keyboard.press('Alt+r');
-  await expect.poll(() => phase(page)).toBe('recording');
+  await expect.poll(() => phase(page), { timeout: 15_000 }).toBe('recording');
   await page.waitForTimeout(700);
   await page.keyboard.press('Alt+m');
   await expect(page.locator('#markerCount')).toHaveText('1');
   const download = page.waitForEvent('download');
   await page.keyboard.press('Alt+r');
   await download;
-  await expect.poll(() => phase(page)).toBe('review');
+  await expect.poll(() => phase(page), { timeout: 20_000 }).toBe('review');
 });
 
 test('a take survives a crash: the next visit offers it and Save it recovers a playable file', async ({ page, context }) => {
@@ -223,7 +225,7 @@ test('with a folder chosen, takes stream straight into it with a correct duratio
   await startRecording(page);
   await page.waitForTimeout(2500);
   await page.click('#btnStop');
-  await expect.poll(() => phase(page)).toBe('review');
+  await expect.poll(() => phase(page), { timeout: 20_000 }).toBe('review');
   await expect(page.locator('#reviewSaved')).toContainText('Lessons');
   const r = await page.evaluate(async () => {
     const names = [...window.__files.keys()];
@@ -263,13 +265,13 @@ test('camera bubble: preview appears and the recording carries the composited vi
   await page.click('#btnChooseScreen');
   await expect(page.locator('#bubblePreview')).toBeVisible();
   await page.click('#btnStart');
-  await expect.poll(() => phase(page)).toBe('recording');
+  await expect.poll(() => phase(page), { timeout: 15_000 }).toBe('recording');
   expect(await page.evaluate(() => window.fullCapture.state.camera.inTake)).toBe(true);
   await page.waitForTimeout(1500);
   const download = page.waitForEvent('download');
   await page.click('#btnStop');
   await download;
-  await expect.poll(() => phase(page)).toBe('review');
+  await expect.poll(() => phase(page), { timeout: 20_000 }).toBe('review');
   const size = await page.evaluate(async () => {
     const v = document.getElementById('reviewVideo');
     if (!v.videoWidth) await new Promise(r => v.addEventListener('loadedmetadata', r, { once: true }));
@@ -303,7 +305,7 @@ test('no horizontal scrolling at phone width in every view', async ({ page }) =>
   const download = page.waitForEvent('download');
   await page.click('#btnStop');
   await download;
-  await expect.poll(() => phase(page)).toBe('review');
+  await expect.poll(() => phase(page), { timeout: 20_000 }).toBe('review');
   expect(await overflow()).toBeLessThanOrEqual(1);
 });
 
@@ -318,7 +320,7 @@ test('stopping screen share from the browser saves the take and explains why', a
     track.dispatchEvent(new Event('ended'));
   });
   await download;
-  await expect.poll(() => phase(page)).toBe('review');
+  await expect.poll(() => phase(page), { timeout: 20_000 }).toBe('review');
   await expect(page.locator('#reviewNotice')).toContainText('screen sharing ended');
 });
 

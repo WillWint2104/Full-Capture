@@ -1,7 +1,7 @@
 // Settings dialog: file type, quality, behaviour switches, theme, save
 // location, and Advanced audio with detailed meters.
 
-import { $, show, text, attr, value } from './dom.js';
+import { $, show, text, attr, value, label } from './dom.js';
 import { QUALITY_PRESETS } from '../media/formats.js';
 import { formatBytes } from '../lib/time.js';
 import { wireDialog } from './dialogs.js';
@@ -78,7 +78,7 @@ export class SettingsView {
       : 'Recordings go to your Downloads folder. Choose a folder to save them straight there, with no download step.';
     text($('folderStatus'), statusText);
     show($('btnChooseFolder'), f.supported);
-    text($('btnChooseFolder'), f.status === 'ready' || f.status === 'needs-permission' ? 'Change folder' : 'Choose a folder');
+    label($('btnChooseFolder'), f.status === 'ready' || f.status === 'needs-permission' ? 'Change folder' : 'Choose a folder');
     show($('btnForgetFolder'), f.supported && (f.status === 'ready' || f.status === 'needs-permission'));
 
     const a = st.audio;
