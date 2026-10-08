@@ -7,8 +7,8 @@
 //    {type:'truncate'};
 //  * names compare case-insensitively (like Windows) by default;
 //  * permission is 'granted' | 'prompt' | 'denied'.
-// Test hooks: failAfterBytes (simulate a full disk), writes (log of
-// {name, position|null, size}), permission.
+// Test hooks: failAfterBytes (simulate a full disk), failCreateWritable,
+// writes (log of {name, position|null, size}), permission.
 
 const domError = (name, message = name) => (typeof DOMException === 'function'
   ? new DOMException(message, name)
@@ -118,6 +118,7 @@ class FakeFileHandle {
   async createWritable({ keepExistingData = false } = {}) {
     this.#alive();
     this.#dir._check();
+    if (this.#dir.failCreateWritable) throw domError(this.#dir.failCreateWritable, 'Could not open the file for writing.');
     return new FakeWritable(this.#dir, this.#entry, keepExistingData);
   }
 
@@ -147,6 +148,7 @@ class FakeDirectoryHandle {
   supportsMove;
   failAfterBytes = null;
   failWith = 'QuotaExceededError';
+  failCreateWritable = null;   // e.g. 'NoModificationAllowedError': createWritable() throws it
   bytesWritten = 0;
   writes = [];
   #entries = new Map();

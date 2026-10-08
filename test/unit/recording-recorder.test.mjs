@@ -536,7 +536,8 @@ test('a failed start cleans up so the same id can be retried with another sink',
   store.refresh();
   await sleep(1);
   const first = make({ sink: new FolderSink(store), journal });
-  await assert.rejects(first.rec.start(), /no longer allowed/);
+  // code 'sink': the folder was the problem, so retrying with a MemorySink makes sense.
+  await assert.rejects(first.rec.start(), e => /no longer allowed/.test(e.message) && e.code === 'sink');
   assert.equal(first.rec.state, 'failed');
   assert.equal(journal.metas.size, 0, 'journal entry removed');
   assert.equal(await first.rec.stop(), null);
@@ -550,7 +551,74 @@ test('a failed start cleans up so the same id can be retried with another sink',
 test('start() refuses an ended screen track with a plain message', async () => {
   const { rec, video } = make();
   video.readyState = 'ended';
-  await assert.rejects(rec.start(), /shared screen has gone/);
+  await assert.rejects(rec.start(), e => /shared screen has gone/.test(e.message) && e.code === 'screen-gone');
+});
+
+test('sharing that ends while start() is still setting up fails the start cleanly (no picture-less take)', async () => {
+  const store = await folderStore();
+  const sink = new FolderSink(store);
+  const journal = new MemJournal();
+  const { rec, video, mr } = make({ sink, journal });
+  // "Stop sharing" clicked while the file is being created: 'ended' fires before
+  // the recorder is listening for it.
+  const open = sink.open.bind(sink);
+  sink.open = async o => { await open(o); video.end(); };
+  await assert.rejects(rec.start(), e => /shared screen has gone/.test(e.message) && e.code === 'screen-gone');
+  assert.equal(rec.state, 'failed');
+  assert.equal(mr().state, 'inactive', 'MediaRecorder never started');
+  assert.equal(mr().calls.some(c => c[0] === 'start'), false);
+  assert.deepEqual(dir.fileNames(), [], 'the new file is removed');
+  assert.equal(journal.metas.size, 0, 'the journal entry is removed');
+});
+
+test('stop() or cancel() before start() ends the take for good: a later start() is refused', async () => {
+  for (const end of ['stop', 'cancel']) {
+    FakeMediaRecorder.last = null;
+    const { rec, journal } = make();
+    assert.equal(await rec[end](), null);
+    await assert.rejects(rec.start(), /already ended/);
+    assert.equal(FakeMediaRecorder.last, null, `${end}: no MediaRecorder was created`);
+    assert.notEqual(rec.state, 'recording');
+    assert.equal(journal.metas.size, 0);
+    assert.equal(await rec.stop(), null);
+  }
+});
+
+test('the folder failing after Stop was pressed: no "keep recording" error, the saved take explains', async () => {
+  const store = await folderStore();
+  const { rec, mr, events } = make({ sink: new FolderSink(store) });
+  await rec.start();
+  mr().data('one-');
+  await sleep(5);
+  dir.failAfterBytes = dir.bytesWritten; // the final chunk can't be written
+  mr().finalChunk = 'last';
+  const r = await rec.stop();
+  assert.equal(events.some(([t]) => t === 'error'), false, 'no live folder-failed error once stopping');
+  assert.equal(r.savedTo, 'memory');
+  assert.equal(await text(r.blob), 'one-last');
+  assert.match(r.warning, /disk .* is full.*Downloads folder instead/s);
+  assert.deepEqual(dir.fileNames(), []);
+});
+
+test('when nothing can be rebuilt, stop() rejects, keeps the journal entry, releases the lock and leaves no empty file', async () => {
+  const locks = fakeLocks();
+  Object.defineProperty(globalThis.navigator, 'locks', { value: locks, configurable: true });
+  const store = await folderStore();
+  const journal = new MemJournal();
+  journal.chunks = async () => { throw new Error('IndexedDB read failed'); };
+  const { rec, mr } = make({ sink: new FolderSink(store), journal });
+  await rec.start();
+  mr().data('aa');
+  await sleep(5);
+  dir.failAfterBytes = dir.bytesWritten; // the folder fails mid-take
+  mr().data('bb');
+  await sleep(5);
+  await assert.rejects(rec.stop(), /couldn’t be saved.*Reload the page/);
+  assert.equal(rec.state, 'failed');
+  assert.ok(journal.metas.has('take-1'), 'kept, so a reload offers it for recovery');
+  assert.equal(journal.metas.get('take-1').status, 'recording');
+  assert.deepEqual(dir.fileNames(), [], 'no empty file left in the folder');
+  assert.equal(locks.held.has('full-capture-take:take-1'), false);
 });
 
 test('a take with no data at all reports it instead of saving an empty file', async () => {

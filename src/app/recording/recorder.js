@@ -33,6 +33,16 @@ function within(promise, ms) {
   return Promise.race([promise, new Promise(r => { timer = setTimeout(r, ms); })]).finally(() => clearTimeout(timer));
 }
 const newId = () => (globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`);
+const SCREEN_GONE = 'The shared screen has gone. Choose a screen again, then press record.';
+
+/** Tag an error with a `code` the caller can branch on (start(): 'sink' = the folder/sink couldn't be opened). */
+function withCode(e, code) {
+  const err = e instanceof Error ? e : new Error(String(e?.message || e));
+  if (!err.code) {
+    try { err.code = code; } catch { /* frozen: leave it */ }
+  }
+  return err;
+}
 
 /**
  * Pure: elapsed recording time, excluding pauses. Stopping while paused
@@ -231,9 +241,19 @@ export class TakeRecorder extends Emitter {
 
   // ------------------------------------------------------------------ start
 
-  /** Start recording (MediaRecorder.start(1000)). Rejects with a teacher-facing message. */
+  /**
+   * Start recording (MediaRecorder.start(1000)). Rejects with a teacher-facing
+   * message; `err.code === 'sink'` when the sink (the folder) couldn't be
+   * opened, so only then is retrying with a MemorySink worthwhile.
+   */
   start() {
-    if (!this.#startPromise) this.#startPromise = this.#start();
+    if (!this.#startPromise) {
+      // stop()/cancel() already ran on this never-started take: starting now
+      // would leave a recorder that nothing can stop.
+      this.#startPromise = this.#ending
+        ? Promise.reject(new Error('This take has already ended. Start a new take.'))
+        : this.#start();
+    }
     return this.#startPromise;
   }
 
@@ -242,9 +262,7 @@ export class TakeRecorder extends Emitter {
     this.#starting = true;
     try {
       const video = this.#videoTrack;
-      if (!video || video.readyState === 'ended') {
-        throw new Error('The shared screen has gone. Choose a screen again, then press record.');
-      }
+      if (!video || video.readyState === 'ended') throw withCode(new Error(SCREEN_GONE), 'screen-gone');
       if (typeof MediaRecorder === 'undefined') throw new Error('This browser can’t record video. Use Chrome or Edge.');
       const tracks = [video];
       if (this.#audioTrack && this.#audioTrack.readyState !== 'ended') tracks.push(this.#audioTrack);
@@ -266,8 +284,17 @@ export class TakeRecorder extends Emitter {
         } else {
           this.#warn('Crash protection isn’t available in this browser window (private windows block it). The take is still saved when you stop.', 'no-journal');
         }
-        await this.#sink.open({ filename: this.#filename, container: this.#container, mimeType: this.#mimeType });
+        try {
+          await this.#sink.open({ filename: this.#filename, container: this.#container, mimeType: this.#mimeType });
+        } catch (e) {
+          throw withCode(e, 'sink');
+        }
         if (this.#sink.filename) this.#filename = this.#sink.filename;
+        // "Stop sharing" may have been pressed while the lock, journal and
+        // file were being set up. Its 'ended' event has already fired, so the
+        // listener below would never hear it and the take would run on, with
+        // no picture, until the teacher noticed.
+        if (video.readyState === 'ended') throw withCode(new Error(SCREEN_GONE), 'screen-gone');
 
         this.#mr = mr;
         this.#mrStopped = new Promise(resolve => mr.addEventListener('stop', () => resolve(), { once: true }));
@@ -432,7 +459,9 @@ export class TakeRecorder extends Emitter {
     console.warn('sink failed', e);
     this.#sinkOk = false;
     this.#sinkError = e;
-    if (!live) return;
+    // Once Stop was pressed, "keep recording" would be wrong (and the saved
+    // take's `warning` already explains it): no live error then.
+    if (!live || (this.#state !== 'recording' && this.#state !== 'paused')) return;
     const folder = this.#sink?.kind === 'folder';
     this.emit('error', {
       fatal: false,
@@ -614,6 +643,12 @@ export class TakeRecorder extends Emitter {
       } catch (e) {
         // Keep the journal entry: after a reload it is offered for recovery.
         console.error('fallback assembly failed', e);
+        // The folder file never got its data (Chrome commits only on close()),
+        // so don't leave an empty file or an open writable behind.
+        if (this.#sink?.kind === 'folder') {
+          try { await this.#sink.abort(); } catch { /* the partial file may remain */ }
+        }
+        this.#backup.clear();
         await this.#dropLock();
         this.#setState('failed');
         throw new Error('This take couldn’t be saved. Reload the page: Full Capture will offer to recover it.');

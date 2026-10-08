@@ -149,7 +149,40 @@ test('FolderSink abort removes the partial file; write errors reach the caller',
   await sink.abort(); // twice is fine
 });
 
+test('FolderSink.abort() after a successful finalize() never deletes the saved file', async () => {
+  const store = await readyStore();
+  const sink = new FolderSink(store);
+  await sink.open({ filename: 'Saved.mp4', container: 'mp4' });
+  await sink.write(new Blob(['lesson']));
+  await sink.finalize({ durationMs: 1000 });
+  await sink.abort();
+  assert.deepEqual(dir.fileNames(), ['Saved.mp4']);
+  assert.equal(new TextDecoder().decode(dir.bytes('Saved.mp4')), 'lesson');
+});
+
 // ------------------------------------------------------------ FolderStore
+
+test('FolderStore.createFile leaves no empty file behind when the file can’t be opened for writing', async () => {
+  const store = await readyStore();
+  dir.failCreateWritable = 'NoModificationAllowedError';
+  await assert.rejects(store.createFile('Lesson.mp4'), e => e.name === 'NoModificationAllowedError' && /Another program/.test(e.message));
+  assert.deepEqual(dir.fileNames(), [], 'no 0-byte "Lesson.mp4" left in the folder');
+  // The same goes for a FolderSink that can't open its file.
+  await assert.rejects(new FolderSink(store).open({ filename: 'Lesson.mp4', container: 'mp4' }));
+  assert.deepEqual(dir.fileNames(), []);
+  // Once it works again the take gets the plain name, not "Lesson (2).mp4".
+  dir.failCreateWritable = null;
+  assert.equal((await store.createFile('Lesson.mp4')).name, 'Lesson.mp4');
+});
+
+test('FolderStore rename (copy fallback) that fails removes the half-made copy and keeps the original', async () => {
+  const store = await readyStore({ supportsMove: false });
+  dir.seed('Week 3.webm', 'payload');
+  dir.failCreateWritable = 'NoModificationAllowedError';
+  await assert.rejects(store.rename('Week 3.webm', 'Week 4.webm'), /Another program/);
+  assert.deepEqual(dir.fileNames(), ['Week 3.webm']);
+  assert.equal(new TextDecoder().decode(dir.bytes('Week 3.webm')), 'payload');
+});
 
 test('FolderStore: unsupported without showDirectoryPicker; none -> ready after choose()', async () => {
   const unsupported = new FolderStore();

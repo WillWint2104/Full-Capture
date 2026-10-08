@@ -176,7 +176,16 @@ export class FolderStore extends Emitter {
     try {
       const name = await uniqueName(filename, n => this.#exists(dir, n));
       const handle = await dir.getFileHandle(name, { create: true });
-      const writable = await handle.createWritable({ keepExistingData: false });
+      let writable;
+      try {
+        writable = await handle.createWritable({ keepExistingData: false });
+      } catch (e) {
+        // getFileHandle(create) already made an empty file under a name that
+        // was free a moment ago: remove it, or the teacher finds a 0-byte
+        // "Lesson.mp4" next to the take that was downloaded instead.
+        try { await dir.removeEntry(name); } catch { /* best effort */ }
+        throw e;
+      }
       return { handle, writable, name };
     } catch (e) {
       throw this.#friendly(e);
@@ -251,12 +260,14 @@ export class FolderStore extends Emitter {
     try {
       const file = await src.getFile();
       const dst = await dir.getFileHandle(finalName, { create: true });
-      const w = await dst.createWritable({ keepExistingData: false });
+      let w = null;
       try {
+        w = await dst.createWritable({ keepExistingData: false });
         await w.write(file);
         await w.close();
       } catch (e) {
-        try { await w.abort?.(); } catch { /* ignore */ }
+        // finalName was free, so the (empty or partial) copy is ours to remove.
+        try { await w?.abort?.(); } catch { /* ignore */ }
         try { await dir.removeEntry(finalName); } catch { /* ignore */ }
         throw e;
       }

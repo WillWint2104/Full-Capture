@@ -84,6 +84,7 @@ export class FolderSink {
   #duration = null;          // { offset, size, timecodeScale } once the placeholder is written
   #written = 0;
   #closed = false;
+  #saved = false;            // finalize() committed the file: it is the teacher's recording now
 
   /** @param {import('./folder.js').FolderStore} folderStore */
   constructor(folderStore) {
@@ -153,12 +154,15 @@ export class FolderSink {
     }
     await this.#writable.close();
     this.#closed = true;
+    this.#saved = true;
     let size = this.#written;
     try { size = (await this.#handle.getFile()).size; } catch { /* keep our count */ }
     return { savedTo: 'folder', size, filename: this.#name, folderName: this.#store.name || '' };
   }
 
   async abort() {
+    // Only partial output is thrown away; a finished file is never deleted from here.
+    if (this.#saved) return;
     const w = this.#writable;
     this.#pending = [];
     this.#pendingBytes = 0;

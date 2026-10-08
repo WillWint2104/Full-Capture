@@ -136,10 +136,18 @@ export class Journal {
     });
   }
 
-  /** Delete every 'downloaded' safety copy except `exceptId`. */
+  /**
+   * Delete the 'downloaded' safety copies that `exceptId` supersedes: every
+   * one except it and any completed after it. (Two tabs saving at once must
+   * not delete each other's fresh copy; the later prune removes the older.)
+   */
   async prune({ exceptId } = {}) {
     const metas = await this.#allMeta();
-    const doomed = metas.filter(m => m.status === 'downloaded' && m.id !== exceptId).map(m => m.id);
+    const keep = exceptId == null ? null : metas.find(m => m.id === exceptId);
+    const cutoff = Number(keep?.completedAt) || Infinity;
+    const doomed = metas
+      .filter(m => m.status === 'downloaded' && m.id !== exceptId && !(Number(m.completedAt) > cutoff))
+      .map(m => m.id);
     for (const id of doomed) await this.discard(id);
     return doomed;
   }
