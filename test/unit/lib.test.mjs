@@ -1,16 +1,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { safeName, makeFilename, withSuffix, splitExt, sidecarName, dateStamp } from '../../src/app/lib/names.js';
+import { safeName, makeFilename, withSuffix, splitExt, sidecarName, dateStamp, suggestNextName } from '../../src/app/lib/names.js';
 import { formatClock, formatTimestamp, formatDuration, formatBytes } from '../../src/app/lib/time.js';
 import { buildChapters } from '../../src/app/lib/chapters.js';
 import { Emitter } from '../../src/app/lib/emitter.js';
 
-test('safeName keeps letters (including accents) and drops what Windows refuses', () => {
-  assert.equal(safeName('Fractions - Week 3'), 'Fractions_-_Week_3');
-  assert.equal(safeName('Équations: “part 2”?'), 'Équations_part_2');
-  assert.equal(safeName('a/b\\c|d*e'), 'a_b_c_d_e');
-  assert.equal(safeName('   '), 'lesson');
-  assert.equal(safeName(null), 'lesson');
+test('safeName removes only what Windows forbids', () => {
+  assert.equal(safeName('Fractions – Week 3'), 'Fractions – Week 3');
+  assert.equal(safeName('Équations: “part 2”?'), 'Équations “part 2”');
+  assert.equal(safeName('a/b\\c|d*e'), 'a b c d e');
+  assert.equal(safeName('   '), 'Lesson');
+  assert.equal(safeName(null), 'Lesson');
   assert.equal(safeName('CON'), '_CON');
   assert.equal(safeName('notes...'), 'notes');
   assert.equal(safeName('x'.repeat(200)).length, 80);
@@ -18,9 +18,16 @@ test('safeName keeps letters (including accents) and drops what Windows refuses'
 
 test('makeFilename stamps the local date and numbers later takes', () => {
   const d = new Date(2026, 9, 8, 14, 5);
-  assert.equal(dateStamp(d), '2026-10-08_1405');
-  assert.equal(makeFilename({ lessonName: 'Fractions', date: d, ext: 'mp4' }), 'Fractions_2026-10-08_1405.mp4');
-  assert.equal(makeFilename({ lessonName: '', date: d, ext: 'webm', take: 3 }), 'lesson_2026-10-08_1405_take3.webm');
+  assert.equal(dateStamp(d), '2026-10-08 14.05');
+  assert.equal(makeFilename({ lessonName: 'Fractions', date: d, ext: 'mp4' }), 'Fractions (2026-10-08 14.05).mp4');
+  assert.equal(makeFilename({ lessonName: '', date: d, ext: 'webm', take: 3 }), 'Lesson (2026-10-08 14.05, take 3).webm');
+});
+
+test('suggestNextName continues a numbered series', () => {
+  assert.equal(suggestNextName('Fractions – Week 3'), 'Fractions – Week 4');
+  assert.equal(suggestNextName('Lesson 09'), 'Lesson 10');
+  assert.equal(suggestNextName('Algebra'), '');
+  assert.equal(suggestNextName('42'), '');
 });
 
 test('suffix and sidecar names', () => {

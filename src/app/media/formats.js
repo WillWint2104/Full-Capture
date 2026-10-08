@@ -42,6 +42,11 @@ export const QUALITY_PRESETS = {
     note: 'For animations, video clips and fast scrolling.',
     maxHeight: 1080, fps: 60, contentHint: 'motion',
   },
+  small: {
+    label: 'Small file (720p)',
+    note: 'For email or a learning platform with upload limits. Small text may look soft.',
+    maxHeight: 720, fps: 30, contentHint: 'detail',
+  },
 };
 
 const MAX_WIDTH = 3840;
@@ -115,6 +120,14 @@ export function recorderOptions({ format = 'auto', width, height, fps = 30, supp
     codec,
     videoBitsPerSecond: videoBitrate({ width, height, fps, codec }),
     audioBitsPerSecond: audioIsAac ? 160_000 : 128_000,
+    // Chrome's MP4 muxer only emits data at keyframes; without a regular
+    // keyframe the crash-safety copy could stay empty for minutes.
+    videoKeyFrameIntervalDuration: 2000,
     note,
   };
+}
+
+/** Rough file size of one hour with these options, in bytes. */
+export function bytesPerHour({ videoBitsPerSecond, audioBitsPerSecond }) {
+  return Math.round(((videoBitsPerSecond + audioBitsPerSecond) * 3600) / 8);
 }

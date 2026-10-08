@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { detectFormats, recorderOptions, outputSize, videoBitrate, codecFromMime, QUALITY_PRESETS } from '../../src/app/media/formats.js';
+import { detectFormats, recorderOptions, outputSize, videoBitrate, codecFromMime, QUALITY_PRESETS, bytesPerHour } from '../../src/app/media/formats.js';
 
 const chrome = new Set(['video/mp4;codecs=avc1.640028,mp4a.40.2', 'video/webm;codecs=vp9,opus', 'video/webm', 'audio/webm;codecs=opus']);
 const chromium = new Set(['video/webm;codecs=vp9,opus', 'video/webm', 'audio/webm;codecs=opus']);
@@ -59,4 +59,11 @@ test('codecFromMime and presets', () => {
   assert.equal(codecFromMime('video/webm;codecs=vp9,opus'), 'vp9');
   assert.equal(codecFromMime('video/webm'), 'unknown');
   for (const p of Object.values(QUALITY_PRESETS)) assert.ok(p.label && p.maxHeight && p.fps && p.contentHint);
+});
+
+test('options set a keyframe interval and estimate size per hour', () => {
+  const o = recorderOptions({ format: 'auto', width: 1920, height: 1080, fps: 30, supported: detectFormats(m => chrome.has(m)) });
+  assert.equal(o.videoKeyFrameIntervalDuration, 2000);
+  const gb = bytesPerHour(o) / 1024 ** 3;
+  assert.ok(gb > 1.5 && gb < 3.5, `${gb} GB/h`);
 });

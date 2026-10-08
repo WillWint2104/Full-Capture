@@ -23,7 +23,7 @@ let dbPromise = null;
 /** @returns {Promise<IDBDatabase|null>} */
 export function openDb() {
   if (dbPromise) return dbPromise;
-  dbPromise = new Promise(resolve => {
+  const p = new Promise(resolve => {
     let factory;
     try { factory = globalThis.indexedDB; } catch { factory = null; }
     if (!factory) return resolve(null);
@@ -39,11 +39,15 @@ export function openDb() {
       const db = req.result;
       // Another tab upgrading the schema: step aside rather than block it.
       db.onversionchange = () => { db.close(); dbPromise = null; };
+      // The browser can close the connection (e.g. storage cleared); reopen next time.
+      db.onclose = () => { dbPromise = null; };
       resolve(db);
     };
     req.onerror = () => resolve(null);
     req.onblocked = () => resolve(null);
   });
+  // Cache only a working connection so a transient failure is retried later.
+  dbPromise = p.then(db => { if (!db) dbPromise = null; return db; });
   return dbPromise;
 }
 

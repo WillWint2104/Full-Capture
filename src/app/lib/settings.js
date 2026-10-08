@@ -16,7 +16,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
   audioMode: 'clean',        // 'clean' (browser noise suppression) | 'studio' (raw mic + high-pass)
   speakers: false,           // true = no headset: echo cancellation on, Listen off
   micGain: 1,                // linear input trim; the sound check sets this
-  gate: true,                // block room noise between sentences (engages only once calibrated)
+  gate: false,               // "mute the mic between sentences" (Advanced; engages only once calibrated)
   autoLevel: false,          // slowly ride the input trim toward a target level
   calibrations: {},          // `${deviceId}|${mode}` -> { noiseHiDb, voiceLoDb, gain, label, at }
   camera: false,
@@ -24,7 +24,12 @@ export const DEFAULT_SETTINGS = Object.freeze({
   bubble: { shape: 'circle', size: 'm', x: 0.88, y: 0.82, mirror: true },
   notes: '',                 // speaker notes shown in the pop-out
   theme: 'system',           // 'system' | 'light' | 'dark'
-  showAdvancedAudio: false,
+  beeps: false,              // soft beeps during the countdown
+  floatingControls: true,    // open the floating controls (Document PiP) when recording starts
+  hidePreview: true,         // still thumbnail instead of the live screen while recording
+  shortcuts: true,           // Alt+R / Alt+P / Alt+M
+  noVoice: false,            // deliberately record without the microphone
+  micPermissionAsked: false, // the teacher has pressed "Turn on microphone" before
 });
 
 function read() {
@@ -40,6 +45,12 @@ export function loadSettings() {
   const merged = { ...DEFAULT_SETTINGS, ...stored };
   merged.bubble = { ...DEFAULT_SETTINGS.bubble, ...(stored.bubble || {}) };
   return merged;
+}
+
+/** Forget every preference (Settings › Reset all settings). */
+export function resetSettings() {
+  try { localStorage.removeItem(KEY); } catch { /* storage unavailable */ }
+  return loadSettings();
 }
 
 /** Merge `patch` into the stored settings. Returns the new settings. */

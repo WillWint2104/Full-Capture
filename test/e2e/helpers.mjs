@@ -4,7 +4,8 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { ROOT, bundleScript } from '../../scripts/bundler.mjs';
 
-export const APP_URL = pathToFileURL(path.join(ROOT, 'full-capture.html')).href;
+// FC_APP points the app tests at another build (e.g. the unstyled skeleton).
+export const APP_URL = pathToFileURL(process.env.FC_APP ? path.resolve(ROOT, process.env.FC_APP) : path.join(ROOT, 'full-capture.html')).href;
 export const BLANK_URL = pathToFileURL(path.join(ROOT, 'test/e2e/fixtures/blank.html')).href;
 
 /**

@@ -10,6 +10,9 @@ export default defineConfig({
   use: {
     browserName: 'chromium',
     launchOptions: {
+      // Without a UTF-8 locale, Chromium on Linux renames downloads with
+      // non-ASCII names (e.g. "Équations") to "download". Windows is unaffected.
+      env: { ...process.env, LANG: 'C.UTF-8', LC_ALL: 'C.UTF-8' },
       args: [
         '--use-fake-device-for-media-stream',
         '--use-fake-ui-for-media-stream',
