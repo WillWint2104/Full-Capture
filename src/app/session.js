@@ -75,6 +75,7 @@ export class Session extends Emitter {
   #countdown = null;
   #countdownTimer = null;
   #screen = null;             // { stream, videoTrack, audioTrack, surface, label, width, height, nativeWidth, nativeHeight }
+  #screenPick = null;         // the screen pick in progress; shared so a second press never opens a second picker
   #mic = { status: 'off', deviceId: 'default', label: '', devices: [] };
   #audioStarted = false;
   #silent = false;
@@ -305,7 +306,19 @@ export class Session extends Emitter {
     return this.#pickScreen();
   }
 
-  async #pickScreen() {
+  /**
+   * One screen pick at a time. A pick is in progress from the moment the
+   * browser's picker opens until the shared screen has been measured and
+   * fitted, which goes on for a moment after the picker closes; a press of
+   * Start (or Choose screen) meanwhile waits for that pick rather than
+   * opening a second one whose screen would replace the first.
+   */
+  #pickScreen() {
+    this.#screenPick ??= this.#openScreenPicker().finally(() => { this.#screenPick = null; });
+    return this.#screenPick;
+  }
+
+  async #openScreenPicker() {
     const preset = QUALITY_PRESETS[this.#settings.quality] || QUALITY_PRESETS.standard;
     let picked;
     try {
@@ -319,6 +332,11 @@ export class Session extends Emitter {
       } else {
         this.#notice({ kind: 'error', title: 'Couldn’t start screen capture', text: e.message || String(e) });
       }
+      return false;
+    }
+    // Never swap the screen under a take that has started (or is counting down).
+    if (this.#phase) {
+      picked.stream.getTracks().forEach(t => t.stop());
       return false;
     }
     this.#releaseScreen();
@@ -736,8 +754,11 @@ export class Session extends Emitter {
           this.#notice({ kind: 'warning', title: `This take will go to Downloads`, text: `Your “${this.#folder.name}” folder needs permission again. Click “Reconnect” at the top before the next take.`, timeoutMs: 10000 });
         }
       }
-      if (!this.#screen && !(await this.#pickScreen())) return;
-      if (this.#abortStart) return;
+      // A pick already under way (Choose screen, or Change) decides the screen: wait for it
+      // rather than open a second picker. A pick that ends without a screen says why.
+      if (this.#screenPick) await this.#screenPick;
+      else if (!this.#screen) await this.#pickScreen();
+      if (!this.#screen || this.#abortStart) return;
     } finally {
       this.#preparing = false;
       this.#changed();

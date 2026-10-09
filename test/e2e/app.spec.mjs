@@ -148,11 +148,12 @@ test('keyboard: Alt+R starts and stops, Alt+M adds a chapter', async ({ page }) 
   await expect.poll(() => phase(page), { timeout: 20_000 }).toBe('review');
 });
 
-/** Count MediaRecorder instances the page creates. */
+/** Count MediaRecorder instances the page creates (and keep the streams they record). */
 const countRecorders = () => {
   const Real = window.MediaRecorder;
   window.__recorders = 0;
-  window.MediaRecorder = class extends Real { constructor(...a) { super(...a); window.__recorders++; } };
+  window.__recorded = [];
+  window.MediaRecorder = class extends Real { constructor(...a) { super(...a); window.__recorders++; window.__recorded.push(a[0]); } };
   for (const k of ['isTypeSupported']) window.MediaRecorder[k] = Real[k].bind(Real);
 };
 
@@ -209,6 +210,109 @@ test('Escape during the countdown cancels without starting a recorder', async ({
   expect(await phase(page)).toBe('ready');
   expect(await page.evaluate(() => window.__recorders)).toBe(0);
   await expect(page.locator('#btnStart')).toBeFocused();
+});
+
+/**
+ * Control when the browser's screen pick finishes. plan[i] is for the i-th
+ * getDisplayMedia call: {delay} ms before it resolves, or {reject: 'NotAllowedError'}.
+ * Every stream handed out is kept on window.__shared.
+ */
+const slowScreenPicks = plan => {
+  const md = navigator.mediaDevices;
+  const real = md.getDisplayMedia.bind(md);
+  window.__shared = [];
+  md.getDisplayMedia = async options => {
+    const step = plan[window.__shared.length] || {};
+    window.__shared.push(null);
+    const i = window.__shared.length - 1;
+    if (step.reject) {
+      await new Promise(r => setTimeout(r, step.delay || 0));
+      throw new DOMException('Permission denied by user', step.reject);
+    }
+    const stream = await real(options);
+    await new Promise(r => setTimeout(r, step.delay || 0));
+    window.__shared[i] = stream;
+    return stream;
+  };
+};
+
+/** One init script from several page functions: fn, or [fn, arg]. */
+const pageScript = (...parts) => ({
+  content: parts.map(p => (Array.isArray(p) ? `(${p[0]})(${JSON.stringify(p[1])});` : `(${p})();`)).join('\n'),
+});
+
+/** readyState of every video track the page's recorders are recording. */
+const recordedVideo = page => page.evaluate(() => window.__recorded.flatMap(s => s.getVideoTracks().map(t => t.readyState)));
+
+/** Watch the phase for a while; returns every phase seen (catches brief ones). */
+const watchPhases = (page, ms) => page.evaluate(ms => new Promise(resolve => {
+  const seen = [document.documentElement.dataset.phase];
+  const off = window.fullCapture.on('change', st => { if (seen[seen.length - 1] !== st.phase) seen.push(st.phase); });
+  setTimeout(() => { off(); resolve(seen); }, ms);
+}), ms);
+
+for (const camera of [false, true]) {
+  test(`Start pressed while the chosen screen is still being set up: one picker, and the take keeps its screen${camera ? ' (camera bubble on)' : ''}`, async ({ page }) => {
+    await openApp(page, {}, { init: pageScript(countRecorders, [slowScreenPicks, [{ delay: 1200 }, { delay: 0 }]]) });
+    await page.mouse.click(5, 5);
+    await expect.poll(() => page.evaluate(() => window.fullCapture.state.mic.status)).toBe('live');
+    if (camera) {
+      await page.check('#cameraToggle');
+      await expect.poll(() => page.evaluate(() => window.fullCapture.state.camera.status)).toBe('live');
+    }
+    await page.click('#btnChooseScreen');
+    await page.waitForTimeout(150);
+    await page.click('#btnStart');
+    await expect(page.locator('#btnStart')).toContainText('Starting');
+    await expect.poll(() => phase(page), { timeout: 15_000 }).toBe('recording');
+    // The pick that was already under way is the one recorded: no second picker,
+    // and nothing replaces (and stops) the screen once the take is running.
+    expect(await watchPhases(page, 2500)).toEqual(['recording']);
+    const shared = await page.evaluate(() => window.__shared.map(s => s && s.getVideoTracks()[0].readyState));
+    expect(shared).toEqual(['live']);
+    expect(await page.evaluate(() => window.__recorders)).toBe(1);
+    expect(await recordedVideo(page)).toEqual(['live']);
+    const download = page.waitForEvent('download');
+    await page.click('#btnStop');
+    await download;
+    await expect.poll(() => phase(page), { timeout: 20_000 }).toBe('review');
+    expect(await page.evaluate(() => window.fullCapture.state.review.durationMs)).toBeGreaterThan(2000);
+  });
+}
+
+test('Start pressed while a changed screen is still being set up records the new screen', async ({ page }) => {
+  await openApp(page, {}, { init: pageScript(countRecorders, [slowScreenPicks, [{ delay: 0 }, { delay: 1200 }]]) });
+  await page.mouse.click(5, 5);
+  await expect.poll(() => page.evaluate(() => window.fullCapture.state.mic.status)).toBe('live');
+  await page.click('#btnChooseScreen');
+  await expect(page.locator('#screenSummary')).toBeVisible();
+  await page.click('#btnChooseScreen');        // "Change"
+  await page.waitForTimeout(150);
+  await page.click('#btnStart');
+  await expect.poll(() => phase(page), { timeout: 15_000 }).toBe('recording');
+  expect(await watchPhases(page, 1500)).toEqual(['recording']);
+  const tracks = await page.evaluate(() => window.__shared.map(s => s.getVideoTracks()[0].readyState));
+  expect(tracks).toEqual(['ended', 'live']);   // the old screen is let go, the new one is recorded
+  expect(await page.evaluate(() => window.fullCapture.state.screen.stream === window.__shared[1])).toBe(true);
+  expect(await page.evaluate(() => window.__recorders)).toBe(1);
+  // The recorder records the new screen, not the one that was let go.
+  expect(await recordedVideo(page)).toEqual(['live']);
+  expect(await page.evaluate(() => window.__recorded[0].getVideoTracks()[0] === window.__shared[1].getVideoTracks()[0])).toBe(true);
+});
+
+test('Start pressed while the screen picker is open, then the picker is cancelled: says so, opens no second picker', async ({ page }) => {
+  await openApp(page, {}, { init: pageScript(countRecorders, [slowScreenPicks, [{ reject: 'NotAllowedError', delay: 1000 }, { delay: 0 }]]) });
+  await page.mouse.click(5, 5);
+  await expect.poll(() => page.evaluate(() => window.fullCapture.state.mic.status)).toBe('live');
+  await page.click('#btnChooseScreen');
+  await page.waitForTimeout(150);
+  await page.click('#btnStart');
+  await expect(page.locator('#toasts')).toContainText('No screen chosen');
+  await expect(page.locator('#btnStart')).toContainText('Start recording');
+  await page.waitForTimeout(500);
+  expect(await phase(page)).toBe('setup');
+  expect(await page.evaluate(() => window.__shared.length)).toBe(1);
+  expect(await page.evaluate(() => window.__recorders)).toBe(0);
 });
 
 test('a take survives a crash: the next visit offers it and Save it recovers a playable file', async ({ page, context }) => {
