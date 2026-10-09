@@ -38,6 +38,7 @@ body.popout { min-height: 100vh; overflow: hidden; background: var(--bg); color:
 .pop-idle { display: grid; gap: var(--s1); padding-top: var(--s2); }
 .pop-ready-title { font-size: var(--fs-lg); font-weight: var(--fw-strong); }
 .pop-ready-text { font-size: var(--fs-sm); color: var(--muted); }
+.pop-blocked { font-size: var(--fs-sm); font-weight: var(--fw-strong); color: var(--bad); }
 .pop-countdown {
   font-family: var(--font-display);
   font-size: clamp(64px, 24vw, 140px);

@@ -326,6 +326,11 @@ export class Compositor extends Emitter {
     }
   }
 
+  /** True while the output includes the camera bubble (running, with a camera, not hidden). */
+  get showsCamera() {
+    return this.#state === 'running' && !!this.#camera.track && this.#cameraVisible;
+  }
+
   /** framesOut: total frames produced; fps: frames produced in the last second. */
   get stats() {
     const now = performance.now();

@@ -102,7 +102,7 @@ export class SetupView {
 
     $('btnMicOn').addEventListener('click', () => { if ($('btnMicOn').getAttribute('aria-disabled') !== 'true') s.enableMic(); });
     $('micSelect').addEventListener('change', e => s.setMicDevice(e.target.value));
-    $('micSuggest').addEventListener('click', e => { const id = e.currentTarget.dataset.deviceId; if (id) s.setMicDevice(id); });
+    $('micSuggest').addEventListener('click', e => { const id = e.currentTarget.dataset.deviceId; if (id && e.currentTarget.getAttribute('aria-disabled') !== 'true') s.setMicDevice(id); });
     $('noiseToggle').addEventListener('change', e => s.setAudioMode(e.target.checked ? 'clean' : 'studio'));
     const check = () => { this.expanded.add('stepMic'); this.focusVerdict = true; s.startSoundCheck(); };
     $('btnSoundCheck').addEventListener('click', check);
@@ -174,7 +174,8 @@ export class SetupView {
     this.render(this.session.state);
     this.notices.shout(reason);
     // The control that fixes it: Turn on microphone, or the error card's Try again.
-    const fix = [$('btnMicOn'), $('micMessage')?.querySelector('button')].find(b => b && b.getClientRects().length);
+    const fix = [$('btnMicOn'), $('micMessage')?.querySelector('button')]
+      .find(b => b && b.getClientRects().length && b.getAttribute('aria-disabled') !== 'true');
     if (fix) { fix.setAttribute('aria-describedby', 'startHint'); focusEl(fix); fix.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
     else focusEl($('stepMic').querySelector('h2'));
   }
@@ -229,6 +230,9 @@ export class SetupView {
     label($('btnMicOn'), mic.status === 'starting' ? 'Starting…' : 'Turn on microphone');
     // Busy or missing: the picker stays (to choose another mic); CSS hides the rest.
     show($('micControls'), live || ['lost', 'notfound', 'busy'].includes(mic.status));
+    // From Start until the take begins, the microphone is not reopened under it.
+    for (const id of ['micSelect', 'noiseToggle']) $(id).disabled = locked;
+    attr($('micSuggest'), 'aria-disabled', locked ? 'true' : null);
 
     setOptions($('micSelect'), mic.devices.length ? mic.devices : [{ deviceId: 'default', label: mic.label || '' }], mic.deviceId, friendlyMicLabel);
     const headset = mic.devices.find(d => HEADSET.test(d.label) && d.deviceId !== 'default' && d.deviceId !== 'communications');

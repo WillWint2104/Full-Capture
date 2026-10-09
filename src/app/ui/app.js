@@ -69,7 +69,14 @@ export function createUI(session) {
       const st = session.state;
       const idle = ['setup', 'ready', 'review'].includes(st.phase) && !st.preparing;
       if (idle && st.startBlocker) {
-        setup.explainBlocked(st.startBlocker);
+        // Said where the press came from, and shown in Set up, where the fix is.
+        if (source === 'popout') popout.explainBlocked(st.startBlocker);
+        if (st.phase === 'review') {
+          session.closeReview();
+          requestAnimationFrame(() => setup.explainBlocked(session.state.startBlocker || st.startBlocker));
+        } else {
+          setup.explainBlocked(st.startBlocker);
+        }
         return;
       }
       if (idle && st.prefs.floatingControls && st.screen && !popout.isOpen && popout.supported) popout.open();

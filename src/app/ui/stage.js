@@ -83,7 +83,9 @@ export class Stage {
     const camStream = cam.enabled && cam.status === 'live' ? cam.previewStream : null;
     if (camStream && this.cameraVideo.srcObject !== camStream) this.cameraVideo.srcObject = camStream;
     if (!camStream && this.cameraVideo.srcObject) this.cameraVideo.srcObject = null;
-    const showBubble = !!camStream && !url && (!!screenStream || !recording) && !hideLive;
+    // During a take the preview shows the bubble only if the recording has it.
+    const inTake = recording && !!st.take;
+    const showBubble = !!camStream && !url && (!!screenStream || !recording) && !hideLive && (!inTake || st.take.camera);
     show(this.bubble, showBubble);
     this.bubbleState = cam.bubble;
     attr(this.bubble, 'data-shape', cam.bubble.shape);

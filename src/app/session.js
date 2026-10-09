@@ -17,7 +17,7 @@ import { detectFormats, recorderOptions, outputSize, bytesPerHour, QUALITY_PRESE
 import { AudioEngine } from './audio/engine.js';
 import { SoundCheck, buildDesktopFixPrompt, recordClip, CHECK_TIMING } from './audio/soundcheck.js';
 import { fixStepsText } from './audio/fixsteps.js';
-import { pickScreen, openCamera, listDevices, onDeviceChange, CaptureError } from './video/sources.js';
+import { pickScreen, openCamera, listDevices, onDeviceChange, CaptureError, deliveredSize } from './video/sources.js';
 import { Compositor, isCompositingSupported } from './video/compositor.js';
 import { TakeRecorder } from './recording/recorder.js';
 import { MemorySink, FolderSink } from './recording/sinks.js';
@@ -31,6 +31,7 @@ const TALKING_WHILE_PAUSED_S = 5;
 // Ignore a second press of Start/Stop or Pause this soon after the first
 // (double clicks, a held key).
 const TOGGLE_GUARD_MS = 400;
+const CAMERA_WAIT_MS = 3000;     // how long Start waits for a camera that is still opening
 const PREF_KEYS = ['beeps', 'floatingControls', 'hidePreview', 'shortcuts', 'theme'];
 const ACTIVE_PHASES = ['starting', 'recording', 'paused', 'stopping'];
 
@@ -70,8 +71,8 @@ export class Session extends Emitter {
   #phase = null;              // explicit phases only: 'countdown' | 'starting' | 'recording' | 'paused' | 'stopping'
   #preparing = false;         // record() is checking things before the countdown (picker open, folder prompt)
   #abortStart = false;        // Stop/Cancel pressed while a take was still starting
-  #lastToggle = 0;
-  #lastPauseToggle = 0;
+  #lastToggle = -Infinity;
+  #lastPauseToggle = -Infinity;
   #countdown = null;
   #countdownTimer = null;
   #screen = null;             // { stream, videoTrack, audioTrack, surface, label, width, height, nativeWidth, nativeHeight }
@@ -93,6 +94,7 @@ export class Session extends Emitter {
   #deadMicTimer = null;
   #camera = { status: 'off', stream: null, label: '', devices: [], activeId: '', error: '' };
   #cameraGen = 0;             // bumps on every camera change, so a slow open can't resurrect an old one
+  #cameraOpening = null;      // the camera open in progress (Start waits a moment for it)
   #take = null;               // { id, filename, lessonName, elapsedMs, bytes, markers, savingTo, ... }
   #review = null;             // take id shown in review
   #takes = [];                // library rows
@@ -153,7 +155,7 @@ export class Session extends Emitter {
     // otherwise wait for the "Turn on microphone" click (no prompt on load).
     const permission = await this.#micPermission();
     const openMic = s.micEnabled && !s.noVoice && permission === 'granted';
-    if (!openMic) this.#mic = { ...this.#mic, status: permission === 'denied' ? 'blocked' : (s.noVoice ? 'off' : 'needs-permission') };
+    if (!openMic) this.#mic = { ...this.#mic, status: s.noVoice ? 'off' : permission === 'denied' ? 'blocked' : 'needs-permission' };
     if (permission === 'denied' && !s.noVoice) this.#micError = BLOCKED;
     try {
       await this.#engine.start({
@@ -176,8 +178,10 @@ export class Session extends Emitter {
     try {
       const st = await navigator.permissions.query({ name: 'microphone' });
       st.onchange = () => {
+        if (this.#settings.noVoice) return;   // "Record without my voice" stays as chosen
         if (st.state === 'denied') this.#setMicError(BLOCKED);
-        else if (st.state === 'granted' && this.#mic.status === 'blocked') this.enableMic();
+        // Allowed again in the browser: open the mic, but never in the middle of a take.
+        else if (st.state === 'granted' && this.#mic.status === 'blocked' && !this.busy) this.enableMic();
       };
       return st.state;
     } catch {
@@ -246,6 +250,11 @@ export class Session extends Emitter {
         const err = MIC_ERROR_FOR_KIND[m.errorKind] || (m.status === 'blocked' ? BLOCKED : null);
         this.#micError = err || { status: 'error', title: 'The microphone didn’t start', text: m.message || 'Press Try again, or pick another microphone.' };
         this.#mic = { ...this.#mic, status: this.#micError.status };
+        // The Set up view (where this error shows) is hidden during a take.
+        if (this.busy) {
+          this.#alert('mic-lost', 'error', 'Your microphone stopped working',
+            `${this.#micError.title}. Recording continues, but without your voice until the microphone works again.`);
+        }
       }
       this.#changed();
     });
@@ -405,6 +414,7 @@ export class Session extends Emitter {
 
   async setAudioMode(mode) {
     if (mode !== 'clean' && mode !== 'studio') return;
+    if (this.#phase || this.#preparing) return;   // locked from Start until the take ends
     this.#stopCheckForChange();
     this.#settings = saveSettings({ audioMode: mode });
     await this.#engine?.setMode(mode);
@@ -599,7 +609,13 @@ export class Session extends Emitter {
     if (this.#settings.camera) await this.#startCamera();
   }
 
-  async #startCamera() {
+  #startCamera() {
+    const opening = this.#openCamera().finally(() => { if (this.#cameraOpening === opening) this.#cameraOpening = null; });
+    this.#cameraOpening = opening;
+    return opening;
+  }
+
+  async #openCamera() {
     const gen = ++this.#cameraGen;
     // Detach the old camera from a take first, so swapping cameras isn't
     // reported as the camera stopping.
@@ -631,7 +647,7 @@ export class Session extends Emitter {
         this.#compositor.setCameraTrack(track);
         this.#compositor.setCameraVisible(true);
       } else if (this.busy) {
-        this.#notice({ kind: 'info', title: 'The camera joins from your next take', text: 'This take started without the camera bubble.' });
+        this.#notice({ id: 'no-bubble', kind: 'info', title: 'The camera joins from your next take', text: 'This take started without the camera bubble.' });
       }
       this.#refreshDevices();
     } catch (e) {
@@ -641,9 +657,10 @@ export class Session extends Emitter {
         this.#settings = saveSettings({ camera: false });
         this.#camera = { ...this.#camera, status: 'off', stream: null };
       } else {
-        // Shown once, in the camera step (with a Try again button), not also as a toast.
+        // Shown in the camera step (with a Try again button); that step is hidden during a take.
         const text = (e?.message || 'The camera didn’t start.').replace(/switch the camera (off and )?on again/i, 'press Try again');
         this.#camera = { ...this.#camera, status: code === 'blocked' ? 'blocked' : 'error', stream: null, error: text };
+        if (this.busy) this.#notice({ id: 'no-bubble', kind: 'warning', title: 'Recording without the camera bubble', text: 'Your camera didn’t start. Check it after this take (step 4).' });
       }
     }
     this.#changed();
@@ -710,6 +727,7 @@ export class Session extends Emitter {
     const s = this.#settings;
     if (s.noVoice) return null;
     if (this.#mic.status === 'live' && s.micEnabled) return null;
+    if (this.#mic.status === 'starting' && s.micEnabled) return 'Your microphone is still starting. Press Start again in a moment.';
     const blocked = ['blocked', 'notfound', 'busy', 'error', 'lost'].includes(this.#mic.status);
     return blocked
       ? 'Your microphone isn’t working yet. Fix it in step 2, or choose “Record without my voice” in Settings.'
@@ -743,7 +761,7 @@ export class Session extends Emitter {
       if (!withoutSound && this.startBlocker) {
         this.#notice({
           id: 'no-voice', kind: 'warning', title: 'Your microphone isn’t on', text: this.startBlocker,
-          actions: [{ label: 'Record without my voice', action: 'record', args: [{ withoutSound: true }] }],
+          actions: [{ label: 'Record anyway', action: 'record', args: [{ withoutSound: true }] }],
         });
         return;
       }
@@ -759,6 +777,8 @@ export class Session extends Emitter {
       if (this.#screenPick) await this.#screenPick;
       else if (!this.#screen) await this.#pickScreen();
       if (!this.#screen || this.#abortStart) return;
+      // A camera still opening (permission prompt, slow USB camera) gets a moment to join this take.
+      if (this.#cameraOpening) await Promise.race([this.#cameraOpening, new Promise(r => setTimeout(r, CAMERA_WAIT_MS))]);
     } finally {
       this.#preparing = false;
       this.#changed();
@@ -816,8 +836,8 @@ export class Session extends Emitter {
     const s = this.#settings;
     const lessonName = s.lessonName;
     const preset = QUALITY_PRESETS[s.quality] || QUALITY_PRESETS.standard;
-    const st = screen.videoTrack.getSettings();
-    const { width, height } = outputSize(st.width || screen.width, st.height || screen.height, preset.maxHeight);
+    const delivered = await deliveredSize(screen);
+    const { width, height } = outputSize(delivered.width, delivered.height, preset.maxHeight);
     const fps = preset.fps;
 
     // Camera bubble: composite only when the camera is live at the start.
@@ -834,11 +854,18 @@ export class Session extends Emitter {
           this.#notice({ kind: 'warning', title: 'Camera bubble', text: w.message });
         });
         videoTrack = compositor.start();
+        // Published now, so a camera switched or changed while the take starts reaches it.
+        this.#compositor = compositor;
       } catch (e) {
         compositor = null;
         videoTrack = screen.videoTrack;
-        this.#notice({ kind: 'warning', title: 'Recording without the camera bubble', text: e.message || String(e) });
+        this.#notice({ id: 'no-bubble', kind: 'warning', title: 'Recording without the camera bubble', text: e.message || String(e) });
       }
+    } else if (s.camera) {
+      this.#notice({
+        id: 'no-bubble', kind: 'warning', title: 'Recording without the camera bubble',
+        text: this.#camera.status === 'starting' ? 'Your camera was still starting. It joins from your next take.' : 'Your camera isn’t working. Check it after this take (step 4).',
+      });
     }
 
     const options = recorderOptions({ format: s.format, width, height, fps, supported: this.#formats });
@@ -870,6 +897,7 @@ export class Session extends Emitter {
       }
       if (!recorder) {
         if (e?.code === 'screen-gone') this.#releaseScreen();
+        if (this.#compositor === compositor) this.#compositor = null;
         compositor?.stop();
         this.#notice({ kind: 'error', title: 'Recording couldn’t start', text: e.message || String(e) });
         return false;
@@ -1455,7 +1483,7 @@ export class Session extends Emitter {
     const s = this.#settings;
     const e = this.#engine;
     const review = this.#review ? this.#findTake(this.#review) : null;
-    const take = this.#take && { ...this.#take, markers: [...this.#take.markers], talkingWhilePaused: this.#talkingWhilePaused };
+    const take = this.#take && { ...this.#take, markers: [...this.#take.markers], talkingWhilePaused: this.#talkingWhilePaused, camera: !!this.#compositor?.showsCamera };
     if (take) delete take.screen;
     return Object.freeze({
       phase: this.#phaseName(),

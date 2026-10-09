@@ -4281,6 +4281,11 @@ body.popout {
   font-size: var(--fs-sm);
   color: var(--muted);
 }
+.pop-blocked {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-strong);
+  color: var(--bad);
+}
 .pop-countdown {
   font-family: var(--font-display);
   font-size: clamp(64px, 24vw, 140px);
@@ -6111,6 +6116,7 @@ html:has(.banners:not([hidden]) .banner[data-kind=error]) {
     <div class="pop-idle" data-part="idle" hidden>
       <p class="pop-ready-title">Ready when you are</p>
       <p class="pop-ready-text">Start from here and keep teaching – this window stays on top.</p>
+      <p class="pop-blocked" data-field="blocked" hidden></p>
     </div>
     <p class="pop-countdown" data-field="countdown" hidden></p>
     <button class="btn btn-record btn-xl btn-block pop-start" type="button" data-action="start" aria-keyshortcuts="Alt+R">
@@ -7949,6 +7955,11 @@ ${list(win10)}
       clone3?.stop();
     }
   }
+  async function deliveredSize(screen) {
+    const reported = reportedSize(screen.videoTrack);
+    if (reported.width === screen.width && reported.height === screen.height) return reported;
+    return await measureFrame(screen.videoTrack) ?? { width: screen.width || reported.width, height: screen.height || reported.height };
+  }
   function reportedSize(track) {
     const s = track.getSettings?.() ?? {};
     return { width: s.width || 0, height: s.height || 0 };
@@ -8286,6 +8297,10 @@ ${list(win10)}
         this.#canvas = null;
         this.#ctx = null;
       }
+    }
+    /** True while the output includes the camera bubble (running, with a camera, not hidden). */
+    get showsCamera() {
+      return this.#state === "running" && !!this.#camera.track && this.#cameraVisible;
     }
     /** framesOut: total frames produced; fps: frames produced in the last second. */
     get stats() {
@@ -10328,6 +10343,7 @@ ${list(win10)}
   var LOW_STORAGE_BYTES = 2 * 1024 ** 3;
   var TALKING_WHILE_PAUSED_S = 5;
   var TOGGLE_GUARD_MS = 400;
+  var CAMERA_WAIT_MS = 3e3;
   var PREF_KEYS = ["beeps", "floatingControls", "hidePreview", "shortcuts", "theme"];
   var ACTIVE_PHASES = ["starting", "recording", "paused", "stopping"];
   var BLOCKED = { status: "blocked", title: "Microphone blocked", text: "Click the icon at the left of the address bar, switch Microphone on, then click Reload." };
@@ -10360,8 +10376,8 @@ ${list(win10)}
     // record() is checking things before the countdown (picker open, folder prompt)
     #abortStart = false;
     // Stop/Cancel pressed while a take was still starting
-    #lastToggle = 0;
-    #lastPauseToggle = 0;
+    #lastToggle = -Infinity;
+    #lastPauseToggle = -Infinity;
     #countdown = null;
     #countdownTimer = null;
     #screen = null;
@@ -10391,6 +10407,8 @@ ${list(win10)}
     #camera = { status: "off", stream: null, label: "", devices: [], activeId: "", error: "" };
     #cameraGen = 0;
     // bumps on every camera change, so a slow open can't resurrect an old one
+    #cameraOpening = null;
+    // the camera open in progress (Start waits a moment for it)
     #take = null;
     // { id, filename, lessonName, elapsedMs, bytes, markers, savingTo, ... }
     #review = null;
@@ -10459,7 +10477,7 @@ ${list(win10)}
       const s = this.#settings;
       const permission = await this.#micPermission();
       const openMic = s.micEnabled && !s.noVoice && permission === "granted";
-      if (!openMic) this.#mic = { ...this.#mic, status: permission === "denied" ? "blocked" : s.noVoice ? "off" : "needs-permission" };
+      if (!openMic) this.#mic = { ...this.#mic, status: s.noVoice ? "off" : permission === "denied" ? "blocked" : "needs-permission" };
       if (permission === "denied" && !s.noVoice) this.#micError = BLOCKED;
       try {
         await this.#engine.start({
@@ -10486,8 +10504,9 @@ ${list(win10)}
       try {
         const st = await navigator.permissions.query({ name: "microphone" });
         st.onchange = () => {
+          if (this.#settings.noVoice) return;
           if (st.state === "denied") this.#setMicError(BLOCKED);
-          else if (st.state === "granted" && this.#mic.status === "blocked") this.enableMic();
+          else if (st.state === "granted" && this.#mic.status === "blocked" && !this.busy) this.enableMic();
         };
         return st.state;
       } catch {
@@ -10556,6 +10575,14 @@ ${list(win10)}
           const err = MIC_ERROR_FOR_KIND[m.errorKind] || (m.status === "blocked" ? BLOCKED : null);
           this.#micError = err || { status: "error", title: "The microphone didn’t start", text: m.message || "Press Try again, or pick another microphone." };
           this.#mic = { ...this.#mic, status: this.#micError.status };
+          if (this.busy) {
+            this.#alert(
+              "mic-lost",
+              "error",
+              "Your microphone stopped working",
+              `${this.#micError.title}. Recording continues, but without your voice until the microphone works again.`
+            );
+          }
         }
         this.#changed();
       });
@@ -10715,6 +10742,7 @@ ${list(win10)}
     }
     async setAudioMode(mode) {
       if (mode !== "clean" && mode !== "studio") return;
+      if (this.#phase || this.#preparing) return;
       this.#stopCheckForChange();
       this.#settings = saveSettings({ audioMode: mode });
       await this.#engine?.setMode(mode);
@@ -10887,7 +10915,14 @@ ${list(win10)}
       this.#settings = saveSettings({ cameraDeviceId: deviceId });
       if (this.#settings.camera) await this.#startCamera();
     }
-    async #startCamera() {
+    #startCamera() {
+      const opening = this.#openCamera().finally(() => {
+        if (this.#cameraOpening === opening) this.#cameraOpening = null;
+      });
+      this.#cameraOpening = opening;
+      return opening;
+    }
+    async #openCamera() {
       const gen = ++this.#cameraGen;
       this.#compositor?.setCameraTrack(null);
       this.#stopCamera();
@@ -10920,7 +10955,7 @@ ${list(win10)}
           this.#compositor.setCameraTrack(track);
           this.#compositor.setCameraVisible(true);
         } else if (this.busy) {
-          this.#notice({ kind: "info", title: "The camera joins from your next take", text: "This take started without the camera bubble." });
+          this.#notice({ id: "no-bubble", kind: "info", title: "The camera joins from your next take", text: "This take started without the camera bubble." });
         }
         this.#refreshDevices();
       } catch (e) {
@@ -10932,6 +10967,7 @@ ${list(win10)}
         } else {
           const text2 = (e?.message || "The camera didn’t start.").replace(/switch the camera (off and )?on again/i, "press Try again");
           this.#camera = { ...this.#camera, status: code === "blocked" ? "blocked" : "error", stream: null, error: text2 };
+          if (this.busy) this.#notice({ id: "no-bubble", kind: "warning", title: "Recording without the camera bubble", text: "Your camera didn’t start. Check it after this take (step 4)." });
         }
       }
       this.#changed();
@@ -11004,6 +11040,7 @@ ${list(win10)}
       const s = this.#settings;
       if (s.noVoice) return null;
       if (this.#mic.status === "live" && s.micEnabled) return null;
+      if (this.#mic.status === "starting" && s.micEnabled) return "Your microphone is still starting. Press Start again in a moment.";
       const blocked = ["blocked", "notfound", "busy", "error", "lost"].includes(this.#mic.status);
       return blocked ? "Your microphone isn’t working yet. Fix it in step 2, or choose “Record without my voice” in Settings." : "Turn on your microphone first (step 2), or choose “Record without my voice” in Settings.";
     }
@@ -11039,7 +11076,7 @@ ${list(win10)}
             kind: "warning",
             title: "Your microphone isn’t on",
             text: this.startBlocker,
-            actions: [{ label: "Record without my voice", action: "record", args: [{ withoutSound: true }] }]
+            actions: [{ label: "Record anyway", action: "record", args: [{ withoutSound: true }] }]
           });
           return;
         }
@@ -11052,6 +11089,7 @@ ${list(win10)}
         if (this.#screenPick) await this.#screenPick;
         else if (!this.#screen) await this.#pickScreen();
         if (!this.#screen || this.#abortStart) return;
+        if (this.#cameraOpening) await Promise.race([this.#cameraOpening, new Promise((r) => setTimeout(r, CAMERA_WAIT_MS))]);
       } finally {
         this.#preparing = false;
         this.#changed();
@@ -11110,8 +11148,8 @@ ${list(win10)}
       const s = this.#settings;
       const lessonName = s.lessonName;
       const preset = QUALITY_PRESETS[s.quality] || QUALITY_PRESETS.standard;
-      const st = screen.videoTrack.getSettings();
-      const { width, height } = outputSize(st.width || screen.width, st.height || screen.height, preset.maxHeight);
+      const delivered = await deliveredSize(screen);
+      const { width, height } = outputSize(delivered.width, delivered.height, preset.maxHeight);
       const fps = preset.fps;
       let videoTrack = screen.videoTrack;
       let compositor = null;
@@ -11125,11 +11163,19 @@ ${list(win10)}
             this.#notice({ kind: "warning", title: "Camera bubble", text: w.message });
           });
           videoTrack = compositor.start();
+          this.#compositor = compositor;
         } catch (e) {
           compositor = null;
           videoTrack = screen.videoTrack;
-          this.#notice({ kind: "warning", title: "Recording without the camera bubble", text: e.message || String(e) });
+          this.#notice({ id: "no-bubble", kind: "warning", title: "Recording without the camera bubble", text: e.message || String(e) });
         }
+      } else if (s.camera) {
+        this.#notice({
+          id: "no-bubble",
+          kind: "warning",
+          title: "Recording without the camera bubble",
+          text: this.#camera.status === "starting" ? "Your camera was still starting. It joins from your next take." : "Your camera isn’t working. Check it after this take (step 4)."
+        });
       }
       const options = recorderOptions({ format: s.format, width, height, fps, supported: this.#formats });
       if (options.note) this.#notice({ kind: "info", title: "Recording as WebM", text: options.note, timeoutMs: 6e3 });
@@ -11167,6 +11213,7 @@ ${list(win10)}
         }
         if (!recorder) {
           if (e?.code === "screen-gone") this.#releaseScreen();
+          if (this.#compositor === compositor) this.#compositor = null;
           compositor?.stop();
           this.#notice({ kind: "error", title: "Recording couldn’t start", text: e.message || String(e) });
           return false;
@@ -11769,7 +11816,7 @@ ${list(win10)}
       const s = this.#settings;
       const e = this.#engine;
       const review = this.#review ? this.#findTake(this.#review) : null;
-      const take = this.#take && { ...this.#take, markers: [...this.#take.markers], talkingWhilePaused: this.#talkingWhilePaused };
+      const take = this.#take && { ...this.#take, markers: [...this.#take.markers], talkingWhilePaused: this.#talkingWhilePaused, camera: !!this.#compositor?.showsCamera };
       if (take) delete take.screen;
       return Object.freeze({
         phase: this.#phaseName(),
@@ -12344,7 +12391,7 @@ ${list(win10)}
       $("micSelect").addEventListener("change", (e) => s.setMicDevice(e.target.value));
       $("micSuggest").addEventListener("click", (e) => {
         const id = e.currentTarget.dataset.deviceId;
-        if (id) s.setMicDevice(id);
+        if (id && e.currentTarget.getAttribute("aria-disabled") !== "true") s.setMicDevice(id);
       });
       $("noiseToggle").addEventListener("change", (e) => s.setAudioMode(e.target.checked ? "clean" : "studio"));
       const check = () => {
@@ -12416,7 +12463,7 @@ ${list(win10)}
       this.expanded.add("stepMic");
       this.render(this.session.state);
       this.notices.shout(reason);
-      const fix = [$("btnMicOn"), $("micMessage")?.querySelector("button")].find((b) => b && b.getClientRects().length);
+      const fix = [$("btnMicOn"), $("micMessage")?.querySelector("button")].find((b) => b && b.getClientRects().length && b.getAttribute("aria-disabled") !== "true");
       if (fix) {
         fix.setAttribute("aria-describedby", "startHint");
         focusEl(fix);
@@ -12469,6 +12516,8 @@ ${list(win10)}
       attr($("btnMicOn"), "aria-disabled", mic.status === "starting" ? "true" : null);
       label($("btnMicOn"), mic.status === "starting" ? "Starting…" : "Turn on microphone");
       show($("micControls"), live || ["lost", "notfound", "busy"].includes(mic.status));
+      for (const id of ["micSelect", "noiseToggle"]) $(id).disabled = locked;
+      attr($("micSuggest"), "aria-disabled", locked ? "true" : null);
       setOptions($("micSelect"), mic.devices.length ? mic.devices : [{ deviceId: "default", label: mic.label || "" }], mic.deviceId, friendlyMicLabel);
       const headset = mic.devices.find((d) => HEADSET.test(d.label) && d.deviceId !== "default" && d.deviceId !== "communications");
       const usingHeadset = HEADSET.test(mic.label || "");
@@ -12802,7 +12851,8 @@ ${list(win10)}
       const camStream = cam.enabled && cam.status === "live" ? cam.previewStream : null;
       if (camStream && this.cameraVideo.srcObject !== camStream) this.cameraVideo.srcObject = camStream;
       if (!camStream && this.cameraVideo.srcObject) this.cameraVideo.srcObject = null;
-      const showBubble = !!camStream && !url && (!!screenStream || !recording) && !hideLive;
+      const inTake = recording && !!st.take;
+      const showBubble = !!camStream && !url && (!!screenStream || !recording) && !hideLive && (!inTake || st.take.camera);
       show(this.bubble, showBubble);
       this.bubbleState = cam.bubble;
       attr(this.bubble, "data-shape", cam.bubble.shape);
@@ -13610,6 +13660,10 @@ ${list(win10)}
       this.loop.add(this.meter);
       this.loop.onFrame((now2) => this.#tickClock(now2));
       onAction(root, (action, btn, e) => this.#act(action, e));
+      root.querySelector('[data-action="start"]')?.addEventListener("click", (e) => {
+        const reason = this.session.state.startBlocker;
+        if (e.currentTarget.getAttribute("aria-disabled") === "true" && reason) this.explainBlocked(reason);
+      });
       d.addEventListener("keydown", (e) => {
         if (e.key === "Escape" && this.confirming) {
           e.preventDefault();
@@ -13649,6 +13703,11 @@ ${list(win10)}
       if (!region || !message2) return;
       text(region, "");
       this.win?.requestAnimationFrame(() => text(region, message2));
+    }
+    /** A Start pressed here that can't go ahead: say why, here (the main tab may be out of sight). */
+    explainBlocked(reason) {
+      if (!this.root) return;
+      this.#say(reason, true);
     }
     #closeConfirm() {
       this.confirming = false;
@@ -13713,17 +13772,23 @@ ${list(win10)}
       attr(body, "data-phase", phase);
       attr(body, "data-alert", noSound ? "nosound" : null);
       attr(this.win.document.documentElement, "data-theme", document.documentElement.getAttribute("data-theme"));
-      const pill = phase === "paused" ? "❚❚ Paused" : phase === "stopping" ? "Saving…" : active ? noSound ? "⚠ No sound" : "● Recording" : counting ? "Starting…" : st.screen ? "Ready" : "Choose a screen";
+      const blocked = !active && !counting && st.startBlocker ? st.startBlocker : "";
+      const pill = phase === "paused" ? "❚❚ Paused" : phase === "stopping" ? "Saving…" : active ? noSound ? "⚠ No sound" : "● Recording" : counting ? "Starting…" : blocked ? "Microphone not ready" : st.screen ? "Ready" : "Choose a screen";
       fill(root, {
         pill,
         lesson: st.lesson.name.trim() || "Untitled lesson",
         notes: st.lesson.notes,
         countdown: phase === "countdown" ? String(st.countdown) : ""
       });
-      for (const el of root.querySelectorAll('[data-field="pill"]')) attr(el, "data-state", noSound ? "nosound" : phase);
+      for (const el of root.querySelectorAll('[data-field="pill"]')) attr(el, "data-state", noSound ? "nosound" : blocked ? "blocked" : phase);
       for (const el of root.querySelectorAll('[data-field="notes"]')) show(el, !!st.lesson.notes.trim());
       for (const el of root.querySelectorAll('[data-field="countdown"]')) show(el, phase === "countdown");
       for (const el of root.querySelectorAll('[data-field="talking"]')) show(el, phase === "paused" && !!st.take?.talkingWhilePaused);
+      for (const el of root.querySelectorAll('[data-field="blocked"]')) {
+        text(el, blocked);
+        show(el, !!blocked);
+      }
+      for (const el of root.querySelectorAll(".pop-ready-text")) show(el, !blocked);
       if (active && st.take) {
         const running = phase === "recording";
         if (st.take.elapsedMs !== this.clock.elapsedMs || running !== this.clock.running || !this.clock.at) {
@@ -13740,7 +13805,7 @@ ${list(win10)}
       }
       for (const b of root.querySelectorAll('[data-action="start"]')) {
         label(b, phase === "countdown" ? `Cancel (${st.countdown})` : phase === "starting" ? "Cancel" : "Start recording");
-        attr(b, "aria-disabled", !counting && (!st.screen || st.preparing) ? "true" : null);
+        attr(b, "aria-disabled", !counting && (!st.screen || st.preparing || !!blocked) ? "true" : null);
       }
       for (const b of root.querySelectorAll('[data-action="stop"], [data-action="marker"], [data-action="more"]')) attr(b, "aria-disabled", phase === "stopping" ? "true" : null);
       for (const b of root.querySelectorAll('[data-action="more"]')) attr(b, "aria-expanded", this.confirming ? "true" : "false");
@@ -13820,7 +13885,13 @@ ${list(win10)}
         const st = session.state;
         const idle = ["setup", "ready", "review"].includes(st.phase) && !st.preparing;
         if (idle && st.startBlocker) {
-          setup.explainBlocked(st.startBlocker);
+          if (source === "popout") popout.explainBlocked(st.startBlocker);
+          if (st.phase === "review") {
+            session.closeReview();
+            requestAnimationFrame(() => setup.explainBlocked(session.state.startBlocker || st.startBlocker));
+          } else {
+            setup.explainBlocked(st.startBlocker);
+          }
           return;
         }
         if (idle && st.prefs.floatingControls && st.screen && !popout.isOpen && popout.supported) popout.open();

@@ -184,6 +184,21 @@ async function measureFrame(track) {
   }
 }
 
+/**
+ * The size a shared screen is delivering now, for sizing a recording. Right
+ * after the capture is fitted Chrome can still report the limits as its size,
+ * and a shared window may have been resized since it was picked: when the
+ * report and the last measurement disagree, a frame decides.
+ * @param {{videoTrack: MediaStreamTrack, width: number, height: number}} screen as returned by pickScreen()
+ * @returns {Promise<{width: number, height: number}>}
+ */
+export async function deliveredSize(screen) {
+  const reported = reportedSize(screen.videoTrack);
+  if (reported.width === screen.width && reported.height === screen.height) return reported;
+  return (await measureFrame(screen.videoTrack))
+    ?? { width: screen.width || reported.width, height: screen.height || reported.height };
+}
+
 /** The size a track says it has (may be the constraint limits before the first frame). */
 function reportedSize(track) {
   const s = track.getSettings?.() ?? {};

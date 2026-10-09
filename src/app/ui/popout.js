@@ -85,6 +85,11 @@ export class Popout {
     this.loop.onFrame(now => this.#tickClock(now));
 
     onAction(root, (action, btn, e) => this.#act(action, e));
+    // A greyed-out Start still answers a press: it says why it can't start.
+    root.querySelector('[data-action="start"]')?.addEventListener('click', e => {
+      const reason = this.session.state.startBlocker;
+      if (e.currentTarget.getAttribute('aria-disabled') === 'true' && reason) this.explainBlocked(reason);
+    });
     d.addEventListener('keydown', e => {
       if (e.key === 'Escape' && this.confirming) {
         e.preventDefault();
@@ -117,6 +122,12 @@ export class Popout {
     if (!region || !message) return;
     text(region, '');
     this.win?.requestAnimationFrame(() => text(region, message));
+  }
+
+  /** A Start pressed here that can't go ahead: say why, here (the main tab may be out of sight). */
+  explainBlocked(reason) {
+    if (!this.root) return;
+    this.#say(reason, true);
   }
 
   #closeConfirm() {
@@ -179,17 +190,20 @@ export class Popout {
     attr(body, 'data-alert', noSound ? 'nosound' : null);
     attr(this.win.document.documentElement, 'data-theme', document.documentElement.getAttribute('data-theme'));
 
-    const pill = phase === 'paused' ? '❚❚ Paused' : phase === 'stopping' ? 'Saving…' : active ? (noSound ? '⚠ No sound' : '● Recording') : counting ? 'Starting…' : st.screen ? 'Ready' : 'Choose a screen';
+    const blocked = !active && !counting && st.startBlocker ? st.startBlocker : '';
+    const pill = phase === 'paused' ? '❚❚ Paused' : phase === 'stopping' ? 'Saving…' : active ? (noSound ? '⚠ No sound' : '● Recording') : counting ? 'Starting…' : blocked ? 'Microphone not ready' : st.screen ? 'Ready' : 'Choose a screen';
     fill(root, {
       pill,
       lesson: st.lesson.name.trim() || 'Untitled lesson',
       notes: st.lesson.notes,
       countdown: phase === 'countdown' ? String(st.countdown) : '',
     });
-    for (const el of root.querySelectorAll('[data-field="pill"]')) attr(el, 'data-state', noSound ? 'nosound' : phase);
+    for (const el of root.querySelectorAll('[data-field="pill"]')) attr(el, 'data-state', noSound ? 'nosound' : blocked ? 'blocked' : phase);
     for (const el of root.querySelectorAll('[data-field="notes"]')) show(el, !!st.lesson.notes.trim());
     for (const el of root.querySelectorAll('[data-field="countdown"]')) show(el, phase === 'countdown');
     for (const el of root.querySelectorAll('[data-field="talking"]')) show(el, phase === 'paused' && !!st.take?.talkingWhilePaused);
+    for (const el of root.querySelectorAll('[data-field="blocked"]')) { text(el, blocked); show(el, !!blocked); }
+    for (const el of root.querySelectorAll('.pop-ready-text')) show(el, !blocked);
 
     if (active && st.take) {
       const running = phase === 'recording';
@@ -209,7 +223,7 @@ export class Popout {
     }
     for (const b of root.querySelectorAll('[data-action="start"]')) {
       label(b, phase === 'countdown' ? `Cancel (${st.countdown})` : phase === 'starting' ? 'Cancel' : 'Start recording');
-      attr(b, 'aria-disabled', !counting && (!st.screen || st.preparing) ? 'true' : null);
+      attr(b, 'aria-disabled', !counting && (!st.screen || st.preparing || !!blocked) ? 'true' : null);
     }
     for (const b of root.querySelectorAll('[data-action="stop"], [data-action="marker"], [data-action="more"]')) attr(b, 'aria-disabled', phase === 'stopping' ? 'true' : null);
     for (const b of root.querySelectorAll('[data-action="more"]')) attr(b, 'aria-expanded', this.confirming ? 'true' : 'false');
