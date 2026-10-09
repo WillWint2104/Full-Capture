@@ -1,0 +1,247 @@
+/* Design tokens. Light is the default; dark applies with the system setting
+   (unless the teacher picked Light) or when <html data-theme="dark">. The
+   floating-controls window copies this stylesheet and gets the same
+   data-theme on its own <html>, so it themes itself independently. */
+
+:root {
+  /* type: one family, sizes 14 / 16 / 20 / 28 plus the timer, weights 400 / 600 */
+  --font: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", -apple-system, BlinkMacSystemFont, Inter, system-ui, sans-serif;
+  --font-display: "Segoe UI Variable Display", "Segoe UI Variable", "Segoe UI", -apple-system, BlinkMacSystemFont, "Inter Display", Inter, system-ui, sans-serif;
+  --fs-sm: 14px;
+  --fs-md: 16px;
+  --fs-lg: 20px;
+  --fs-xl: 28px;
+  --fs-timer: 80px;          /* 48 px below 720 px: see responsive.css */
+  --fw: 400;
+  --fw-strong: 600;
+
+  /* 8 px grid (4 is the half step) */
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px; --s7: 48px; --s8: 64px;
+
+  --r: 8px;                  /* controls */
+  --r-lg: 12px;              /* cards and dialogs: 8 + 4 for nested corners */
+  --r-pill: 999px;
+
+  --page-max: 1320px;
+  --gutter: 32px;
+  --panel: 440px;
+  --header-h: 64px;
+  --ease: cubic-bezier(.2, .7, .2, 1);
+
+  /* level meters: −60..0 dBFS mapped to 0..1; the good band is −28..−12 dBFS */
+  --good-from: .53;
+  --good-to: .8;
+}
+
+/* ── Light ─────────────────────────────────────────────── */
+:root, :root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f6f5f1;             /* warm paper */
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-2: #f2f0eb;
+  --surface-3: #e9e6df;
+  --line: #e6e3dc;
+  --line-strong: #d3cfc6;
+  --border: #86888d;         /* control edges, 3.55:1 on white */
+  --text: #1c1d1f;
+  --text-2: #45474c;
+  --muted: #6b6d72;          /* 4.75:1 on bg, 5.18:1 on white */
+  --focus: #1a5fd0;
+
+  --ink: #1c1d1f;            /* primary buttons: Stop & save, Record another take, Done */
+  --ink-hover: #000000;
+  --on-ink: #ffffff;
+
+  --record: #c0392b;         /* red is only for recording */
+  --record-fill: #c0392b;
+  --record-hover: #a93224;
+  --on-record: #ffffff;      /* 5.44:1 */
+  --record-soft: #fbe9e6;
+  --record-soft-text: #a3301f; /* 5.97:1 on record-soft */
+  --stop-square: #e5483b;    /* the red square on the ink Stop & save */
+
+  --good: #1e6b41;
+  --good-fill: #2b8a57;
+  --good-soft: #e7f3eb;
+  --good-line: #c0dcc9;
+  --warn: #8a5300;
+  --warn-fill: #e3a32a;
+  --warn-soft: #fcf2db;
+  --warn-line: #eed59e;
+  --bad: #b3261e;
+  --bad-fill: #b3261e;
+  --bad-soft: #fcecea;
+  --bad-line: #f1c7c2;
+  --info: #1f4f8f;
+  --info-soft: #ebf1fa;
+  --info-line: #cbd9ee;
+
+  --paused: #f2b632;         /* paused banner, pill, rings */
+  --on-paused: #1c1d1f;      /* 9.25:1 */
+  --paused-text: #8a5300;    /* amber text on light surfaces */
+  --paused-bg: #f2b632;
+  --paused-stripe: #f2b632;
+  --paused-line: #d9971a;
+  --paused-title: #1c1d1f;
+  --paused-sub: #3b2a05;
+
+  --stage: #151517;
+  --chrome-blue: #0b57d0;    /* Chrome's own buttons in the illustrations */
+  --on-chrome-blue: #ffffff;
+  --chrome-blue-soft: #e8f0fe;
+
+  --meter-track: #ebe8e1;
+  --meter-good-zone: #d5e9db;
+  --meter-loud-zone: #f5dcd7;
+  --meter-quiet: #727479;    /* 3.82:1 on track */
+  --meter-good: #2b8a57;     /* 3.52:1 on track */
+  --meter-loud: #c0392b;
+  --meter-peak: #1c1d1f;
+  --spectrum-bar: #2b8a57;
+  --spectrum-low: #c98a12;
+
+  --shadow-xs: 0 1px 1px rgba(46, 38, 24, .06);
+  --shadow-sm: 0 1px 2px rgba(46, 38, 24, .05), 0 2px 8px rgba(46, 38, 24, .04);
+  --shadow-md: 0 1px 2px rgba(46, 38, 24, .06), 0 10px 28px rgba(46, 38, 24, .08);
+  --shadow-lg: 0 4px 12px rgba(46, 38, 24, .08), 0 24px 60px rgba(46, 38, 24, .18);
+  --backdrop: rgba(32, 27, 20, .36);
+}
+
+/* ── Dark (system), unless Light was chosen ─────────────── */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #17181a;
+    --surface: #1f2023;
+    --surface-raised: #26272b;
+    --surface-2: #26272b;
+    --surface-3: #2f3035;
+    --line: #2e2f34;
+    --line-strong: #3e4046;
+    --border: #7d8087;
+    --text: #ededee;
+    --text-2: #c9cacd;
+    --muted: #a7a9ae;
+    --focus: #8ab4ff;
+    --ink: #e8e8ea;
+    --ink-hover: #ffffff;
+    --on-ink: #17181a;
+    --record: #ff6b5e;
+    --record-fill: #c43c2e;
+    --record-hover: #d64535;
+    --on-record: #ffffff;
+    --record-soft: #3a2320;
+    --record-soft-text: #ff8f85;
+    --stop-square: #c43c2e;
+    --good: #74d49d;
+    --good-fill: #3a9e65;
+    --good-soft: #1b2b21;
+    --good-line: #2d4a38;
+    --warn: #f3c56b;
+    --warn-fill: #e3a32a;
+    --warn-soft: #30280f;
+    --warn-line: #54441b;
+    --bad: #ff8a80;
+    --bad-fill: #b3261e;
+    --bad-soft: #351e1c;
+    --bad-line: #5a2c28;
+    --info: #9cc2ff;
+    --info-soft: #1b2535;
+    --info-line: #2d3f5d;
+    --paused: #f2b632;
+    --on-paused: #1c1d1f;
+    --paused-text: #f3c56b;
+    --paused-bg: #2c2410;
+    --paused-stripe: #352b12;
+    --paused-line: #8a6a1c;
+    --paused-title: #ffd67a;
+    --paused-sub: #e9dcc0;
+    --stage: #0e0e10;
+    --chrome-blue: #a8c7fa;
+    --on-chrome-blue: #062e6f;
+    --chrome-blue-soft: #1f2a3d;
+    --meter-track: #2c2d31;
+    --meter-good-zone: #1e3628;
+    --meter-loud-zone: #3f2422;
+    --meter-quiet: #8b8d93;
+    --meter-good: #48b97a;
+    --meter-loud: #ff6b5e;
+    --meter-peak: #ededee;
+    --spectrum-bar: #48b97a;
+    --spectrum-low: #e3a32a;
+    --shadow-xs: 0 1px 1px rgba(0, 0, 0, .3);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, .35), 0 0 0 1px rgba(255, 255, 255, .02);
+    --shadow-md: 0 2px 4px rgba(0, 0, 0, .35), 0 12px 32px rgba(0, 0, 0, .3);
+    --shadow-lg: 0 6px 16px rgba(0, 0, 0, .4), 0 28px 64px rgba(0, 0, 0, .5);
+    --backdrop: rgba(0, 0, 0, .58);
+  }
+}
+
+/* ── Dark (chosen in Settings) ──────────────────────────── */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #17181a;
+  --surface: #1f2023;
+  --surface-raised: #26272b;
+  --surface-2: #26272b;
+  --surface-3: #2f3035;
+  --line: #2e2f34;
+  --line-strong: #3e4046;
+  --border: #7d8087;
+  --text: #ededee;
+  --text-2: #c9cacd;
+  --muted: #a7a9ae;
+  --focus: #8ab4ff;
+  --ink: #e8e8ea;
+  --ink-hover: #ffffff;
+  --on-ink: #17181a;
+  --record: #ff6b5e;
+  --record-fill: #c43c2e;
+  --record-hover: #d64535;
+  --on-record: #ffffff;
+  --record-soft: #3a2320;
+  --record-soft-text: #ff8f85;
+  --stop-square: #c43c2e;
+  --good: #74d49d;
+  --good-fill: #3a9e65;
+  --good-soft: #1b2b21;
+  --good-line: #2d4a38;
+  --warn: #f3c56b;
+  --warn-fill: #e3a32a;
+  --warn-soft: #30280f;
+  --warn-line: #54441b;
+  --bad: #ff8a80;
+  --bad-fill: #b3261e;
+  --bad-soft: #351e1c;
+  --bad-line: #5a2c28;
+  --info: #9cc2ff;
+  --info-soft: #1b2535;
+  --info-line: #2d3f5d;
+  --paused: #f2b632;
+  --on-paused: #1c1d1f;
+  --paused-text: #f3c56b;
+  --paused-bg: #2c2410;
+  --paused-stripe: #352b12;
+  --paused-line: #8a6a1c;
+  --paused-title: #ffd67a;
+  --paused-sub: #e9dcc0;
+  --stage: #0e0e10;
+  --chrome-blue: #a8c7fa;
+  --on-chrome-blue: #062e6f;
+  --chrome-blue-soft: #1f2a3d;
+  --meter-track: #2c2d31;
+  --meter-good-zone: #1e3628;
+  --meter-loud-zone: #3f2422;
+  --meter-quiet: #8b8d93;
+  --meter-good: #48b97a;
+  --meter-loud: #ff6b5e;
+  --meter-peak: #ededee;
+  --spectrum-bar: #48b97a;
+  --spectrum-low: #e3a32a;
+  --shadow-xs: 0 1px 1px rgba(0, 0, 0, .3);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .35), 0 0 0 1px rgba(255, 255, 255, .02);
+  --shadow-md: 0 2px 4px rgba(0, 0, 0, .35), 0 12px 32px rgba(0, 0, 0, .3);
+  --shadow-lg: 0 6px 16px rgba(0, 0, 0, .4), 0 28px 64px rgba(0, 0, 0, .5);
+  --backdrop: rgba(0, 0, 0, .58);
+}

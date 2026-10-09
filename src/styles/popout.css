@@ -1,0 +1,157 @@
+/* Floating controls: a Document Picture-in-Picture window (320 × 420 by
+   default) whose <body> gets class "popout", data-phase and, when the mic is
+   silent, data-alert="nosound". Its <html> gets the same data-theme. */
+
+body.popout { min-height: 100vh; overflow: hidden; background: var(--bg); color: var(--text); transition: background-color .25s var(--ease); }
+
+.pop {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+  max-width: 560px;
+  height: 100vh;
+  margin: 0 auto;
+  padding: var(--s4);
+}
+
+.pop-head { display: flex; align-items: center; gap: var(--s2); min-width: 0; flex: none; }
+.pop-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  flex: none;
+  border-radius: var(--r-pill);
+  background: var(--surface-3);
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: var(--fw-strong);
+  letter-spacing: .02em;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.pop-pill[data-state="recording"] { background: var(--record-fill); color: var(--on-record); }
+.pop-pill[data-state="paused"] { background: var(--paused); color: var(--on-paused); }
+.pop-pill[data-state="countdown"] { background: var(--record-soft); color: var(--record-soft-text); }
+.pop-lesson { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-sm); font-weight: var(--fw-strong); color: var(--text-2); }
+/* Hide: closes this window (the only way to keep it out of a whole-screen recording) */
+.pop-hide { margin-left: auto; color: var(--text-2); box-shadow: inset 0 0 0 1px var(--line-strong); }
+
+/* The most important problem other than "no sound" (camera unplugged, storage nearly full…) */
+.pop-alert { display: flex; align-items: flex-start; gap: var(--s2); flex: none; padding: 10px 12px; border-radius: var(--r); background: var(--warn-soft); color: var(--warn); }
+.pop-alert[data-kind="error"] { background: var(--bad-soft); color: var(--bad); }
+.pop-alert .i { width: 22px; height: 22px; flex: none; }
+.pop-alert-title { font-size: var(--fs-sm); font-weight: var(--fw-strong); }
+.pop-alert-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; font-size: var(--fs-sm); color: var(--text); }
+
+.pop-idle { display: grid; gap: var(--s1); padding-top: var(--s2); }
+.pop-ready-title { font-size: var(--fs-lg); font-weight: var(--fw-strong); }
+.pop-ready-text { font-size: var(--fs-sm); color: var(--muted); }
+.pop-blocked { font-size: var(--fs-sm); font-weight: var(--fw-strong); color: var(--bad); }
+.pop-countdown {
+  font-family: var(--font-display);
+  font-size: clamp(64px, 24vw, 140px);
+  font-weight: var(--fw-strong);
+  line-height: 1;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  padding: var(--s2) 0;
+}
+/* Start / Cancel (3): only before recording */
+.pop:has([data-part="active"]:not([hidden])) .pop-start,
+.pop:has([data-part="confirm"]:not([hidden])) .pop-start { display: none; }
+.pop-start { flex: none; }
+.pop:has(.pop-countdown:not([hidden])) .pop-start { background: var(--surface); border-color: var(--border); color: var(--text); box-shadow: none; }
+.pop:has(.pop-countdown:not([hidden])) .pop-start .i { color: var(--record); }
+
+.pop-active { display: grid; gap: var(--s3); flex: none; }
+.pop-timer {
+  font-family: var(--font-display);
+  font-size: clamp(48px, 15vw, 96px);
+  font-weight: var(--fw-strong);
+  line-height: 1;
+  letter-spacing: -.03em;
+  font-variant-numeric: tabular-nums;
+}
+body.popout[data-phase="paused"] .pop-timer { color: var(--paused-text); }
+.pop-level { display: grid; gap: 6px; }
+.pop-mic-label { min-height: 21px; font-size: var(--fs-sm); font-weight: var(--fw-strong); color: var(--muted); }
+.pop-level:has(.meter[data-zone="good"]) .pop-mic-label { color: var(--good); }
+.pop-level:has(.meter[data-zone="loud"]) .pop-mic-label { color: var(--bad); }
+/* Talking while paused: the main tab is probably hidden behind the slides */
+.pop-talking {
+  padding: 8px 12px;
+  border-radius: var(--r);
+  background: var(--warn-soft);
+  color: var(--warn);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-strong);
+  text-align: center;
+}
+.pop-stop { min-height: 48px; }
+.pop-stop .i { color: var(--stop-square); }
+body.popout[data-phase="paused"] .pop-stop { background: var(--surface); border-color: var(--line-strong); color: var(--text); }
+body.popout[data-phase="paused"] .pop-stop .i { color: currentColor; }
+.pop-row { display: flex; gap: var(--s2); }
+.pop-row .btn { flex: 1 1 auto; min-width: 0; padding: 0 10px; font-size: var(--fs-sm); gap: 6px; overflow: hidden; }
+.pop-row .pop-pause { flex: 0 1 auto; min-width: 88px; }
+.pop-row .btn .i { width: 18px; height: 18px; }
+.pop-row .count { min-width: 20px; height: 20px; padding: 0 5px; font-size: 13px; }
+.pop-more { flex: none; box-shadow: inset 0 0 0 1px var(--line-strong); }
+@media (max-width: 379.98px) { .pop-marker > .i { display: none; } }
+.pop-pause::before {
+  content: "";
+  width: 10px;
+  height: 12px;
+  flex: none;
+  background: linear-gradient(to right, currentColor 0 34%, transparent 34% 66%, currentColor 66%);
+}
+body[data-phase="paused"] .pop-pause::before { background: currentColor; clip-path: polygon(0 0, 100% 50%, 0 100%); }
+/* Paused: Resume is the button to press */
+body[data-phase="paused"] .pop-pause { background: var(--record-fill); border-color: var(--record-fill); color: var(--on-record); }
+
+/* Discard: Keep recording first and filled; Discard second and quieter */
+.pop-confirm { display: grid; gap: var(--s2); flex: none; padding-top: var(--s2); }
+.pop-confirm-title { font-size: var(--fs-lg); font-weight: var(--fw-strong); }
+.pop-confirm-text { margin-bottom: var(--s2); color: var(--text-2); font-size: var(--fs-sm); }
+
+/* Notes follow the buttons and scroll if long */
+.pop-notes { flex: 1 1 auto; min-height: 0; overflow: auto; padding-top: var(--s3); border-top: 1px solid var(--line); }
+.pop-notes:has([data-field="notes"][hidden]),
+.pop-notes:has([data-field="notes"]:empty),
+body.popout[data-alert="nosound"] .pop-notes,
+.pop:has([data-part="nosound"]:not([hidden])) .pop-notes { display: none; }
+.pop-notes-label { font-size: var(--fs-sm); font-weight: var(--fw-strong); color: var(--muted); }
+.pop-notes-text { font-size: var(--fs-sm); white-space: pre-wrap; color: var(--text); }
+
+/* NO SOUND: the whole window turns red */
+.pop-nosound { display: flex; align-items: center; gap: var(--s3); flex: none; }
+.pop-nosound .i { width: 34px; height: 34px; flex: none; }
+.pop-nosound-title { font-size: var(--fs-lg); font-weight: var(--fw-strong); line-height: 1.15; }
+.pop-nosound-text { font-size: var(--fs-sm); }
+body.popout[data-alert="nosound"],
+body.popout:has([data-part="nosound"]:not([hidden])) {
+  --bg: #b3261e;
+  --text: #ffffff;
+  --text-2: #ffe9e6;
+  --muted: #ffd6d1;
+  --line: rgba(255, 255, 255, .3);
+  --line-strong: rgba(255, 255, 255, .55);
+  --good: #ffffff;
+  --meter-track: rgba(255, 255, 255, .22);
+  --meter-good-zone: rgba(255, 255, 255, .3);
+  --meter-loud-zone: rgba(255, 255, 255, .22);
+  --meter-quiet: #ffffff;
+  --meter-peak: #ffffff;
+  background: #b3261e;
+  color: #ffffff;
+  animation: nosound-flash 2.4s ease-in-out infinite;
+}
+@keyframes nosound-flash { 0%, 100% { background-color: #b3261e; } 50% { background-color: #9c1f18; } }
+body.popout:is([data-alert="nosound"], :has([data-part="nosound"]:not([hidden]))) .pop-pill { background: #ffffff; color: #b3261e; }
+body.popout:is([data-alert="nosound"], :has([data-part="nosound"]:not([hidden]))) .pop-stop { background: #ffffff; border-color: #ffffff; color: #1c1d1f; }
+body.popout:is([data-alert="nosound"], :has([data-part="nosound"]:not([hidden]))) .pop-stop .i { color: #b3261e; }
+body.popout:is([data-alert="nosound"], :has([data-part="nosound"]:not([hidden]))) .btn-secondary { background: rgba(255, 255, 255, .14); border-color: rgba(255, 255, 255, .55); color: #ffffff; box-shadow: none; }
+body.popout:is([data-alert="nosound"], :has([data-part="nosound"]:not([hidden]))) :is(.pop-more, .pop-hide) { color: #ffffff; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .55); }
+body.popout:is([data-alert="nosound"], :has([data-part="nosound"]:not([hidden]))) .count { background: #ffffff; color: #b3261e; }
+body.popout:is([data-alert="nosound"], :has([data-part="nosound"]:not([hidden]))) :focus-visible { outline-color: #ffffff; }

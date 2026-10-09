@@ -1,0 +1,137 @@
+/* Recording: the paused banner, the on-air card (pill, 80 px timer, meters,
+   Stop & save, Pause, Add chapter, Floating controls, Discard take) and notes. */
+
+/* ── Paused banner: full width, one filled button (Resume) ── */
+
+.rec-banner {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--s4) var(--s5);
+  margin-bottom: var(--s5);
+  padding: var(--s5);
+  border: 1px solid var(--paused-line);
+  border-radius: var(--r-lg);
+  background: repeating-linear-gradient(-45deg, var(--paused-bg) 0 14px, var(--paused-stripe) 14px 28px);
+  color: var(--paused-title);
+  box-shadow: 0 1px 2px rgba(120, 80, 0, .15), 0 12px 32px -10px rgba(200, 140, 20, .45);
+}
+.rec-banner-icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--paused-title) 12%, transparent);
+}
+.rec-banner-icon .i { width: 24px; height: 24px; }
+.rec-banner-title { font-size: var(--fs-lg); color: var(--paused-title); }
+.rec-banner-sub { margin-top: 2px; color: var(--paused-sub); }
+.rec-banner-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: var(--s3); }
+.rec-banner-btn { min-width: 180px; font-size: var(--fs-lg); }
+.rec-banner-btn .i { width: 22px; height: 22px; }
+
+/* "You're talking, but recording is paused – Resume?" sits right next to Resume */
+.talking-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  max-width: 340px;
+  padding: 8px 14px;
+  border-radius: var(--r);
+  background: #1c1d1f;
+  color: #ffffff;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-strong);
+  line-height: 1.35;
+}
+.talking-hint::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--paused);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+/* ── On-air card ───────────────────────────────────────── */
+
+.rec-card { display: grid; gap: var(--s4); }
+.rec-top { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); flex-wrap: wrap; }
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 14px;
+  border-radius: var(--r-pill);
+  background: var(--record-fill);
+  color: var(--on-record);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-strong);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+html[data-phase="recording"] #recPill { box-shadow: 0 0 0 4px color-mix(in srgb, var(--record-fill) 18%, transparent); }
+#recPill[data-state="paused"], html[data-phase="paused"] #recPill { background: var(--paused); color: var(--on-paused); }
+#recPill[data-state="stopping"], html[data-phase="stopping"] #recPill { background: var(--surface-3); color: var(--text-2); }
+.rec-safety { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sm); font-weight: var(--fw-strong); color: var(--good); }
+.rec-safety .i { width: 18px; height: 18px; }
+.rec-safety:has(#recSafety[data-on="false"]) { color: var(--warn); }
+
+/* The glance target from across the room */
+.rec-timer {
+  margin: -6px 0 -10px;
+  font-family: var(--font-display);
+  font-size: var(--fs-timer);
+  font-weight: var(--fw-strong);
+  line-height: 1.05;
+  letter-spacing: -.035em;
+  font-variant-numeric: tabular-nums;
+}
+html[data-phase="paused"] .rec-timer { color: var(--paused-text); }
+html[data-phase="stopping"] .rec-timer { color: var(--muted); }
+.rec-lesson { font-size: var(--fs-lg); letter-spacing: -.01em; overflow-wrap: anywhere; color: var(--text-2); }
+
+.rec-meters { display: grid; gap: var(--s4); padding: var(--s4); border-radius: var(--r); background: var(--surface-2); }
+.meter-label-paused { display: none; }
+/* Paused and talking: the mic label says what to do */
+html[data-phase="paused"]:has(#recTalkingHint:not([hidden])) #recMicLabel { display: none; }
+html[data-phase="paused"]:has(#recTalkingHint:not([hidden])) .meter-label-paused { display: inline; color: var(--paused-text); }
+html[data-phase="paused"] .rec-meters .meter::before { background: var(--meter-quiet); }
+/* No sound from the mic: a red label that stays until sound returns */
+.meter-block:has(#recMicMeter[aria-valuetext^="No sound"]) #recMicLabel { display: inline-flex; align-items: center; gap: 6px; color: var(--bad); }
+.meter-block:has(#recMicMeter[aria-valuetext^="No sound"]) #recMicLabel::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: currentColor; animation: pulse 1.2s ease-in-out infinite; }
+#recMicMeter[aria-valuetext^="No sound"] { box-shadow: inset 0 0 0 1.5px var(--bad); }
+
+/* Stop & save: ink with a red square, so red stays "recording" */
+.stop-square { width: 14px; height: 14px; flex: none; border-radius: 3px; background: var(--stop-square); }
+/* Paused: Resume is the one filled button; Stop & save steps back */
+html[data-phase="paused"] #btnStop { background: var(--surface); border-color: var(--line-strong); color: var(--text); box-shadow: var(--shadow-xs); }
+html[data-phase="paused"] #btnStop:hover { background: var(--surface-2); border-color: var(--border); }
+html[data-phase="paused"] #btnStop .stop-square { background: currentColor; }
+/* Saving… */
+#btnStop[aria-disabled="true"] { background: var(--surface-2); border-color: var(--line); color: var(--muted); box-shadow: none; cursor: progress; transform: none; }
+#btnStop[aria-disabled="true"] .stop-square { background: none; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .9s linear infinite; }
+#btnStop[aria-disabled="true"] .btn-keys { display: none; }
+
+.rec-actions-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s2); margin-top: calc(var(--s2) * -1); }
+.ico-resume { display: none; }
+html[data-phase="paused"] #btnPause .ico-pause { display: none; }
+html[data-phase="paused"] #btnPause .ico-resume { display: block; }
+:is(#btnPause, #btnMarker)[aria-disabled="true"] { opacity: 1; }
+
+#btnPopout { margin-top: calc(var(--s2) * -1); }
+/* "Shown" (green) or "Hidden" (grey): Alt+H and this button bring hidden controls back */
+.on-tag { display: inline-block; padding: 1px 8px; border-radius: var(--r-pill); background: var(--surface-3); color: var(--text-2); font-size: var(--fs-sm); }
+#btnPopout[aria-pressed="true"] .on-tag { background: var(--good-soft); color: var(--good); }
+
+.rec-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); flex-wrap: wrap; padding-top: var(--s3); border-top: 1px solid var(--line); }
+.rec-keys { font-size: var(--fs-sm); color: var(--muted); }
+.rec-keys > span { white-space: nowrap; }
+
+.notes-card { display: grid; gap: var(--s2); padding: 20px var(--s5); }
+.notes-card .card-title { font-size: var(--fs-sm); color: var(--muted); }
+.rec-notes { white-space: pre-wrap; color: var(--text); }
+.notes-card:has(#recNotes[hidden]) { display: none; }
