@@ -129,6 +129,7 @@ html[data-phase="paused"] #btnPause .ico-resume { display: block; }
 
 .rec-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); flex-wrap: wrap; padding-top: var(--s3); border-top: 1px solid var(--line); }
 .rec-keys { font-size: var(--fs-sm); color: var(--muted); }
+.rec-keys > span { white-space: nowrap; }
 
 .notes-card { display: grid; gap: var(--s2); padding: 20px var(--s5); }
 .notes-card .card-title { font-size: var(--fs-sm); color: var(--muted); }
