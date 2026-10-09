@@ -74,6 +74,9 @@ const settle = page => page.waitForTimeout(600);
 
 async function stopTake(page) {
   await settle(page);
+  // A take with no data yet is "too short to save" and downloads nothing. The first chunk comes
+  // after ~1 s, later on a busy machine (e.g. while the real-capture test runs alongside).
+  await expect.poll(() => state(page, st => st.take?.bytes ?? 0), { timeout: 15_000 }).toBeGreaterThan(0);
   const download = page.waitForEvent('download');
   await page.click('#btnStop');
   await download;

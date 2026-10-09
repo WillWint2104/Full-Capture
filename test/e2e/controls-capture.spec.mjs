@@ -7,7 +7,7 @@
 // ffmpeg.
 //
 // Needs a display (CI runs the browser tests under xvfb-run), ffmpeg and
-// ffprobe. When Xvfb is installed the test starts its own private 1280×720
+// ffprobe. When Xvfb is installed the test starts its own private 960×540
 // X server, so nothing else on the display can get into the picture and
 // parallel runs can't see each other. Run `npm run build` first.
 import { test, expect, chromium } from '@playwright/test';
@@ -19,7 +19,7 @@ const onPath = cmd => spawnSync('sh', ['-c', `command -v ${cmd}`], { stdio: 'ign
 // Frames are measured at this size; a pixel is the controls' when it is clearly magenta.
 const W = 320, H = 180;
 const CLEAN = 0.0005;        // at most 0.05 % of a frame (about 29 of 57 600 pixels) may look magenta
-const SHOWN = 0.2;           // the controls cover far more than this of the 1280×720 screen when they are in the picture
+const SHOWN = 0.2;           // the controls cover far more than this of the screen when they are in the picture
 
 /** Magenta share of every decoded video frame, with its time in seconds. */
 function magentaFrames(file) {
@@ -49,7 +49,7 @@ test.beforeAll(async () => {
   for (const tool of ['ffmpeg', 'ffprobe']) if (!onPath(tool)) throw new Error(`${tool} is needed to check the recorded frames`);
   let display = process.env.DISPLAY;
   if (onPath('Xvfb')) {
-    xvfb = spawn('Xvfb', ['-displayfd', '1', '-screen', '0', '1280x720x24', '-nolisten', 'tcp'], { stdio: ['ignore', 'pipe', 'ignore'] });
+    xvfb = spawn('Xvfb', ['-displayfd', '1', '-screen', '0', '960x540x24', '-nolisten', 'tcp'], { stdio: ['ignore', 'pipe', 'ignore'] });
     display = await new Promise((resolve, reject) => {
       let buf = '';
       xvfb.stdout.on('data', d => { buf += d; if (buf.includes('\n')) resolve(`:${buf.trim()}`); });
@@ -60,7 +60,7 @@ test.beforeAll(async () => {
     headless: false,
     env: { ...process.env, DISPLAY: display, LANG: 'C.UTF-8', LC_ALL: 'C.UTF-8' },
     // A real screen capture: no fake screen, and the picker picks the whole screen.
-    args: ['--auto-select-desktop-capture-source=Entire screen', '--autoplay-policy=no-user-gesture-required', '--window-position=0,0', '--window-size=1280,720'],
+    args: ['--auto-select-desktop-capture-source=Entire screen', '--autoplay-policy=no-user-gesture-required', '--window-position=0,0', '--window-size=960,540'],
   });
 });
 test.afterAll(async () => {
@@ -119,6 +119,7 @@ test('whole-screen takes: auto-hidden floating controls are in no recorded frame
   const settle = () => page.waitForTimeout(600);        // presses on a view in its first 500 ms are ignored
   const stopAndSave = async name => {
     await settle();
+    await expect.poll(() => page.evaluate(() => window.fullCapture.state.take?.bytes ?? 0), { timeout: 15_000 }).toBeGreaterThan(0);
     const download = page.waitForEvent('download');
     await page.click('#btnStop');
     const file = testInfo.outputPath(name);
