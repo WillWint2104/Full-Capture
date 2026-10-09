@@ -90,13 +90,50 @@ pull request.
 
 ## Scope
 
-Stay on the task at hand: no unrelated development and no broad review
-campaigns. Planned order of work:
+Full Capture (the HGL Lesson Recorder) is a simple, dependable screen
+recorder with lightweight post-production for teaching videos:
 
-1. Recording reliability and UX
-2. Mistake markers and easy editing (mark errors while recording, review the
-   cuts, produce a clean take)
-3. Audio production (soundtracks, ducking, intro/outro levels, Adobe Podcast
-   exchange)
-4. Production automation (branding, standard exports, thumbnails,
-   publish-ready packages)
+**Prepare → Record → Review/Trim → Export**
+
+A teacher opens the recorder, picks their HGL Studio screen, records,
+marks mistakes, removes unwanted footage, applies a stored intro and outro,
+adjusts basic audio and exports an upload-ready MP4. Everything beyond that
+is optional future work. HGL Studio is a separate application (lessons,
+mathematics, handwriting, widgets, questions, presentations); the recorder
+never duplicates its teaching features.
+
+| Feature                                                        | Decision                    |
+| -------------------------------------------------------------- | --------------------------- |
+| Reliable screen recording, microphone and optional camera      | Keep — essential            |
+| Saved recording settings and preflight checks                  | Keep — essential            |
+| Floating controls and mistake markers                          | Keep — essential            |
+| Simple timeline for trimming mistakes                          | Keep — essential            |
+| Upload and store intro/outro video files                       | Keep — essential            |
+| Automatically add intro/outro during export                    | Keep — essential            |
+| Basic narration/music volume control and fades                 | Keep — later in core flow   |
+| Adobe Podcast audio replacement (manual export/import)         | Keep — simple workflow      |
+| Basic MP4 export settings                                      | Keep — essential            |
+| Thumbnail creator integration, direct YouTube publishing       | Defer                       |
+| AI handwriting reconstruction                                  | Separate project, paused    |
+| Built-in intro/outro animation creator                         | Do not build                |
+| AI editing, automatic transcription, scene reconstruction      | Do not build                |
+| Complex multitrack editing, audio workstation, effects suite   | Do not build                |
+
+Rules that follow from this:
+
+- Preserve what works (screen/window recording, mic checks, webcam,
+  presets, floating controls, pause/resume, recovery, the takes library).
+  No rewrites of working systems, and no recording-UI redesign while
+  reliability fixes are outstanding.
+- Edits are non-destructive until export, and the original recording is
+  always kept independently of any export.
+- Intro, outro and music files are imported once and stored locally; an
+  invalid or missing asset must never block recovery of a recording.
+- Keep media processing in the browser where it is reliable. A small local
+  processing component, or any move to a desktop framework, needs a
+  documented justification and the project owner's approval first.
+- Avoid large rewrites, new dependencies without a clear need, and
+  speculative abstractions.
+- Build one feature stage at a time (`docs/PLAN.md`), and stop for approval
+  before starting each stage. No unrelated development and no broad review
+  campaigns.
