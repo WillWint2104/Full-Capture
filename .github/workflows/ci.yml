@@ -28,6 +28,12 @@ jobs:
           cache: npm
       - run: npm ci
 
+      # Before the checks: the page contract check opens the page in Chromium too.
+      - name: Install Chromium and ffmpeg
+        run: |
+          npx playwright install --with-deps chromium
+          sudo apt-get install -y --no-install-recommends ffmpeg
+
       - name: Build (the committed full-capture.html must match src/)
         run: |
           npm run build
@@ -38,11 +44,6 @@ jobs:
 
       - name: Unit tests
         run: npm test
-
-      - name: Install Chromium and ffmpeg
-        run: |
-          npx playwright install --with-deps chromium
-          sudo apt-get install -y --no-install-recommends ffmpeg
 
       - name: Browser tests
         run: npx playwright test --reporter=line
