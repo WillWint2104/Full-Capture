@@ -668,6 +668,9 @@ test('an MP4 whose mdat header can’t be written after its index: the take come
   const finalize = sink.finalize.bind(sink);
   sink.finalize = async o => { dir.failAfterBytes = dir.bytesWritten + (indexed.length - bytes.length); return finalize(o); };
   const r = await rec.stop();
+  // The index went in (written at the end); the 8-byte header at the old moov is what failed.
+  const positioned = dir.writes.filter(w => w.position !== null);
+  assert.deepEqual(positioned.map(w => [w.position, w.size]), [[bytes.length, indexed.length - bytes.length]]);
   assert.equal(r.savedTo, 'memory');
   assert.deepEqual(new Uint8Array(await r.blob.arrayBuffer()), indexed);
   assert.deepEqual(dir.fileNames(), [], 'no half-indexed file is left in the folder');

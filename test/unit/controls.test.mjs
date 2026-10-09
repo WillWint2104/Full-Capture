@@ -40,10 +40,23 @@ test('on an extended desktop, a display of another size is not the recorded moni
   assert.equal(controlsWouldBeRecorded(monitor(1920, 1080), display(true, 2560, 1440)), false);
   assert.equal(controlsWouldBeRecorded(monitor(2560, 1440), display(true, 1920, 1080)), false);
   assert.equal(controlsWouldBeRecorded(monitor(1920, 1080), display(true, 1280, 1024)), false);
-  // Same CSS size, different scaling: different panels.
-  assert.equal(controlsWouldBeRecorded(monitor(1920, 1080), display(true, 1920, 1080, 1.5)), false);
   // A portrait monitor next to a landscape one.
   assert.equal(controlsWouldBeRecorded(monitor(1920, 1080), display(true, 1080, 1920)), false);
+});
+
+test('page zoom can’t hide the recorded monitor: devicePixelRatio includes it, so every common scale is tried', () => {
+  // A 1080p monitor at 100 % scaling, with Chrome's page zoom at 110 %, 125 %, 90 % or 150 %.
+  for (const zoom of [1.1, 1.25, 0.9, 1.5]) assert.equal(controlsWouldBeRecorded(monitor(1920, 1080), display(true, 1920, 1080, zoom)), true, `zoom ${zoom}`);
+  // A 1440p panel at 125 % scaling (2048×1152 CSS px) with 110 % zoom.
+  assert.equal(controlsWouldBeRecorded(monitor(2560, 1440), display(true, 2048, 1152, 1.25 * 1.1)), true);
+  // A 4K panel at 150 % with 90 % zoom.
+  assert.equal(controlsWouldBeRecorded(monitor(3840, 2160), display(true, 2560, 1440, 1.5 * 0.9)), true);
+  // A display that can't be the recorded monitor at any common scale still keeps its controls, zoomed or not.
+  for (const dpr of [1, 1.1, 1.25]) {
+    assert.equal(controlsWouldBeRecorded(monitor(1920, 1080), display(true, 2560, 1440, dpr)), false);
+    assert.equal(controlsWouldBeRecorded(monitor(2560, 1440), display(true, 1920, 1080, dpr)), false);
+    assert.equal(controlsWouldBeRecorded(monitor(1920, 1080), display(true, 1920, 1200, dpr)), false);
+  }
 });
 
 test('a capture held to 3840×2160 matches a bigger display of the same shape, not a smaller or other-shaped one', () => {
@@ -52,8 +65,8 @@ test('a capture held to 3840×2160 matches a bigger display of the same shape, n
   assert.equal(controlsWouldBeRecorded(monitor(3840, 2160), display(true, 2560, 1440, 2)), true);
   // A super-ultrawide 5120×1440 arrives as 3840×1080.
   assert.equal(controlsWouldBeRecorded(monitor(3840, 1080), display(true, 5120, 1440)), true);
-  // Smaller than the capture: can't be the panel it came from.
-  assert.equal(controlsWouldBeRecorded(monitor(3840, 2160), display(true, 2560, 1440)), false);
+  // 2560×1440 CSS px could be a 4K panel at 150 % (zoom hides the scale): it counts.
+  assert.equal(controlsWouldBeRecorded(monitor(3840, 2160), display(true, 2560, 1440)), true);
   // Bigger but another shape (16:10).
   assert.equal(controlsWouldBeRecorded(monitor(3840, 2160), display(true, 5120, 3200)), false);
   // An unclamped capture never matches by shape alone.

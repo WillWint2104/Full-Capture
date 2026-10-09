@@ -19,27 +19,40 @@ const TAKE_PHASES = ['starting', 'recording', 'paused', 'stopping'];
 export const HIDE_SETTLE_MS = 300;
 // Captures are limited to this size (video/sources.js), so a bigger monitor arrives scaled down.
 const MAX_CAPTURE = { width: 3840, height: 2160 };
+// Display scale factors in common use (Windows' settings, Retina). The browser's
+// devicePixelRatio is the display's scale times the page zoom, so on its own it can't
+// say how many pixels a display has.
+const SCALES = [1, 1.25, 1.5, 1.75, 2, 2.25, 2.5, 3, 3.5, 4];
+// A show request this soon after the controls closed themselves is a late "hide" (the
+// teacher pressing Alt+H as they vanish), not a wish to record them.
+const LATE_PRESS_MS = 1500;
 
 /**
  * Would a recording of this capture include the floating controls? Pure.
  *   capture: the shared screen { surface, nativeWidth, nativeHeight } (its size before fitting a preset)
  *   display: the controls' own screen { isExtended, width, height (CSS px), dpr }
  * A window or tab capture never contains them. On a single display they are on
- * the recorded monitor. With several displays, one the size of the recorded
- * monitor may be it (two identical monitors can't be told apart), so it counts;
- * one of a different size doesn't. Anything unknown counts.
+ * the recorded monitor. With several displays, one that could be the size of the
+ * recorded monitor may be it (two identical monitors can't be told apart), so it
+ * counts; one that can't be doesn't. The display's size is known in CSS pixels
+ * only, and the page zoom hides its scale, so every common scale is tried: any
+ * match counts. Anything unknown counts. In doubt, the controls hide.
  */
 export function controlsWouldBeRecorded(capture, display) {
   if (!capture || capture.surface !== 'monitor') return false;
   if (typeof display?.isExtended !== 'boolean' || !display.isExtended) return true;
-  const dw = display.width * display.dpr, dh = display.height * display.dpr;
+  const { width: w, height: h } = display;
   const cw = capture.nativeWidth, ch = capture.nativeHeight;
-  if (!(dw > 0 && dh > 0 && cw > 0 && ch > 0)) return true;
+  if (!(w > 0 && h > 0 && cw > 0 && ch > 0)) return true;
   const near = (a, b) => Math.abs(a - b) <= 0.02 * Math.max(a, b);
-  if (near(dw, cw) && near(dh, ch)) return true;
   // A capture at the size limit may be a bigger monitor scaled down: then only its shape can match.
   const clamped = cw >= MAX_CAPTURE.width * 0.98 || ch >= MAX_CAPTURE.height * 0.98;
-  return clamped && dw >= cw * 0.98 && dh >= ch * 0.98 && near(dw / dh, cw / ch);
+  return [display.dpr, ...SCALES].some(s => {
+    if (!(s > 0)) return false;
+    const dw = w * s, dh = h * s;
+    if (near(dw, cw) && near(dh, ch)) return true;
+    return clamped && dw >= cw * 0.98 && dh >= ch * 0.98 && near(dw / dh, cw / ch);
+  });
 }
 
 export class Popout {
@@ -114,8 +127,9 @@ export class Popout {
 
   /** Alt+H and the Floating controls button: hide them when shown, show them when hidden (needs the press). */
   toggle() {
-    if (this.win || this.opening) this.hide();
-    else this.open();
+    if (this.win || this.opening) { this.hide(); return; }
+    if (this.take?.hiddenAt && performance.now() - this.take.hiddenAt < LATE_PRESS_MS) return;
+    this.open();
   }
 
   /**
@@ -145,10 +159,14 @@ export class Popout {
       const capture = st.screen && { surface: st.screen.surface, nativeWidth: st.screen.nativeWidth, nativeHeight: st.screen.nativeHeight };
       if (!controlsWouldBeRecorded(capture, { isExtended: s?.isExtended, width: s?.width, height: s?.height, dpr: w.devicePixelRatio || 1 })) return;
       await this.hide();
+      take.hiddenAt = performance.now();
       const keys = st.prefs.shortcuts ? 'Alt+H or ' : '';
+      const elsewhere = s?.isExtended
+        ? ' If they were on a screen you aren’t recording, turn off “Hide floating controls if they’d be recorded” in Settings.'
+        : '';
       this.toast?.({
         id: 'controls-hidden', kind: 'info', title: 'Floating controls hidden',
-        text: `So they aren’t in your recording of the whole screen. To bring them back, press ${keys}Floating controls.`,
+        text: `So they aren’t in your recording of the whole screen. To bring them back, press ${keys}Floating controls.${elsewhere}`,
         timeoutMs: 10000,
       });
       await new Promise(resolve => setTimeout(resolve, HIDE_SETTLE_MS));

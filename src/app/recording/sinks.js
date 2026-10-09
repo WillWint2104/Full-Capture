@@ -77,7 +77,9 @@ export class MemorySink {
  * The indexer's plan, or null: the file is then kept exactly as recorded. A
  * plan whose length disagrees with the recorder's clock (by more than 5 s or
  * a tenth) is not trusted: an index can only be checked by its length here,
- * and a folder take keeps no other copy once it is saved.
+ * and a folder take keeps no other copy once it is saved. (The recorder's
+ * fallback and crash recovery index whatever is readable without this check:
+ * their safety copy is kept.)
  */
 function mp4Plan(indexer, durationMs = 0) {
   try {

@@ -853,6 +853,15 @@ export class Session extends Emitter {
     this.#phase = 'starting';
     this.#changed();
     await this.#waitBeforeTake();
+    // Cancelled while waiting: nothing has been opened or recorded yet. (If the shared screen
+    // ended instead, #startTake says so.)
+    if (this.#abortStart && this.#screen?.videoTrack.readyState === 'live') {
+      this.#abortStart = false;
+      if (this.#phase === 'starting') this.#phase = null;
+      this.#notice({ kind: 'info', title: 'Recording cancelled', text: 'Nothing was recorded.', timeoutMs: 4000 });
+      this.#changed();
+      return;
+    }
     const ok = await this.#startTake();
     if (!ok && this.#phase === 'starting') this.#phase = null;
     this.#changed();

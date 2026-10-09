@@ -417,6 +417,40 @@ test('past 4 GB, through the indexer: a 64-bit mdat in the stream, 64-bit chunk 
   assert.ok(plan.durationMs > 3800 && plan.durationMs < 4200, `${plan.durationMs} ms`);
 });
 
+test('track and edit lengths follow the new sample timeline, even if a fragment’s start time steps back', async () => {
+  const bytes = await fixture('mediarecorder-vp9-opus.mp4');
+  const m = boxes(bytes).find(b => b.type === 'moov');
+  const moovBytes = bytes.slice(m.start, m.start + m.size);
+  const header = parseMoov(moovBytes);
+  const [video] = header.tracks;   // timescale 30000
+  // Samples at 0, 1000, 2000, then a fragment restarting at 1500 (back by 500), the last one shown
+  // 2000 ticks after it is decoded. Each lasts 1000.
+  [[0, 0], [1000, 0], [2000, 0], [1500, 0], [2500, 2000]].forEach(([dts, cto], i) => {
+    video.chunks.push({ offset: 10_000 + i * 100, first: video.sizes.length, count: 1, sdi: 1 });
+    video.sizes.push(100); video.dts.push(dts); video.durations.push(1000); video.sync.push(1); video.cto.push(cto);
+    if (cto) video.anyCto = true;
+  });
+  header.tracks = [video];
+  header.top = header.top.filter(c => c.type !== 'trak' || c === header.top.find(t => t.type === 'trak'));
+  const { moov, durationMs } = buildMoov(moovBytes, header, Infinity);
+  // New timeline: 0, 1000, 2000, 3000 (the step back can't be kept), 4000; shown until 4000 + 2000 + 1000.
+  const trak = boxes(moov)[0].children.find(c => c.type === 'trak');
+  assert.equal(durationOf(moov, child(trak, 'tkhd')), Math.round(7000 / 30));
+  assert.equal(durationMs, Math.round(7000 / 30));
+});
+
+test('indexing reads ahead: about one read per fragment, not one per box', async () => {
+  const bytes = await fixture('mediarecorder-h264-opus.mp4');
+  const real = new Blob([bytes]);
+  let reads = 0;
+  const counted = { size: real.size, slice(a, b) { reads++; return real.slice(a, b); } };
+  const ix = new Mp4Indexer();
+  await ix.push(counted);
+  const fragments = boxes(bytes).filter(b => b.type === 'moof').length;
+  assert.ok(ix.plan(), 'indexed');
+  assert.ok(reads <= fragments + 2, `${reads} reads for ${fragments} fragments`);
+});
+
 test('applyPlanToBlob refuses a plan made for other bytes', async () => {
   const bytes = await fixture('mediarecorder-vp9-opus.mp4');
   const ix = new Mp4Indexer();

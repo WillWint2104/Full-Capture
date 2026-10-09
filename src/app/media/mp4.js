@@ -21,7 +21,7 @@
 // fragments; WebM keeps the gap instead. It can't be recovered from the file.)
 
 const MAX_BOX_BYTES = 16 * 1024 * 1024;   // a moov or moof bigger than this isn't MediaRecorder's
-const READ_AHEAD = 64 * 1024;              // one read covers a box header, a moof and the next header
+const READ_AHEAD = 16 * 1024;              // one read covers a box header, a moof (1–2 KB) and the next header
 const U32 = 0x1_0000_0000;
 
 // tfhd flags

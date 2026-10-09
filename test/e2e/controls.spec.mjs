@@ -227,14 +227,16 @@ test('a take waits for floating controls that are slow to close, never more than
   await stopTake(page);
   expect(await state(page, st => st.library.length)).toBe(2);
 
-  // Escape while the take waits for them: nothing is recorded.
+  // Escape while the take waits for them: nothing is recorded, and no recorder even starts.
   await newTake(page);
+  const recorders = await page.evaluate(() => window.__recStarts.length);
   await page.click('#btnStart');
   await expect.poll(() => phase(page)).toBe('starting');
   await page.keyboard.press('Escape');
   await expect(page.locator('#toasts')).toContainText('Recording cancelled');
   await expect.poll(() => phase(page), { timeout: 10_000 }).toBe('ready');
   expect(await state(page, st => st.library.length)).toBe(2);
+  expect(await page.evaluate(() => window.__recStarts.length)).toBe(recorders);
 });
 
 test('a window capture keeps the floating controls open; the same controls close once the whole screen is recorded', async ({ page }) => {
@@ -307,12 +309,14 @@ test('a warning while the controls are hidden shows in the tab title, and in the
     t.stop();
     t.dispatchEvent(new Event('ended'));
   });
-  await expect.poll(() => page.title()).toBe('⚠ Camera disconnected – Fractions');
+  await expect.poll(() => page.title()).toMatch(/^● 00:\d\d Recording · ⚠ Camera disconnected – Fractions$/);
   expect(await phase(page)).toBe('recording');
   await expect(page.locator('#banners')).toContainText('Camera disconnected');
   expect(await pipOpen(page)).toBe(false);                // they closed as the take started (whole screen, one display)
 
-  // Shown again, the controls say it too, out loud as well.
+  // Shown again, the controls say it too, out loud as well. (A press within 1.5 s of them closing
+  // themselves is taken as a late "hide": see the Alt+H test below.)
+  await page.waitForFunction(() => performance.now() - window.__pipEvents.findLast(e => e[0] === 'closed')[1] > 1600);
   await page.locator('#btnStop').focus();
   await page.keyboard.press('Alt+h');
   await expect.poll(() => pipOpen(page)).toBe(true);
@@ -325,5 +329,40 @@ test('a warning while the controls are hidden shows in the tab title, and in the
   await page.locator('#banners .banner', { hasText: 'Camera disconnected' }).getByRole('button', { name: 'Dismiss' }).first().click();
   await expect.poll(() => page.title()).toMatch(/^● \d\d:\d\d Recording – Fractions$/);
   await expect(pip(page).locator('[data-part="alert"]')).toBeHidden();
+  await stopTake(page);
+});
+
+test('a warning keeps the state in the tab title: paused still reads Paused', async ({ page }) => {
+  await openApp(page, { lessonName: 'Fractions' }, [() => { window.__freeBytes = 200e6; }], [freeStorage]);
+  await micLive(page);
+  await chooseScreen(page);
+  await expect(page.locator('#banners')).toContainText('Storage is nearly full');
+  await startTake(page);
+  await expect.poll(() => page.title()).toMatch(/^● 00:\d\d Recording · ⚠ Storage is nearly full – Fractions$/);
+  await settle(page);
+  await page.click('#btnPause');
+  await expect.poll(() => phase(page)).toBe('paused');
+  await expect.poll(() => page.title()).toBe('❚❚ Paused · ⚠ Storage is nearly full – Fractions');
+  await settle(page);
+  await page.click('#btnResumeBig');
+  await expect.poll(() => phase(page)).toBe('recording');
+  await stopTake(page);
+});
+
+test('Alt+H pressed as the controls close themselves doesn’t bring them back into the recording', async ({ page }) => {
+  await openApp(page, { countdown: true });
+  await micLive(page);
+  await chooseScreen(page);
+  await page.click('#btnStart');
+  // The moment they close (at the end of the countdown), the teacher presses Alt+H to hide them.
+  await page.waitForFunction(() => (window.__pipEvents || []).some(e => e[0] === 'closed'), null, { polling: 'raf', timeout: 15_000 });
+  await page.keyboard.press('Alt+h');
+  await expect.poll(() => phase(page), { timeout: 15_000 }).toBe('recording');
+  await page.waitForTimeout(500);
+  expect(await pipOpen(page)).toBe(false);
+  // A deliberate Alt+H a moment later brings them back.
+  await page.waitForTimeout(1200);
+  await page.keyboard.press('Alt+h');
+  await expect.poll(() => pipOpen(page)).toBe(true);
   await stopTake(page);
 });

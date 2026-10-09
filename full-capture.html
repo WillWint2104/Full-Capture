@@ -8752,7 +8752,7 @@ ${list(win10)}
 
   // src/app/media/mp4.js
   var MAX_BOX_BYTES = 16 * 1024 * 1024;
-  var READ_AHEAD = 64 * 1024;
+  var READ_AHEAD = 16 * 1024;
   var U32 = 4294967296;
   var TF_BASE_DATA_OFFSET = 1;
   var TF_SAMPLE_DESCRIPTION = 2;
@@ -10617,7 +10617,7 @@ ${list(win10)}
         throw e;
       }
       let out = null;
-      let warning = "";
+      let warning2 = "";
       if (this.#sinkOk) {
         try {
           out = await this.#sink.finalize({ durationMs });
@@ -10646,14 +10646,14 @@ ${list(win10)}
         out = { savedTo: "memory", blob, size: blob.size, filename: this.#filename };
         if (this.#sink?.kind === "folder") {
           const why = this.#sinkError ? `${folderErrorMessage(this.#sinkError?.cause || this.#sinkError, this.#sink.folderName || "")} ` : "";
-          warning = `${why}This take was saved to your Downloads folder instead.`;
+          warning2 = `${why}This take was saved to your Downloads folder instead.`;
           try {
             await this.#sink.abort();
           } catch {
           }
         }
       }
-      if (missing) warning = [warning, "A few seconds of this take couldn’t be saved."].filter(Boolean).join(" ");
+      if (missing) warning2 = [warning2, "A few seconds of this take couldn’t be saved."].filter(Boolean).join(" ");
       if (this.#journal) {
         try {
           if (out.savedTo === "memory" && this.#journalOk) {
@@ -10669,7 +10669,7 @@ ${list(win10)}
       }
       this.#backup.clear();
       await this.#dropLock();
-      if (warning) this.#warn(warning, "saved-elsewhere");
+      if (warning2) this.#warn(warning2, "saved-elsewhere");
       this.#result = {
         id: this.#id,
         filename: out.filename || this.#filename,
@@ -10682,7 +10682,7 @@ ${list(win10)}
         savedTo: out.savedTo === "folder" ? "folder" : "memory",
         blob: out.blob,
         folderName: out.folderName || "",
-        warning,
+        warning: warning2,
         endedBy: this.#endedBy
       };
       this.#setState("stopped");
@@ -11866,6 +11866,13 @@ ${list(win10)}
       this.#phase = "starting";
       this.#changed();
       await this.#waitBeforeTake();
+      if (this.#abortStart && this.#screen?.videoTrack.readyState === "live") {
+        this.#abortStart = false;
+        if (this.#phase === "starting") this.#phase = null;
+        this.#notice({ kind: "info", title: "Recording cancelled", text: "Nothing was recorded.", timeoutMs: 4e3 });
+        this.#changed();
+        return;
+      }
       const ok = await this.#startTake();
       if (!ok && this.#phase === "starting") this.#phase = null;
       this.#changed();
@@ -14209,6 +14216,7 @@ ${list(win10)}
 
   // src/app/ui/chrome.js
   var ICON_COLORS = { idle: "#5b6b7f", live: "#c0392b", paused: "#d99a1f", alert: "#c0392b" };
+  var warning = (alert) => alert ? ` · ⚠ ${alert.title}` : "";
   function drawFavicon(kind) {
     const c = document.createElement("canvas");
     c.width = c.height = 64;
@@ -14317,15 +14325,15 @@ ${list(win10)}
       } else if (st.phase === "starting") {
         title = `Starting…${suffix}`;
         fav = "live";
-      } else if (top) {
-        title = `⚠ ${isNoSound(top) ? "No sound!" : top.title}${suffix}`;
+      } else if (top && isNoSound(top)) {
+        title = `⚠ No sound!${suffix}`;
         fav = "alert";
       } else if (st.phase === "recording") {
-        title = `● ${formatClock(st.take?.elapsedMs || 0)} Recording${suffix}`;
-        fav = "live";
+        title = `● ${formatClock(st.take?.elapsedMs || 0)} Recording${warning(top)}${suffix}`;
+        fav = top?.kind === "error" ? "alert" : "live";
       } else if (st.phase === "paused") {
-        title = `❚❚ Paused${suffix}`;
-        fav = "paused";
+        title = `❚❚ Paused${warning(top)}${suffix}`;
+        fav = top?.kind === "error" ? "alert" : "paused";
       } else if (st.phase === "stopping") {
         title = `Saving…${suffix}`;
         fav = "live";
@@ -14368,16 +14376,22 @@ ${list(win10)}
   var TAKE_PHASES = ["starting", "recording", "paused", "stopping"];
   var HIDE_SETTLE_MS = 300;
   var MAX_CAPTURE2 = { width: 3840, height: 2160 };
+  var SCALES = [1, 1.25, 1.5, 1.75, 2, 2.25, 2.5, 3, 3.5, 4];
+  var LATE_PRESS_MS = 1500;
   function controlsWouldBeRecorded(capture, display) {
     if (!capture || capture.surface !== "monitor") return false;
     if (typeof display?.isExtended !== "boolean" || !display.isExtended) return true;
-    const dw = display.width * display.dpr, dh = display.height * display.dpr;
+    const { width: w, height: h } = display;
     const cw = capture.nativeWidth, ch = capture.nativeHeight;
-    if (!(dw > 0 && dh > 0 && cw > 0 && ch > 0)) return true;
+    if (!(w > 0 && h > 0 && cw > 0 && ch > 0)) return true;
     const near = (a, b) => Math.abs(a - b) <= 0.02 * Math.max(a, b);
-    if (near(dw, cw) && near(dh, ch)) return true;
     const clamped = cw >= MAX_CAPTURE2.width * 0.98 || ch >= MAX_CAPTURE2.height * 0.98;
-    return clamped && dw >= cw * 0.98 && dh >= ch * 0.98 && near(dw / dh, cw / ch);
+    return [display.dpr, ...SCALES].some((s) => {
+      if (!(s > 0)) return false;
+      const dw = w * s, dh = h * s;
+      if (near(dw, cw) && near(dh, ch)) return true;
+      return clamped && dw >= cw * 0.98 && dh >= ch * 0.98 && near(dw / dh, cw / ch);
+    });
   }
   var Popout = class {
     constructor(session, { notices, toast, onOpen, onClose } = {}) {
@@ -14459,8 +14473,12 @@ ${list(win10)}
     }
     /** Alt+H and the Floating controls button: hide them when shown, show them when hidden (needs the press). */
     toggle() {
-      if (this.win || this.opening) this.hide();
-      else this.open();
+      if (this.win || this.opening) {
+        this.hide();
+        return;
+      }
+      if (this.take?.hiddenAt && performance.now() - this.take.hiddenAt < LATE_PRESS_MS) return;
+      this.open();
     }
     /**
      * Once per take, as it is about to begin ('starting'): close the controls if the
@@ -14487,12 +14505,14 @@ ${list(win10)}
         const capture = st.screen && { surface: st.screen.surface, nativeWidth: st.screen.nativeWidth, nativeHeight: st.screen.nativeHeight };
         if (!controlsWouldBeRecorded(capture, { isExtended: s?.isExtended, width: s?.width, height: s?.height, dpr: w.devicePixelRatio || 1 })) return;
         await this.hide();
+        take.hiddenAt = performance.now();
         const keys = st.prefs.shortcuts ? "Alt+H or " : "";
+        const elsewhere = s?.isExtended ? " If they were on a screen you aren’t recording, turn off “Hide floating controls if they’d be recorded” in Settings." : "";
         this.toast?.({
           id: "controls-hidden",
           kind: "info",
           title: "Floating controls hidden",
-          text: `So they aren’t in your recording of the whole screen. To bring them back, press ${keys}Floating controls.`,
+          text: `So they aren’t in your recording of the whole screen. To bring them back, press ${keys}Floating controls.${elsewhere}`,
           timeoutMs: 1e4
         });
         await new Promise((resolve) => setTimeout(resolve, HIDE_SETTLE_MS));

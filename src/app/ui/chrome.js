@@ -7,6 +7,7 @@ import { formatClock } from '../lib/time.js';
 import { topAlert, isNoSound } from './notices.js';
 
 const ICON_COLORS = { idle: '#5b6b7f', live: '#c0392b', paused: '#d99a1f', alert: '#c0392b' };
+const warning = alert => (alert ? ` · ⚠ ${alert.title}` : '');
 
 function drawFavicon(kind) {
   const c = document.createElement('canvas');
@@ -112,9 +113,10 @@ export class Chrome {
     let title = this.baseTitle + suffix, fav = 'idle';
     if (st.phase === 'countdown') { title = `Starting in ${st.countdown}…${suffix}`; fav = 'live'; }
     else if (st.phase === 'starting') { title = `Starting…${suffix}`; fav = 'live'; }
-    else if (top) { title = `⚠ ${isNoSound(top) ? 'No sound!' : top.title}${suffix}`; fav = 'alert'; }
-    else if (st.phase === 'recording') { title = `● ${formatClock(st.take?.elapsedMs || 0)} Recording${suffix}`; fav = 'live'; }
-    else if (st.phase === 'paused') { title = `❚❚ Paused${suffix}`; fav = 'paused'; }
+    else if (top && isNoSound(top)) { title = `⚠ No sound!${suffix}`; fav = 'alert'; }
+    // Any other warning joins the state, which stays: paused must never look like recording.
+    else if (st.phase === 'recording') { title = `● ${formatClock(st.take?.elapsedMs || 0)} Recording${warning(top)}${suffix}`; fav = top?.kind === 'error' ? 'alert' : 'live'; }
+    else if (st.phase === 'paused') { title = `❚❚ Paused${warning(top)}${suffix}`; fav = top?.kind === 'error' ? 'alert' : 'paused'; }
     else if (st.phase === 'stopping') { title = `Saving…${suffix}`; fav = 'live'; }
     if (document.title !== title) document.title = title;
     if (fav !== this.favKind) {
