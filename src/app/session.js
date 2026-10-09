@@ -724,6 +724,7 @@ export class Session extends Emitter {
 
   /** Why Start can't go ahead yet, or null. One rule for the button, Alt+R and the floating controls. */
   get startBlocker() {
+    if (!this.#engine) return 'Full Capture is still getting ready. Press Start again in a moment (reload the page if this stays).';
     const s = this.#settings;
     if (s.noVoice) return null;
     if (this.#mic.status === 'live' && s.micEnabled) return null;
@@ -739,10 +740,9 @@ export class Session extends Emitter {
     const now = performance.now();
     if (now - this.#lastToggle < TOGGLE_GUARD_MS) return;
     this.#lastToggle = now;
-    if (this.#phase === 'countdown') return this.cancelCountdown();
-    if (this.#phase === 'starting') { this.#abortStart = true; return; }
+    if (this.#phase === 'countdown' || this.#phase === 'starting' || this.#preparing) return this.cancelCountdown();
     if (this.#phase === 'recording' || this.#phase === 'paused') return this.stop();
-    if (this.#phase === 'stopping' || this.#preparing) return;
+    if (this.#phase === 'stopping') return;
     return this.record(opts);
   }
 
@@ -776,9 +776,14 @@ export class Session extends Emitter {
       // rather than open a second picker. A pick that ends without a screen says why.
       if (this.#screenPick) await this.#screenPick;
       else if (!this.#screen) await this.#pickScreen();
-      if (!this.#screen || this.#abortStart) return;
+      if (!this.#screen) return;
       // A camera still opening (permission prompt, slow USB camera) gets a moment to join this take.
-      if (this.#cameraOpening) await Promise.race([this.#cameraOpening, new Promise(r => setTimeout(r, CAMERA_WAIT_MS))]);
+      if (this.#cameraOpening && !this.#abortStart) await Promise.race([this.#cameraOpening, new Promise(r => setTimeout(r, CAMERA_WAIT_MS))]);
+      if (this.#abortStart) {
+        this.#abortStart = false;
+        this.#notice({ kind: 'info', title: 'Recording cancelled', text: 'Nothing was recorded.', timeoutMs: 4000 });
+        return;
+      }
     } finally {
       this.#preparing = false;
       this.#changed();
@@ -800,7 +805,11 @@ export class Session extends Emitter {
   }
 
   cancelCountdown() {
-    if (this.#phase === 'starting') { this.#abortStart = true; return; }
+    // A start still being set up (screen, camera, file) is cancelled as soon as that settles.
+    if (this.#phase === 'starting' || this.#preparing) {
+      if (!this.#abortStart) { this.#abortStart = true; this.#changed(); }
+      return;
+    }
     if (this.#phase !== 'countdown') return;
     clearInterval(this.#countdownTimer);
     this.#countdownTimer = null;
@@ -826,6 +835,10 @@ export class Session extends Emitter {
   }
 
   async #startTake() {
+    if (!this.#engine) {
+      this.#notice({ kind: 'error', title: 'Full Capture is still getting ready', text: 'Wait a moment, then press Start recording. Reload the page if this stays.' });
+      return false;
+    }
     const screen = this.#screen;
     if (!screen || screen.videoTrack.readyState !== 'live') {
       this.#notice({ kind: 'error', title: 'The shared screen has gone', text: 'Choose a screen again, then press Start recording.' });
@@ -1000,13 +1013,17 @@ export class Session extends Emitter {
     try {
       result = await recorder.stop();
     } catch (e) {
-      if (e?.code === 'empty') {
+      if (e?.code === 'empty' && this.#endedBy.get(take.id) === 'share-ended') {
+        this.#notice({ kind: 'warning', title: 'Screen sharing stopped', text: 'It stopped before anything was recorded. Choose a screen, then press Start recording.' });
+      } else if (e?.code === 'empty') {
         this.#notice({ kind: 'info', title: 'That take was too short to save', text: 'Nothing had been recorded yet. Press Start recording when you’re ready.', timeoutMs: 6000 });
       } else {
         this.#notice({ kind: 'error', title: 'Saving failed', text: String(e?.message || e) });
       }
     }
     this.#releaseTake();
+    // A share that has ended is let go, so Set up never shows a dead screen as chosen.
+    if (take?.screen?.videoTrack.readyState === 'ended' && this.#screen === take.screen) this.#releaseScreen();
     if (!result) { this.#phase = null; this.#changed(); return; }
 
     const row = {
@@ -1487,7 +1504,9 @@ export class Session extends Emitter {
     if (take) delete take.screen;
     return Object.freeze({
       phase: this.#phaseName(),
+      ready: !!this.#engine,
       preparing: this.#preparing,
+      cancelling: this.#abortStart && (this.#phase === 'starting' || this.#preparing),
       countdown: this.#countdown,
       screen: this.#screen && {
         label: this.#screen.label, surface: this.#screen.surface, width: this.#screen.width, height: this.#screen.height,

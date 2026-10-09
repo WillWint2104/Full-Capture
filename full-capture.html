@@ -9365,6 +9365,8 @@ ${list(win10)}
   var TICK_MS = 500;
   var STOP_TIMEOUT_MS = 1e4;
   var LOCK_TIMEOUT_MS = 3e3;
+  var JOURNAL_TIMEOUT_MS = 3e3;
+  var SINK_TIMEOUT_MS = 5e3;
   function within(promise, ms) {
     let timer;
     return Promise.race([promise, new Promise((r) => {
@@ -9618,15 +9620,16 @@ ${list(win10)}
         try {
           if (this.#journal) {
             try {
-              await this.#journal.begin({
+              const begun = this.#journal.begin({
                 id: this.#id,
                 lessonName: this.#meta.lessonName || "",
                 filename: this.#filename,
                 container: this.#container,
                 mimeType: this.#mimeType,
                 startedAt: this.#meta.startedAt
-              });
-              this.#journalOk = true;
+              }).then(() => true);
+              if (await within(begun, JOURNAL_TIMEOUT_MS)) this.#journalOk = true;
+              else this.#warn("Crash protection isn’t available for this take, because the browser’s storage didn’t answer in time. The take is still saved when you stop.", "no-journal");
             } catch (e) {
               console.warn("journal.begin failed", e);
               this.#warn("Crash protection isn’t available for this take, because the browser’s storage can’t be used. The take is still saved when you stop.", "no-journal");
@@ -9634,10 +9637,18 @@ ${list(win10)}
           } else {
             this.#warn("Crash protection isn’t available in this browser window (private windows block it). The take is still saved when you stop.", "no-journal");
           }
+          const opened = this.#sink.open({ filename: this.#filename, container: this.#container, mimeType: this.#mimeType }).then(() => true);
+          let open;
           try {
-            await this.#sink.open({ filename: this.#filename, container: this.#container, mimeType: this.#mimeType });
+            open = await within(opened, SINK_TIMEOUT_MS);
           } catch (e) {
             throw withCode(e, "sink");
+          }
+          if (!open) {
+            opened.then(() => this.#sink.abort?.(), () => {
+            }).catch(() => {
+            });
+            throw withCode(new Error("Your lessons folder didn’t answer in time."), "sink");
           }
           if (this.#sink.filename) this.#filename = this.#sink.filename;
           if (video.readyState === "ended") throw withCode(new Error(SCREEN_GONE), "screen-gone");
@@ -11037,6 +11048,7 @@ ${list(win10)}
     // -------------------------------------------------------------- recording
     /** Why Start can't go ahead yet, or null. One rule for the button, Alt+R and the floating controls. */
     get startBlocker() {
+      if (!this.#engine) return "Full Capture is still getting ready. Press Start again in a moment (reload the page if this stays).";
       const s = this.#settings;
       if (s.noVoice) return null;
       if (this.#mic.status === "live" && s.micEnabled) return null;
@@ -11049,13 +11061,9 @@ ${list(win10)}
       const now2 = performance.now();
       if (now2 - this.#lastToggle < TOGGLE_GUARD_MS) return;
       this.#lastToggle = now2;
-      if (this.#phase === "countdown") return this.cancelCountdown();
-      if (this.#phase === "starting") {
-        this.#abortStart = true;
-        return;
-      }
+      if (this.#phase === "countdown" || this.#phase === "starting" || this.#preparing) return this.cancelCountdown();
       if (this.#phase === "recording" || this.#phase === "paused") return this.stop();
-      if (this.#phase === "stopping" || this.#preparing) return;
+      if (this.#phase === "stopping") return;
       return this.record(opts);
     }
     /**
@@ -11088,8 +11096,13 @@ ${list(win10)}
         }
         if (this.#screenPick) await this.#screenPick;
         else if (!this.#screen) await this.#pickScreen();
-        if (!this.#screen || this.#abortStart) return;
-        if (this.#cameraOpening) await Promise.race([this.#cameraOpening, new Promise((r) => setTimeout(r, CAMERA_WAIT_MS))]);
+        if (!this.#screen) return;
+        if (this.#cameraOpening && !this.#abortStart) await Promise.race([this.#cameraOpening, new Promise((r) => setTimeout(r, CAMERA_WAIT_MS))]);
+        if (this.#abortStart) {
+          this.#abortStart = false;
+          this.#notice({ kind: "info", title: "Recording cancelled", text: "Nothing was recorded.", timeoutMs: 4e3 });
+          return;
+        }
       } finally {
         this.#preparing = false;
         this.#changed();
@@ -11112,8 +11125,11 @@ ${list(win10)}
       }, 1e3);
     }
     cancelCountdown() {
-      if (this.#phase === "starting") {
-        this.#abortStart = true;
+      if (this.#phase === "starting" || this.#preparing) {
+        if (!this.#abortStart) {
+          this.#abortStart = true;
+          this.#changed();
+        }
         return;
       }
       if (this.#phase !== "countdown") return;
@@ -11138,6 +11154,10 @@ ${list(win10)}
       }
     }
     async #startTake() {
+      if (!this.#engine) {
+        this.#notice({ kind: "error", title: "Full Capture is still getting ready", text: "Wait a moment, then press Start recording. Reload the page if this stays." });
+        return false;
+      }
       const screen = this.#screen;
       if (!screen || screen.videoTrack.readyState !== "live") {
         this.#notice({ kind: "error", title: "The shared screen has gone", text: "Choose a screen again, then press Start recording." });
@@ -11318,13 +11338,16 @@ ${list(win10)}
       try {
         result = await recorder.stop();
       } catch (e) {
-        if (e?.code === "empty") {
+        if (e?.code === "empty" && this.#endedBy.get(take.id) === "share-ended") {
+          this.#notice({ kind: "warning", title: "Screen sharing stopped", text: "It stopped before anything was recorded. Choose a screen, then press Start recording." });
+        } else if (e?.code === "empty") {
           this.#notice({ kind: "info", title: "That take was too short to save", text: "Nothing had been recorded yet. Press Start recording when you’re ready.", timeoutMs: 6e3 });
         } else {
           this.#notice({ kind: "error", title: "Saving failed", text: String(e?.message || e) });
         }
       }
       this.#releaseTake();
+      if (take?.screen?.videoTrack.readyState === "ended" && this.#screen === take.screen) this.#releaseScreen();
       if (!result) {
         this.#phase = null;
         this.#changed();
@@ -11820,7 +11843,9 @@ ${list(win10)}
       if (take) delete take.screen;
       return Object.freeze({
         phase: this.#phaseName(),
+        ready: !!this.#engine,
         preparing: this.#preparing,
+        cancelling: this.#abortStart && (this.#phase === "starting" || this.#preparing),
         countdown: this.#countdown,
         screen: this.#screen && {
           label: this.#screen.label,
@@ -12429,7 +12454,9 @@ ${list(win10)}
       for (const r of document.querySelectorAll('input[name="bubbleSize"]')) r.addEventListener("change", (e) => e.target.checked && s.setBubble({ size: e.target.value }));
       $("bubbleMirror").addEventListener("change", (e) => s.setBubble({ mirror: e.target.checked }));
       for (const [id, pos] of Object.entries(CORNERS)) $(id).addEventListener("click", () => s.setBubble(pos));
-      $("btnStart").addEventListener("click", () => this.startOrStop("button"));
+      $("btnStart").addEventListener("click", () => {
+        if ($("btnStart").dataset.state !== "starting") this.startOrStop("button");
+      });
       document.addEventListener("click", (e) => {
         const btn = e.target.closest('[data-action="expand-step"], [data-action="change"], [data-action="cancel-sound-check"]');
         if (!btn || btn.closest("template")) return;
@@ -12513,8 +12540,8 @@ ${list(win10)}
       const locked = st.phase === "countdown" || st.phase === "starting" || st.preparing;
       attr($("stepMic"), "data-mic", noVoice ? "off" : mic.status);
       show($("micIntro"), !noVoice && ["needs-permission", "starting", "off"].includes(mic.status));
-      attr($("btnMicOn"), "aria-disabled", mic.status === "starting" ? "true" : null);
-      label($("btnMicOn"), mic.status === "starting" ? "Starting…" : "Turn on microphone");
+      attr($("btnMicOn"), "aria-disabled", mic.status === "starting" || !st.ready ? "true" : null);
+      label($("btnMicOn"), !st.ready ? "Getting ready…" : mic.status === "starting" ? "Starting…" : "Turn on microphone");
       show($("micControls"), live || ["lost", "notfound", "busy"].includes(mic.status));
       for (const id of ["micSelect", "noiseToggle"]) $(id).disabled = locked;
       attr($("micSuggest"), "aria-disabled", locked ? "true" : null);
@@ -12748,7 +12775,7 @@ ${list(win10)}
       const btn = $("btnStart");
       const counting = st.phase === "countdown";
       const starting = st.phase === "starting" || st.preparing;
-      label(btn, counting ? `Cancel (${st.countdown})` : starting ? "Starting…" : "Start recording");
+      label(btn, counting ? `Cancel (${st.countdown})` : st.cancelling ? "Cancelling…" : starting ? "Starting…" : "Start recording");
       attr(btn, "aria-disabled", !counting && !micReady || starting ? "true" : null);
       attr(btn, "data-state", counting ? "countdown" : starting ? "starting" : "idle");
       if (micReady) show($("startHint"), false);
@@ -12774,6 +12801,8 @@ ${list(win10)}
       }
       this.prevMicStatus = ms;
       if (st.phase === "countdown" && this.prevPhase !== "countdown") this.notices.announce(`Recording starts in ${st.countdown} seconds. Press Escape to cancel.`);
+      if (st.cancelling && !this.prevCancelling) this.notices.announce("Cancelling.");
+      this.prevCancelling = st.cancelling;
       if (!inSetup) this.expanded.clear();
     }
   };
@@ -13006,6 +13035,7 @@ ${list(win10)}
       });
       const now2 = this.session.state;
       if (ok && now2.take?.id === id && ["recording", "paused"].includes(now2.phase)) this.session.cancelTake();
+      else if (ok) this.notices.toast({ kind: "info", title: "That take was already saved", text: "It stopped while you were deciding. Delete it from Your takes if you don’t want it." });
     }
     #tickClock(now2) {
       const c = this.clock;
@@ -13486,7 +13516,7 @@ ${list(win10)}
     /** Shortcuts shared with the floating controls. Returns true if handled. */
     handleKey(e) {
       const st = this.session.state;
-      if (e.key === "Escape" && (st.phase === "countdown" || st.phase === "starting")) {
+      if (e.key === "Escape" && (st.phase === "countdown" || st.phase === "starting" || st.preparing)) {
         this.session.cancelCountdown();
         return true;
       }
@@ -13856,6 +13886,7 @@ ${list(win10)}
   };
   var PHASE_FOCUS = { setup: "btnStart", ready: "btnStart", countdown: "btnStart", starting: "btnStart", recording: "btnStop", paused: "btnResumeBig", stopping: "recTimer", review: "reviewHeading" };
   var isShown = (el) => !!el && el.isConnected && !el.closest("[hidden]") && el.getClientRects().length > 0;
+  var VIEW_SETTLE_MS = 500;
   var FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
   function createUI(session) {
     const meters = new MeterLoop();
@@ -13940,8 +13971,20 @@ ${list(win10)}
         focusEl(target);
       }
     }
+    let shownView = null, shownAt = -Infinity;
+    const settling = (e) => {
+      if (!shownView || performance.now() - shownAt > VIEW_SETTLE_MS || !$(shownView).contains(e.target)) return;
+      if (e.type === "click" && e.detail === 0) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    };
+    for (const type of ["pointerdown", "mousedown", "click"]) document.addEventListener(type, settling, { capture: true });
     function renderAll(st) {
       const current = VIEW_FOR[st.phase] || "viewSetup";
+      if (current !== shownView) {
+        if (shownView) shownAt = performance.now();
+        shownView = current;
+      }
       for (const id of new Set(Object.values(VIEW_FOR))) show($(id), id === current);
       for (const p of parts) {
         try {

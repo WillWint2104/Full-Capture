@@ -57,6 +57,7 @@ export class RecordingView {
     // The take may have ended while the question was open (Stop in the floating controls, sharing ended).
     const now = this.session.state;
     if (ok && now.take?.id === id && ['recording', 'paused'].includes(now.phase)) this.session.cancelTake();
+    else if (ok) this.notices.toast({ kind: 'info', title: 'That take was already saved', text: 'It stopped while you were deciding. Delete it from Your takes if you don’t want it.' });
   }
 
   #tickClock(now) {

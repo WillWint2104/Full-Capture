@@ -37,6 +37,10 @@ const FOCUS_NEXT = {
 const PHASE_FOCUS = { setup: 'btnStart', ready: 'btnStart', countdown: 'btnStart', starting: 'btnStart', recording: 'btnStop', paused: 'btnResumeBig', stopping: 'recTimer', review: 'reviewHeading' };
 
 const isShown = el => !!el && el.isConnected && !el.closest('[hidden]') && el.getClientRects().length > 0;
+// A view can appear between the two clicks of a double-click (Start records within
+// ~30 ms; Stop & save reaches Review within ~100 ms), and the second click would press
+// whatever now sits under the pointer, e.g. Pause. Windows' default double-click time.
+const VIEW_SETTLE_MS = 500;
 const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
 
 export function createUI(session) {
@@ -121,8 +125,19 @@ export function createUI(session) {
     if (target) { lastFocused = target; focusEl(target); }
   }
 
+  // Pointer presses on a view in its first moments are ignored (keyboard presses are not).
+  let shownView = null, shownAt = -Infinity;
+  const settling = e => {
+    if (!shownView || performance.now() - shownAt > VIEW_SETTLE_MS || !$(shownView).contains(e.target)) return;
+    if (e.type === 'click' && e.detail === 0) return;    // Enter or Space
+    e.preventDefault();
+    e.stopImmediatePropagation();
+  };
+  for (const type of ['pointerdown', 'mousedown', 'click']) document.addEventListener(type, settling, { capture: true });
+
   function renderAll(st) {
     const current = VIEW_FOR[st.phase] || 'viewSetup';
+    if (current !== shownView) { if (shownView) shownAt = performance.now(); shownView = current; }
     for (const id of new Set(Object.values(VIEW_FOR))) show($(id), id === current);
     for (const p of parts) {
       try { p.render(st); } catch (e) { console.error('render failed in', p.constructor.name, e); }

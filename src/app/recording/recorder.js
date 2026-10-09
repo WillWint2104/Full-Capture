@@ -26,6 +26,9 @@ export const JOURNAL_UPDATE_MS = 2000;
 export const TICK_MS = 500;
 const STOP_TIMEOUT_MS = 10_000;
 const LOCK_TIMEOUT_MS = 3000;
+// Storage that doesn't answer must not leave the take "Starting…" forever.
+const JOURNAL_TIMEOUT_MS = 3000;   // then the take runs without its safety copy
+const SINK_TIMEOUT_MS = 5000;      // then the folder is skipped and the take downloads when stopped
 
 /** Wait for `promise`, but no longer than `ms` (and don't leave the timer running). */
 function within(promise, ms) {
@@ -272,11 +275,13 @@ export class TakeRecorder extends Emitter {
       try {
         if (this.#journal) {
           try {
-            await this.#journal.begin({
+            const begun = this.#journal.begin({
               id: this.#id, lessonName: this.#meta.lessonName || '', filename: this.#filename,
               container: this.#container, mimeType: this.#mimeType, startedAt: this.#meta.startedAt,
-            });
-            this.#journalOk = true;
+            }).then(() => true);
+            // An entry that lands late has no chunks; the next visit cleans it up (Journal.listPending).
+            if (await within(begun, JOURNAL_TIMEOUT_MS)) this.#journalOk = true;
+            else this.#warn('Crash protection isn’t available for this take, because the browser’s storage didn’t answer in time. The take is still saved when you stop.', 'no-journal');
           } catch (e) {
             console.warn('journal.begin failed', e);
             this.#warn('Crash protection isn’t available for this take, because the browser’s storage can’t be used. The take is still saved when you stop.', 'no-journal');
@@ -284,10 +289,17 @@ export class TakeRecorder extends Emitter {
         } else {
           this.#warn('Crash protection isn’t available in this browser window (private windows block it). The take is still saved when you stop.', 'no-journal');
         }
+        const opened = this.#sink.open({ filename: this.#filename, container: this.#container, mimeType: this.#mimeType }).then(() => true);
+        let open;
         try {
-          await this.#sink.open({ filename: this.#filename, container: this.#container, mimeType: this.#mimeType });
+          open = await within(opened, SINK_TIMEOUT_MS);
         } catch (e) {
           throw withCode(e, 'sink');
+        }
+        if (!open) {
+          // If the file does open later, it is removed again (nothing will be written to it).
+          opened.then(() => this.#sink.abort?.(), () => {}).catch(() => {});
+          throw withCode(new Error('Your lessons folder didn’t answer in time.'), 'sink');
         }
         if (this.#sink.filename) this.#filename = this.#sink.filename;
         // "Stop sharing" may have been pressed while the lock, journal and

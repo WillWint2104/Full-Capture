@@ -57,7 +57,7 @@ export class Chrome {
   /** Shortcuts shared with the floating controls. Returns true if handled. */
   handleKey(e) {
     const st = this.session.state;
-    if (e.key === 'Escape' && (st.phase === 'countdown' || st.phase === 'starting')) { this.session.cancelCountdown(); return true; }
+    if (e.key === 'Escape' && (st.phase === 'countdown' || st.phase === 'starting' || st.preparing)) { this.session.cancelCountdown(); return true; }
     if (!st.prefs.shortcuts || !e.altKey || e.ctrlKey || e.metaKey) return false;
     const k = e.key.toLowerCase();
     if (!['r', 'p', 'm'].includes(k)) return false;

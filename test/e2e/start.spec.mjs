@@ -201,6 +201,35 @@ test('a camera that only opens after the take has started: the preview shows no 
   await expect(page.locator('#screenVideo')).toBeVisible();
 });
 
+test('a double-click on Start or on Stop & save: the second click never lands on the view that appears', async ({ page }) => {
+  // A person's second click comes 100-250 ms after the first; a take records ~30 ms after
+  // Start, and Review is up ~90 ms after Stop & save. At 1920×1080 Pause sits under Start.
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await openApp(page);
+  await micLive(page);
+  await chooseScreen(page);
+  const at = async (id, fx = 0.5) => { const b = await page.locator(id).boundingBox(); return [b.x + b.width * fx, b.y + b.height * 0.45]; };
+  const [sx, sy] = await at('#btnStart', 0.25);
+  await page.mouse.click(sx, sy);
+  await page.waitForFunction(() => window.fullCapture.state.phase === 'recording', null, { polling: 5 });
+  await page.mouse.click(sx, sy);
+  await page.waitForTimeout(800);
+  expect(await phase(page)).toBe('recording');         // not paused by a click on Pause
+  expect(await state(page, st => st.take.markers.length)).toBe(0);
+  const [tx, ty] = await at('#btnStop');
+  const download = page.waitForEvent('download');
+  await page.mouse.click(tx, ty);
+  await download;
+  await page.waitForFunction(() => window.fullCapture.state.phase === 'review', null, { polling: 5, timeout: 20_000 });
+  await page.mouse.click(tx, ty);
+  await page.waitForTimeout(800);
+  expect(await phase(page)).toBe('review');            // not sent on by "Record another take"
+  // Keyboard presses are never held back.
+  await page.locator('#btnNewTake').focus();
+  await page.keyboard.press('Enter');
+  await expect.poll(() => phase(page)).toBe('ready');
+});
+
 test('a camera-bubble take started straight after sharing is sized from the picture, not a stale report', async ({ page }) => {
   // Chrome can report the capture limits as the track's size for a moment after
   // they are applied; here that lasts 1 s, and Start picks the screen itself.

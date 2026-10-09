@@ -406,7 +406,9 @@ test('with a folder chosen, takes stream straight into it with a correct duratio
   expect(r.size).toBeGreaterThan(10_000);
   expect(r.duration).toBeGreaterThan(1.5);
   expect(r.duration).toBeLessThan(4);
-  // Delete take removes the file from the folder.
+  // Delete take removes the file from the folder. (A view ignores pointer clicks for
+  // its first half second, so the second click of a double-click can't land on it.)
+  await page.waitForTimeout(600);
   await page.click('#btnDeleteTake');
   await page.click('#btnConfirmOk');
   await expect.poll(() => page.evaluate(() => [...window.__files.keys()].filter(n => /^Folder lesson/.test(n)).length)).toBe(0);

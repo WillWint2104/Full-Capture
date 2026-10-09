@@ -134,7 +134,9 @@ export class SetupView {
     $('bubbleMirror').addEventListener('change', e => s.setBubble({ mirror: e.target.checked }));
     for (const [id, pos] of Object.entries(CORNERS)) $(id).addEventListener('click', () => s.setBubble(pos));
 
-    $('btnStart').addEventListener('click', () => this.startOrStop('button'));
+    // While a take is starting the button is greyed out: a stray click (the second half of a
+    // slow double-click) must not cancel it. Escape and Alt+R cancel.
+    $('btnStart').addEventListener('click', () => { if ($('btnStart').dataset.state !== 'starting') this.startOrStop('button'); });
 
     // Helper buttons in the design: "Change" on a collapsed step, "Cancel" on the sound check.
     document.addEventListener('click', e => {
@@ -226,8 +228,8 @@ export class SetupView {
     attr($('stepMic'), 'data-mic', noVoice ? 'off' : mic.status);
 
     show($('micIntro'), !noVoice && ['needs-permission', 'starting', 'off'].includes(mic.status));
-    attr($('btnMicOn'), 'aria-disabled', mic.status === 'starting' ? 'true' : null);
-    label($('btnMicOn'), mic.status === 'starting' ? 'Starting…' : 'Turn on microphone');
+    attr($('btnMicOn'), 'aria-disabled', mic.status === 'starting' || !st.ready ? 'true' : null);
+    label($('btnMicOn'), !st.ready ? 'Getting ready…' : mic.status === 'starting' ? 'Starting…' : 'Turn on microphone');
     // Busy or missing: the picker stays (to choose another mic); CSS hides the rest.
     show($('micControls'), live || ['lost', 'notfound', 'busy'].includes(mic.status));
     // From Start until the take begins, the microphone is not reopened under it.
@@ -441,7 +443,7 @@ export class SetupView {
     const btn = $('btnStart');
     const counting = st.phase === 'countdown';
     const starting = st.phase === 'starting' || st.preparing;
-    label(btn, counting ? `Cancel (${st.countdown})` : starting ? 'Starting…' : 'Start recording');
+    label(btn, counting ? `Cancel (${st.countdown})` : st.cancelling ? 'Cancelling…' : starting ? 'Starting…' : 'Start recording');
     attr(btn, 'aria-disabled', (!counting && !micReady) || starting ? 'true' : null);
     attr(btn, 'data-state', counting ? 'countdown' : starting ? 'starting' : 'idle');
     if (micReady) show($('startHint'), false);
@@ -472,6 +474,8 @@ export class SetupView {
     }
     this.prevMicStatus = ms;
     if (st.phase === 'countdown' && this.prevPhase !== 'countdown') this.notices.announce(`Recording starts in ${st.countdown} seconds. Press Escape to cancel.`);
+    if (st.cancelling && !this.prevCancelling) this.notices.announce('Cancelling.');
+    this.prevCancelling = st.cancelling;
     if (!inSetup) this.expanded.clear();
   }
 }
