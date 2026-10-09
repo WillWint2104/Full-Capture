@@ -49,8 +49,15 @@ doesn't happen as written is a failure. Note it with a screenshot.
       chose), named `Lesson name (date time).mp4`. The extension is
       **.mp4**.
 - [ ] It opens in the **Windows Media Player / Films & TV** app (and in VLC, if
-      you have it). Picture and voice both play. The length matches the
-      timer, without the paused part. Seeking to the middle and the end works.
+      you have it). Picture and voice both play. The length shown matches the
+      timer, without the paused part. (File Explorer → right-click → Properties
+      → Details shows the same Length.)
+- [ ] **Scrubbing:** in Media Player, drag the seek bar to about a quarter,
+      the middle and near the end, and click a few points on it. Each time the
+      picture and sound jump there straight away and play on from that point.
+      Do the same in VLC and in Chrome (drag the file onto a new tab).
+- [ ] **Sync after a jump:** jump back to the second set of claps. Each clap's
+      sound still lands on the hands meeting.
 - [ ] **Sync:** each clap's sound lands on the hands meeting, at the start
       and at the end. Look closely at the **first claps**: in testing, about
       one camera-bubble take in three had the sound about 0.15 s *ahead* of
