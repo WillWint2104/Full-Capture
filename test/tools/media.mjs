@@ -1,7 +1,7 @@
 // Independent checks of saved recordings, shared by the unit and browser
 // tests: ffmpeg/ffprobe, GStreamer (through gst_probe.py) and a minimal MP4
 // box reader that doesn't share code with the app.
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const run = (cmd, args) => execFileSync(cmd, args, { maxBuffer: 256 << 20, stdio: ['ignore', 'pipe', 'pipe'] }).toString();
@@ -108,6 +108,12 @@ function metadataRows(text, key) {
   return rows;
 }
 
+/** The first pts_time in ffmpeg's ashowinfo log. */
+function firstPts(log) {
+  const m = log.match(/\bpts_time:(-?[\d.]+)/);
+  return m ? Number(m[1]) : null;
+}
+
 /**
  * Flash and beep onsets of a recording of the sync stimulus (test/e2e/stimulus.mjs),
  * decoded from `from` seconds on with ffmpeg's index-based seek, keeping the file's
@@ -120,12 +126,14 @@ export function flashesAndBeeps(file, { from = 0 } = {}) {
   const audio = run('ffmpeg', ['-v', 'quiet', ...seek, '-copyts', '-i', file, '-map', '0:a:0', '-af', 'aresample=16000,asetnsamples=n=80:p=0,astats=metadata=1:reset=1,ametadata=print:key=lavfi.astats.Overall.RMS_level:file=-', '-f', 'null', '-']);
   const v = metadataRows(video, 'lavfi.signalstats.YAVG');
   const a = metadataRows(audio, 'lavfi.astats.Overall.RMS_level');
+  // Where the decoded sound starts, before resampling (which shifts its first frame by about a millisecond).
+  const shown = spawnSync('ffmpeg', ['-v', 'info', '-nostats', ...seek, '-copyts', '-i', file, '-map', '0:a:0', '-af', 'ashowinfo', '-f', 'null', '-'], { encoding: 'utf8', maxBuffer: 256 << 20 }).stderr || '';
   // A window that opens mid-flash or mid-beep has no real onset at its start.
   const settled = rows => rows.filter(r => r.t > (rows[0]?.t ?? 0) + 0.15);
   return {
     frames: v.map(r => r.t),
     firstVideo: v[0]?.t ?? null,
-    firstAudio: a[0]?.t ?? null,
+    firstAudio: firstPts(shown) ?? a[0]?.t ?? null,
     flashes: onsets(settled(v), 64, 128),
     beeps: onsets(settled(a), -50, -30),
   };
@@ -137,4 +145,10 @@ export function syncOffsets({ flashes, beeps }) {
     const b = beeps.reduce((best, x) => (Math.abs(x - f) < Math.abs(best - f) ? x : best), Infinity);
     return Math.abs(b - f) < 0.5 ? { at: f, ms: Math.round((b - f) * 1000) } : null;
   }).filter(Boolean);
+}
+
+/** Audio packets as [{pts, end}] in seconds (ffprobe). */
+export function audioPackets(file) {
+  return run('ffprobe', ['-v', 'error', '-select_streams', 'a:0', '-show_entries', 'packet=pts_time,duration_time', '-of', 'csv=p=0', file])
+    .trim().split('\n').filter(Boolean).map(l => { const [pts, d] = l.split(',').map(Number); return { pts, end: pts + d }; });
 }

@@ -58,7 +58,7 @@ export class MemorySink {
     let blob = new Blob(this.#parts, { type: this.#type });
     if (this.#container === 'webm' && durationMs > 0 && blob.size) blob = await patchWebmBlob(blob, durationMs);
     if (this.#mp4) {
-      const plan = mp4Plan(this.#mp4);
+      const plan = mp4Plan(this.#mp4, durationMs);
       if (plan && plan.moovAt === blob.size) blob = applyPlanToBlob(blob, plan, this.#type);
       this.#mp4 = null;
     }
@@ -73,11 +73,20 @@ export class MemorySink {
   }
 }
 
-/** The indexer's plan, or null (the file is then kept exactly as recorded). */
-function mp4Plan(indexer) {
+/**
+ * The indexer's plan, or null: the file is then kept exactly as recorded. A
+ * plan whose length disagrees with the recorder's clock (by more than 5 s or
+ * a tenth) is not trusted: an index can only be checked by its length here,
+ * and a folder take keeps no other copy once it is saved.
+ */
+function mp4Plan(indexer, durationMs = 0) {
   try {
     const plan = indexer.plan();
     if (!plan && indexer.error) console.warn('MP4 left as recorded:', indexer.error.message);
+    if (plan && durationMs > 0 && Math.abs(plan.durationMs - durationMs) > Math.max(5000, durationMs / 10)) {
+      console.warn(`MP4 left as recorded: its index says ${plan.durationMs} ms, the take lasted ${durationMs} ms`);
+      return null;
+    }
     return plan;
   } catch (e) {
     console.warn('MP4 left as recorded:', e.message);
@@ -180,7 +189,7 @@ export class FolderSink {
       const { offset, size, timecodeScale } = this.#duration;
       await this.#writable.write({ type: 'write', position: offset, data: encodeDurationPayload(durationMs, timecodeScale, size) });
     }
-    if (this.#mp4) await this.#indexMp4();
+    if (this.#mp4) await this.#indexMp4(durationMs);
     await this.#writable.close();
     this.#closed = true;
     this.#saved = true;
@@ -195,8 +204,8 @@ export class FolderSink {
    * other write, and the recorder falls back to its safety copy, which is
    * indexed the same way.
    */
-  async #indexMp4() {
-    const plan = mp4Plan(this.#mp4);
+  async #indexMp4(durationMs) {
+    const plan = mp4Plan(this.#mp4, durationMs);
     this.#mp4 = null;
     if (!plan || plan.moovAt !== this.#written) return;
     await this.#writable.write({ type: 'write', position: plan.moovAt, data: plan.moov });

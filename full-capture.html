@@ -8752,6 +8752,7 @@ ${list(win10)}
 
   // src/app/media/mp4.js
   var MAX_BOX_BYTES = 16 * 1024 * 1024;
+  var READ_AHEAD = 64 * 1024;
   var U32 = 4294967296;
   var TF_BASE_DATA_OFFSET = 1;
   var TF_SAMPLE_DESCRIPTION = 2;
@@ -9141,7 +9142,7 @@ ${list(win10)}
       const mediaDuration = deltas.reduce((s, d) => s + d, 0);
       const firstDts = n ? t.dts.at(0) : 0;
       let end = firstDts + mediaDuration;
-      for (let i2 = 0; i2 < n; i2++) end = Math.max(end, t.dts.at(i2) + t.cto.at(i2) + deltas[i2]);
+      for (let i2 = 0, at = firstDts; i2 < n; at += deltas[i2], i2++) end = Math.max(end, at + t.cto.at(i2) + deltas[i2]);
       const toMovie = (v) => Math.round(v * movieTimescale / t.timescale);
       const edits = n ? editsFor(t, firstDts, end, toMovie) : null;
       const trackDuration = edits ? edits.reduce((s, e) => s + e.duration, 0) : toMovie(end - firstDts);
@@ -9184,6 +9185,8 @@ ${list(win10)}
     // where the next top-level box starts
     #carry = null;
     // { blob, need }: bytes from #next on, held while a box straddles pushes
+    #cache = null;
+    // { blob, from, bytes }: the last read-ahead
     #moovBytes = null;
     #moovAt = -1;
     #header = null;
@@ -9209,9 +9212,15 @@ ${list(win10)}
       }
     }
     async #read(blob, blobStart, n) {
-      const src = this.#carry ? new Blob([this.#carry.blob, blob]) : blob;
-      const from = this.#carry ? 0 : this.#next - blobStart;
-      return new Uint8Array(await src.slice(from, from + n).arrayBuffer());
+      if (this.#carry) return new Uint8Array(await new Blob([this.#carry.blob, blob]).slice(0, n).arrayBuffer());
+      const from = this.#next - blobStart;
+      const c = this.#cache;
+      if (!c || c.blob !== blob || from < c.from || from + n > c.from + c.bytes.length) {
+        const bytes2 = new Uint8Array(await blob.slice(from, Math.max(from + n, Math.min(blob.size, from + READ_AHEAD))).arrayBuffer());
+        this.#cache = { blob, from, bytes: bytes2 };
+      }
+      const { bytes, from: start } = this.#cache;
+      return bytes.subarray(from - start, from - start + n);
     }
     /** Hold the bytes from #next on until `need` (an absolute offset) has arrived. */
     #keep(blob, blobStart, need) {
@@ -10761,7 +10770,7 @@ ${list(win10)}
       let blob = new Blob(this.#parts, { type: this.#type });
       if (this.#container === "webm" && durationMs > 0 && blob.size) blob = await patchWebmBlob(blob, durationMs);
       if (this.#mp4) {
-        const plan = mp4Plan(this.#mp4);
+        const plan = mp4Plan(this.#mp4, durationMs);
         if (plan && plan.moovAt === blob.size) blob = applyPlanToBlob(blob, plan, this.#type);
         this.#mp4 = null;
       }
@@ -10774,10 +10783,14 @@ ${list(win10)}
       this.#mp4 = null;
     }
   };
-  function mp4Plan(indexer) {
+  function mp4Plan(indexer, durationMs = 0) {
     try {
       const plan = indexer.plan();
       if (!plan && indexer.error) console.warn("MP4 left as recorded:", indexer.error.message);
+      if (plan && durationMs > 0 && Math.abs(plan.durationMs - durationMs) > Math.max(5e3, durationMs / 10)) {
+        console.warn(`MP4 left as recorded: its index says ${plan.durationMs} ms, the take lasted ${durationMs} ms`);
+        return null;
+      }
       return plan;
     } catch (e) {
       console.warn("MP4 left as recorded:", e.message);
@@ -10872,7 +10885,7 @@ ${list(win10)}
         const { offset, size: size2, timecodeScale } = this.#duration;
         await this.#writable.write({ type: "write", position: offset, data: encodeDurationPayload(durationMs, timecodeScale, size2) });
       }
-      if (this.#mp4) await this.#indexMp4();
+      if (this.#mp4) await this.#indexMp4(durationMs);
       await this.#writable.close();
       this.#closed = true;
       this.#saved = true;
@@ -10889,8 +10902,8 @@ ${list(win10)}
      * other write, and the recorder falls back to its safety copy, which is
      * indexed the same way.
      */
-    async #indexMp4() {
-      const plan = mp4Plan(this.#mp4);
+    async #indexMp4(durationMs) {
+      const plan = mp4Plan(this.#mp4, durationMs);
       this.#mp4 = null;
       if (!plan || plan.moovAt !== this.#written) return;
       await this.#writable.write({ type: "write", position: plan.moovAt, data: plan.moov });

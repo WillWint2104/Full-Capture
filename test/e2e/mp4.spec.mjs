@@ -8,12 +8,15 @@
 // (skipped without them, except in CI); run `npm run build` first.
 import { test, expect } from '@playwright/test';
 import { APP_URL, trackErrors } from './helpers.mjs';
+import { ROOT, bundleScript } from '../../scripts/bundler.mjs';
+import { finalizeMp4Blob } from '../../src/app/media/mp4.js';
 import { syncStimulus, mp4InChromium, fakeFolder } from './stimulus.mjs';
 import {
   hasFfmpeg, gstPython, gstProbe, ffprobeInfo, decodeErrors, boxes, child, durationOf, timescaleOf,
-  flashesAndBeeps, syncOffsets,
+  flashesAndBeeps, syncOffsets, audioPackets,
 } from '../tools/media.mjs';
 import { readFileSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
 
 const SETTINGS_KEY = 'full-capture:settings:v1';
 const PERIOD_S = 2;
@@ -96,17 +99,20 @@ async function checkSavedMp4(page, file, recordedMs, testInfo) {
   const all = syncOffsets(whole);
   expect(all.length).toBeGreaterThanOrEqual(3);
   const after = [];
-  for (const flash of [whole.flashes[1], whole.flashes[Math.floor(whole.flashes.length / 2)], whole.flashes.at(-2)]) {
-    const from = Math.round((flash + 0.6) * 100) / 100;     // between flashes
+  const sound = audioPackets(file);
+  // Seek between flashes that have their beep, so the window after each seek holds a pair.
+  for (const { at: flash } of [all[0], all[Math.floor(all.length / 2) - 1], all.at(-2)]) {
+    const from = Math.round((flash + 0.6) * 100) / 100;
     const seen = flashesAndBeeps(file, { from });
     // The first picture is a frame of the file at the seek point: not earlier, none skipped.
     const i = whole.frames.findIndex(t => Math.abs(t - seen.firstVideo) < 0.001);
     expect(i, `the first frame after seeking to ${from}s is a frame of the file`).toBeGreaterThanOrEqual(0);
     expect(seen.firstVideo).toBeGreaterThanOrEqual(from - 0.001);
     expect(i === 0 || whole.frames[i - 1] < from + 0.001).toBe(true);
-    // Sound starts there too, give or take one Opus packet (60 ms) and its 80 ms decoder pre-roll.
-    expect(seen.firstAudio).toBeGreaterThanOrEqual(from - 0.001);
-    expect(seen.firstAudio).toBeLessThan(from + 0.15);
+    // Sound starts there too: at the seek point, or where the file's sound resumes if it has a gap there.
+    const covering = sound.find(p => p.pts <= from && from < p.end);
+    const expectedAudio = covering ? from : sound.find(p => p.pts > from)?.pts;
+    expect(Math.abs(seen.firstAudio - expectedAudio)).toBeLessThan(0.001);
     const pairs = syncOffsets(seen);
     expect(pairs.length).toBeGreaterThanOrEqual(1);
     for (const p of pairs) {
@@ -177,4 +183,38 @@ test('a take saved as MP4 into a folder is the same finished file', async ({ pag
   const file = testInfo.outputPath('take.mp4');
   writeFileSync(file, Buffer.from(b64, 'base64'));
   await checkSavedMp4(page, file, review.durationMs, testInfo);
+});
+
+test('the folder sink indexes an MP4 through Chrome’s own file stream, byte for byte', async ({ page }) => {
+  // The origin-private file system gives a real FileSystemWritableFileStream (temporary file,
+  // committed on close, positioned writes); it needs a secure origin, so the page is served
+  // as http://localhost (from memory: nothing listens there).
+  await page.route('http://localhost:1/**', route => route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>OPFS</title>' }));
+  await page.goto('http://localhost:1/');
+  const { text } = await bundleScript(path.resolve(ROOT, 'test/e2e/harness/recording.entry.js'));
+  await page.addScriptTag({ content: text });
+  const raw = readFileSync(path.resolve(ROOT, 'test/fixtures/mediarecorder-h264-opus.mp4'));
+  const saved = await page.evaluate(async b64 => {
+    const bytes = Uint8Array.from(atob(b64), ch => ch.charCodeAt(0));
+    const root = await navigator.storage.getDirectory();
+    for await (const name of root.keys()) await root.removeEntry(name);
+    window.showDirectoryPicker = async () => root;
+    const store = new window.rec.FolderStore();
+    await store.choose();
+    const sink = new window.rec.FolderSink(store);
+    await sink.open({ filename: 'Lesson.mp4', container: 'mp4' });
+    for (let p = 0; p < bytes.length; p += 30_000) await sink.write(new Blob([bytes.subarray(p, p + 30_000)]));
+    const before = (await (await root.getFileHandle(sink.filename)).getFile()).size;
+    const r = await sink.finalize({ durationMs: 4000 });
+    const out = new Uint8Array(await (await (await root.getFileHandle(r.filename)).getFile()).arrayBuffer());
+    let s = '';
+    for (let i = 0; i < out.length; i += 0x8000) s += String.fromCharCode(...out.subarray(i, i + 0x8000));
+    return { before, size: r.size, b64: btoa(s) };
+  }, raw.toString('base64'));
+  expect(saved.before).toBe(0);   // nothing reaches the real file until it is finished
+  const expected = new Uint8Array(await (await finalizeMp4Blob(new Blob([raw]))).blob.arrayBuffer());
+  const got = new Uint8Array(Buffer.from(saved.b64, 'base64'));
+  expect(saved.size).toBe(expected.length);
+  expect(Buffer.compare(Buffer.from(got), Buffer.from(expected))).toBe(0);
+  expect(boxes(got).map(b => b.type)).toEqual(['ftyp', 'mdat', 'moov']);
 });

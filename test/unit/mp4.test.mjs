@@ -211,6 +211,25 @@ test('FolderSink: when the index can’t be written, finalize fails (the recorde
   assert.equal(dir.bytes('Lesson.mp4'), null, 'no half-written file is left');
 });
 
+test('an index whose length disagrees with the take’s clock is not trusted: both sinks save as recorded', async () => {
+  const bytes = await fixture('mediarecorder-vp9-opus.mp4');
+  const memory = new MemorySink();
+  await memory.open({ filename: 'Lesson.mp4', container: 'mp4' });
+  for (const b of pieces(bytes, [30_000])) await memory.write(b);
+  assert.deepEqual(await bytesOf((await memory.finalize({ durationMs: 60_000 })).blob), bytes);
+  const { dir, sink } = await folderSink();
+  await sink.open({ filename: 'Lesson.mp4', container: 'mp4' });
+  for (const b of pieces(bytes, [30_000])) await sink.write(b);
+  await sink.finalize({ durationMs: 60_000 });
+  assert.deepEqual(dir.bytes('Lesson.mp4'), bytes);
+  // Within 5 s (or a tenth) of the clock, the index is used.
+  const { dir: dir2, sink: sink2 } = await folderSink();
+  await sink2.open({ filename: 'Lesson.mp4', container: 'mp4' });
+  for (const b of pieces(bytes, [30_000])) await sink2.write(b);
+  await sink2.finalize({ durationMs: 8000 });
+  assert.deepEqual(top(dir2.bytes('Lesson.mp4')), ['ftyp', 'mdat', 'moov']);
+});
+
 // ------------------------------------------------------------ left alone
 
 test('anything that isn’t a MediaRecorder-style fragmented MP4 is saved exactly as recorded', async () => {
@@ -360,6 +379,42 @@ test('past 4 GB: 64-bit chunk offsets and mdat size, and 64-bit durations when n
   const mdhd = child(out.children.find(c => c.type === 'trak'), 'mdia', 'mdhd');
   assert.equal(moov[mdhd.body], 1, 'mdhd version 1');
   assert.equal(durationOf(moov, mdhd), 3 * 2 ** 31);
+});
+
+test('past 4 GB, through the indexer: a 64-bit mdat in the stream, 64-bit chunk offsets and mdat header', async () => {
+  // The recording as the indexer sees it: header and first fragments, then 4.3 GB of media the
+  // indexer never reads (a stand-in Blob that refuses to be read), then the last fragments.
+  const bytes = await fixture('mediarecorder-h264-opus.mp4');
+  const list = boxes(bytes);
+  const split = list.filter(b => b.type === 'moof')[4].start;
+  const PAD = 4_300_000_000;
+  const padHead = new Uint8Array(16);
+  const dv = new DataView(padHead.buffer);
+  dv.setUint32(0, 1);
+  padHead.set([0x66, 0x72, 0x65, 0x65], 4);   // 'free': a 64-bit box of filler
+  dv.setBigUint64(8, BigInt(PAD));
+  const unread = { size: PAD - 16, slice() { throw new Error('the indexer read the media'); } };
+  const ix = new Mp4Indexer();
+  for (const piece of [new Blob([bytes.subarray(0, split)]), new Blob([padHead]), unread, new Blob([bytes.subarray(split)])]) await ix.push(piece);
+  assert.equal(ix.error, null);
+  const plan = ix.plan();
+  assert.equal(plan.moovAt, bytes.length + PAD);
+  // A 16-byte mdat header over the old moov, spanning everything to the new moov.
+  assert.equal(plan.header.length, 16);
+  const h = new DataView(plan.header.buffer, plan.header.byteOffset);
+  assert.equal(h.getUint32(0), 1);
+  assert.equal(Number(h.getBigUint64(8)), plan.moovAt - plan.headerAt);
+  // Fragments after the filler are indexed with 64-bit offsets, exactly where they are.
+  const moov = boxes(plan.moov)[0];
+  const offsetsAfter = [];
+  for (const trak of moov.children.filter(c => c.type === 'trak')) {
+    const stbl = child(trak, 'mdia', 'minf', 'stbl');
+    assert.ok(child(stbl, 'co64'), 'co64');
+    offsetsAfter.push(...chunkOffsets(plan.moov, stbl).filter(o => o > 2 ** 32));
+  }
+  const expected = boxes(bytes).filter(b => b.type === 'mdat' && b.start > split).map(b => b.start + 8 + PAD);
+  for (const o of expected) assert.ok(offsetsAfter.includes(o), `a chunk at ${o}`);
+  assert.ok(plan.durationMs > 3800 && plan.durationMs < 4200, `${plan.durationMs} ms`);
 });
 
 test('applyPlanToBlob refuses a plan made for other bytes', async () => {

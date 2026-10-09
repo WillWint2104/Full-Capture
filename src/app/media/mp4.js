@@ -16,6 +16,7 @@
 // have, so finalising costs two small writes, never a copy of the recording.
 
 const MAX_BOX_BYTES = 16 * 1024 * 1024;   // a moov or moof bigger than this isn't MediaRecorder's
+const READ_AHEAD = 64 * 1024;              // one read covers a box header, a moof and the next header
 const U32 = 0x1_0000_0000;
 
 // tfhd flags
@@ -377,9 +378,10 @@ function buildMoov(b, header, limit) {
     }
     const mediaDuration = deltas.reduce((s, d) => s + d, 0);
     const firstDts = n ? t.dts.at(0) : 0;
-    // With reordered frames the last frame shown isn't the last decoded.
+    // Where presentation ends on the new timeline (with reordered frames the last frame shown
+    // isn't the last decoded).
     let end = firstDts + mediaDuration;
-    for (let i = 0; i < n; i++) end = Math.max(end, t.dts.at(i) + t.cto.at(i) + deltas[i]);
+    for (let i = 0, at = firstDts; i < n; at += deltas[i], i++) end = Math.max(end, at + t.cto.at(i) + deltas[i]);
     const toMovie = v => Math.round((v * movieTimescale) / t.timescale);
     const edits = n ? editsFor(t, firstDts, end, toMovie) : null;
     const trackDuration = edits ? edits.reduce((s, e) => s + e.duration, 0) : toMovie(end - firstDts);
@@ -431,6 +433,7 @@ export class Mp4Indexer {
   #size = 0;          // bytes pushed
   #next = 0;          // where the next top-level box starts
   #carry = null;      // { blob, need }: bytes from #next on, held while a box straddles pushes
+  #cache = null;      // { blob, from, bytes }: the last read-ahead
   #moovBytes = null;
   #moovAt = -1;
   #header = null;
@@ -455,9 +458,16 @@ export class Mp4Indexer {
   }
 
   async #read(blob, blobStart, n) {
-    const src = this.#carry ? new Blob([this.#carry.blob, blob]) : blob;
-    const from = this.#carry ? 0 : this.#next - blobStart;
-    return new Uint8Array(await src.slice(from, from + n).arrayBuffer());
+    if (this.#carry) return new Uint8Array(await new Blob([this.#carry.blob, blob]).slice(0, n).arrayBuffer());
+    // Reads are few and small but each one is a round trip (to disk, for a recovered take), so read ahead.
+    const from = this.#next - blobStart;
+    const c = this.#cache;
+    if (!c || c.blob !== blob || from < c.from || from + n > c.from + c.bytes.length) {
+      const bytes = new Uint8Array(await blob.slice(from, Math.max(from + n, Math.min(blob.size, from + READ_AHEAD))).arrayBuffer());
+      this.#cache = { blob, from, bytes };
+    }
+    const { bytes, from: start } = this.#cache;
+    return bytes.subarray(from - start, from - start + n);
   }
 
   /** Hold the bytes from #next on until `need` (an absolute offset) has arrived. */
