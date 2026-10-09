@@ -69,4 +69,6 @@ npx playwright test  # browser tests from file:// with fake camera, mic and scre
 - `docs/AUDIT-v13.md` is the audit of the previous version that shaped v2.
 - `legacy/lesson-recorder-v13.html` is the previous version, for reference.
 
-All changes land via pull request to `main` after the CodeRabbit review comes back clean.
+Changes land in `main` through a pull request, reviewed by an agent other than
+the one that made them, and are merged only with the project owner's approval.
+`AGENTS.md` has the full development and review policy.

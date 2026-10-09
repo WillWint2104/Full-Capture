@@ -1,0 +1,6 @@
+# CodeRabbit is reserved for major, high-risk changes (see AGENTS.md).
+# Routine pull requests are reviewed by an independent agent instead.
+# To ask for a CodeRabbit review on a pull request, comment: @coderabbitai review
+reviews:
+  auto_review:
+    enabled: false
