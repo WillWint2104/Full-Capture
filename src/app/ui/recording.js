@@ -54,11 +54,22 @@ export class RecordingView {
       text: mins >= 1 ? `${formatDuration(st.take.elapsedMs)} will be deleted. This can’t be undone.` : 'It won’t be saved. This can’t be undone.',
       ok: 'Discard take', cancel: 'Keep recording', danger: true,
     });
+    if (!ok) return;
     // The take may have ended while the question was open (Stop in the floating controls, sharing ended).
     const now = this.session.state;
-    if (ok && now.take?.id === id && ['recording', 'paused'].includes(now.phase)) this.session.cancelTake();
-    else if (ok && now.library.some(t => t.id === id)) this.notices.toast({ kind: 'info', title: 'That take was already saved', text: 'It stopped while you were deciding. Delete it from Your takes if you don’t want it.' });
-    else if (ok) this.notices.toast({ kind: 'info', title: 'That take had already ended', text: 'There was nothing left to discard.' });
+    if (now.take?.id === id && ['recording', 'paused'].includes(now.phase)) { this.session.cancelTake(); return; }
+    // Still being saved: say what happened once it is settled.
+    const settled = await this.#settled();
+    if (settled.library.some(t => t.id === id)) this.notices.toast({ kind: 'info', title: 'That take was already saved', text: 'It stopped while you were deciding. Delete it from Your takes if you don’t want it.' });
+    else this.notices.toast({ kind: 'info', title: 'That take had already ended', text: 'There was nothing left to discard.' });
+  }
+
+  /** The state once the session is no longer saving a take. */
+  #settled() {
+    return new Promise(resolve => {
+      if (this.session.state.phase !== 'stopping') { resolve(this.session.state); return; }
+      const off = this.session.on('change', st => { if (st.phase !== 'stopping') { off(); resolve(st); } });
+    });
   }
 
   #tickClock(now) {

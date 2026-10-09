@@ -472,3 +472,25 @@ test('Discard confirmed after the take was thrown away elsewhere says it had alr
   await expect(page.locator('#toasts')).not.toContainText('already saved');
 });
 
+
+test('Discard confirmed while a take stopped elsewhere is still saving says it was saved', async ({ page }) => {
+  await openApp(page, {}, [() => {
+    const real = MediaRecorder.prototype.stop;   // saving takes a couple of seconds
+    MediaRecorder.prototype.stop = function () { setTimeout(() => real.call(this), 2000); };
+  }]);
+  await micLive(page);
+  await chooseScreen(page);
+  await page.click('#btnStart');
+  await expect.poll(() => phase(page), { timeout: 15_000 }).toBe('recording');
+  await page.waitForTimeout(1500);
+  await page.click('#btnDiscard');
+  await expect(page.locator('#confirmDialog')).toBeVisible();
+  const download = page.waitForEvent('download');
+  await page.evaluate(() => { window.fullCapture.stop(); });   // e.g. Stop & save in the floating controls
+  await expect.poll(() => phase(page)).toBe('stopping');
+  await page.click('#btnConfirmOk');
+  await download;
+  await expect(page.locator('#toasts')).toContainText('That take was already saved');
+  await expect(page.locator('#toasts')).not.toContainText('nothing left to discard');
+  expect(await state(page, st => st.library.length)).toBe(1);
+});
