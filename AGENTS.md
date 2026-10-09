@@ -132,6 +132,8 @@ Rules that follow from this:
 - Keep media processing in the browser where it is reliable. A small local
   processing component, or any move to a desktop framework, needs a
   documented justification and the project owner's approval first.
+- No drawing canvas, handwriting, question tools or general-purpose video
+  editor: those belong to HGL Studio or nowhere.
 - Avoid large rewrites, new dependencies without a clear need, and
   speculative abstractions.
 - Build one feature stage at a time (`docs/PLAN.md`), and stop for approval

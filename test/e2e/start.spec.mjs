@@ -8,7 +8,9 @@ const SETTINGS_KEY = 'full-capture:settings:v1';
 /** Open the app with settings seeded and page scripts installed before it boots. */
 async function openApp(page, settings = {}, ...scripts) {
   await page.addInitScript(([key, value]) => {
-    try { if (!sessionStorage.getItem('seeded')) { localStorage.setItem(key, value); sessionStorage.setItem('seeded', '1'); } } catch {}
+    // Seed once per test. The marker lives in the storage it protects: a reload can come
+    // before Chromium has made the page's sessionStorage visible again, which re-seeded.
+    try { if (!localStorage.getItem('full-capture:test-seeded')) { localStorage.setItem(key, value); localStorage.setItem('full-capture:test-seeded', '1'); } } catch {}
   }, [SETTINGS_KEY, JSON.stringify({ countdown: false, floatingControls: false, ...settings })]);
   for (const [fn, arg] of scripts) await page.addInitScript(fn, arg);
   await page.goto(APP_URL);

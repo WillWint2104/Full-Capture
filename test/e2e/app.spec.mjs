@@ -9,7 +9,9 @@ const SETTINGS_KEY = 'full-capture:settings:v1';
 /** Open the app with some settings pre-seeded (e.g. no countdown, no floating controls). */
 async function openApp(page, settings = {}, { init } = {}) {
   await page.addInitScript(([key, value]) => {
-    try { if (!sessionStorage.getItem('seeded')) { localStorage.setItem(key, value); sessionStorage.setItem('seeded', '1'); } } catch {}
+    // Seed once per test. The marker lives in the storage it protects: a reload can come
+    // before Chromium has made the page's sessionStorage visible again, which re-seeded.
+    try { if (!localStorage.getItem('full-capture:test-seeded')) { localStorage.setItem(key, value); localStorage.setItem('full-capture:test-seeded', '1'); } } catch {}
   }, [SETTINGS_KEY, JSON.stringify({ countdown: false, floatingControls: false, ...settings })]);
   if (init) await page.addInitScript(init);
   await page.goto(APP_URL);
@@ -462,7 +464,7 @@ test('settings dialog: theme switch applies and persists', async ({ page }) => {
   await page.reload();
   await page.waitForFunction(() => document.documentElement.dataset.ready === 'true');
   // What storage held on each side of the reload, if this ever fails.
-  const after = await page.evaluate(k => ({ stored: localStorage.getItem(k), seeded: sessionStorage.getItem('seeded'), theme: document.documentElement.dataset.theme ?? null }), SETTINGS_KEY);
+  const after = await page.evaluate(k => ({ stored: localStorage.getItem(k), seeded: localStorage.getItem('full-capture:test-seeded'), theme: document.documentElement.dataset.theme ?? null }), SETTINGS_KEY);
   expect(after.theme, JSON.stringify({ before, after })).toBe('dark');
 });
 

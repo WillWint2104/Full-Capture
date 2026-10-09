@@ -1,8 +1,10 @@
 # Implementation plan: from recorder to upload-ready video
 
-Status: **proposal, awaiting approval.** One stage at a time; each stage
-stops for approval before the next one starts. Scope rules are in
-`AGENTS.md`.
+Status: **design defaults approved; no editing work started.** The order of
+work is gated: recording reliability is accepted first (Windows acceptance
+test, `docs/ACCEPTANCE.md`), then the rendering spike runs, then its results
+are reviewed before any editing or MP4 rendering is implemented. One stage at
+a time; each stage stops for approval. Scope rules are in `AGENTS.md`.
 
 Goal: Prepare → Record → Review/Trim → Export. A teacher records, marks
 mistakes, removes them, gets the stored intro and outro added, adjusts basic
@@ -29,7 +31,8 @@ audio and saves an upload-ready MP4, all inside the one-file app.
   framework (installation, breaks the open-the-file simplicity). Revisit only
   if the spike below fails on the real PC, with a written justification.
 
-**Spike first (half a day, throwaway):** on the teacher's real Windows
+**Spike first (half a day, throwaway; authorised only once recording
+reliability is accepted):** on the teacher's real Windows
 Chrome/Edge, cut a 60-minute recording into an H.264/AAC MP4 with two cuts and
 a 1080p intro. Measure speed, check audio/video sync at every join, and check
 the file plays in YouTube's uploader. Our test browser has no H.264/AAC
@@ -110,10 +113,15 @@ wanted before music.
 - An independent agent reviews each stage (AGENTS.md), focused on the
   original never being changed or lost and the export matching the edit.
 
-## Decisions needed before stage 2
+## Decisions (approved by the project owner)
 
-1. Approve the browser-only render approach (after the spike), and the one
-   new dependency (Mediabunny).
-2. Default lead-in for a mistake's proposed cut (10 s suggested).
-3. Where an export is saved when no lessons folder is chosen (a save dialog
-   is suggested; a download would hold the whole video in memory).
+1. **Rendering:** a limited Mediabunny/browser-rendering feasibility spike
+   only, after recording reliability is accepted. MP4 (H.264/AAC) capability
+   must be demonstrated on the real Windows machine before committing to a
+   browser-only export. No editing or final MP4 rendering is implemented
+   until the spike's results are reviewed.
+2. **Mistake markers:** a proposed cut starts 10 seconds before the marker,
+   adjustable by the teacher. Footage is never removed automatically: every
+   cut is approved by the teacher, and the original recording is always kept.
+3. **Export destination:** the chosen lessons folder when there is one;
+   otherwise a save dialog asks where to put the file.
