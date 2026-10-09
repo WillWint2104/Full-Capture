@@ -230,6 +230,70 @@ test('a double-click on Start or on Stop & save: the second click never lands on
   await expect.poll(() => phase(page)).toBe('ready');
 });
 
+/** A lessons folder whose files take `window.__openDelay` ms to open. */
+const slowFolder = () => {
+  const files = new Map();
+  window.__openDelay = 0;
+  const dir = {
+    kind: 'directory', name: 'Lessons',
+    async queryPermission() { return 'granted'; },
+    async requestPermission() { return 'granted'; },
+    async getFileHandle(name, opts = {}) {
+      if (!files.has(name)) { if (!opts.create) throw new DOMException('not found', 'NotFoundError'); files.set(name, new Blob([])); }
+      return {
+        kind: 'file', name,
+        async createWritable() {
+          await new Promise(r => setTimeout(r, window.__openDelay));
+          const parts = [];
+          return { async write(d) { if (!(d && d.type === 'write')) parts.push(d); }, async close() { files.set(name, new Blob(parts)); }, async abort() {} };
+        },
+        async getFile() { return new File([files.get(name)], name); },
+      };
+    },
+    async removeEntry(name) { files.delete(name); },
+  };
+  window.showDirectoryPicker = async () => dir;
+};
+
+/** Keep the crash journal's store busy from another connection for `ms`. */
+const holdJournal = (page, ms) => page.evaluate(ms => new Promise((resolve, reject) => {
+  const r = indexedDB.open('full-capture');
+  r.onerror = () => reject(r.error);
+  r.onsuccess = () => {
+    const store = r.result.transaction(['journalMeta'], 'readwrite').objectStore('journalMeta');
+    const until = performance.now() + ms;
+    const spin = () => { if (performance.now() < until) store.get('x').onsuccess = spin; };
+    spin();
+    resolve();
+  };
+}), ms);
+
+test('storage that doesn’t answer: the take still starts within seconds, without its safety copy, and says so', async ({ page }) => {
+  await openApp(page);
+  await micLive(page);
+  await chooseScreen(page);
+  await holdJournal(page, 15_000);
+  const t0 = Date.now();
+  await page.click('#btnStart');
+  await expect.poll(() => phase(page), { timeout: 10_000 }).toBe('recording');
+  expect(Date.now() - t0).toBeLessThan(8000);
+  await expect(page.locator('#toasts')).toContainText('didn’t answer in time');
+  expect(await state(page, st => st.take.safetyCopy)).toBe(false);
+});
+
+test('a lessons folder that doesn’t answer: the take starts anyway and will download instead', async ({ page }) => {
+  await openApp(page, {}, [slowFolder]);
+  await micLive(page);
+  await page.evaluate(() => window.fullCapture.chooseFolder());
+  await expect.poll(() => state(page, st => st.folder.status)).toBe('ready');
+  await chooseScreen(page);
+  await page.evaluate(() => { window.__openDelay = 20_000; });
+  await page.click('#btnStart');
+  await expect.poll(() => phase(page), { timeout: 12_000 }).toBe('recording');
+  await expect(page.locator('#toasts')).toContainText('Couldn’t write to your folder');
+  expect(await state(page, st => st.take.savingTo)).toBe('memory');
+});
+
 test('a camera-bubble take started straight after sharing is sized from the picture, not a stale report', async ({ page }) => {
   // Chrome can report the capture limits as the track's size for a moment after
   // they are applied; here that lasts 1 s, and Start picks the screen itself.
