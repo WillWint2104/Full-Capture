@@ -224,7 +224,7 @@ test('a double-click on Start or on Stop & save: the second click never lands on
   await page.mouse.click(tx, ty);
   await page.waitForTimeout(800);
   expect(await phase(page)).toBe('review');            // not sent on by "Record another take"
-  // Keyboard presses are never held back.
+  // Once the view has settled, the keyboard works as usual.
   await page.locator('#btnNewTake').focus();
   await page.keyboard.press('Enter');
   await expect.poll(() => phase(page)).toBe('ready');
@@ -327,3 +327,148 @@ test('a camera-bubble take started straight after sharing is sized from the pict
   });
   expect(Math.abs(w / h - screen[0] / screen[1])).toBeLessThan(0.02);
 });
+
+// ---- Findings of the independent review ------------------------------------
+
+/** Every phase seen during `ms` (catches brief ones). */
+const watchPhases = (page, ms) => page.evaluate(ms => new Promise(resolve => {
+  const seen = [document.documentElement.dataset.phase];
+  const off = window.fullCapture.on('change', st => { if (seen[seen.length - 1] !== st.phase) seen.push(st.phase); });
+  setTimeout(() => { off(); resolve(seen); }, ms);
+}), ms);
+
+/** A microphone permission the test controls; every mic track handed out is kept. */
+const controllablePermission = () => {
+  const perm = { state: 'granted', onchange: null };
+  window.__perm = { set(s) { perm.state = s; perm.onchange?.(); } };
+  const realQuery = navigator.permissions.query.bind(navigator.permissions);
+  navigator.permissions.query = async d => (d?.name === 'microphone' ? perm : realQuery(d));
+  const md = navigator.mediaDevices;
+  const real = md.getUserMedia.bind(md);
+  window.__micTracks = [];
+  md.getUserMedia = async c => {
+    if (c?.audio && perm.state === 'denied') throw new DOMException('Permission denied', 'NotAllowedError');
+    const st = await real(c);
+    if (c?.audio) window.__micTracks.push(...st.getAudioTracks());
+    return st;
+  };
+};
+
+/** Screen picks: plan[i] = {delay} or {reject, delay} for the i-th getDisplayMedia call. */
+const plannedPicks = plan => {
+  const md = navigator.mediaDevices;
+  const real = md.getDisplayMedia.bind(md);
+  let n = 0;
+  md.getDisplayMedia = async o => {
+    const step = plan[n++] || {};
+    await new Promise(r => setTimeout(r, step.delay || 0));
+    if (step.reject) throw new DOMException('Permission denied by user', step.reject);
+    return real(o);
+  };
+};
+
+test('the microphone blocked mid-take and then allowed again: the voice comes back', async ({ page }) => {
+  await openApp(page, {}, [controllablePermission]);
+  await micLive(page);
+  await chooseScreen(page);
+  await page.click('#btnStart');
+  await expect.poll(() => phase(page), { timeout: 15_000 }).toBe('recording');
+  await page.evaluate(() => {
+    window.__perm.set('denied');
+    for (const t of window.__micTracks) { t.stop(); t.dispatchEvent(new Event('ended')); }
+  });
+  await expect.poll(() => state(page, st => st.mic.status), { timeout: 10_000 }).toBe('blocked');
+  await expect(page.locator('#banners')).toContainText('without your voice');
+  await page.evaluate(() => window.__perm.set('granted'));
+  await expect.poll(() => state(page, st => st.mic.status), { timeout: 5000 }).toBe('live');
+  expect(await phase(page)).toBe('recording');
+  expect(await state(page, st => st.alerts.some(a => a.id === 'mic-lost'))).toBe(false);
+});
+
+test('a Change pick cancelled while Start waits for it: no take starts on the old screen', async ({ page }) => {
+  await openApp(page, {}, [keepRecorded], [plannedPicks, [{ delay: 0 }, { reject: 'NotAllowedError', delay: 1000 }]]);
+  await micLive(page);
+  await chooseScreen(page);
+  await page.click('#btnChooseScreen');           // "Change": the picker is open
+  await page.waitForTimeout(150);
+  await page.keyboard.press('Alt+r');             // the same path as the floating Start
+  await expect(page.locator('#toasts')).toContainText('No screen chosen');
+  await page.waitForTimeout(1000);
+  expect(await phase(page)).toBe('ready');
+  expect(await page.evaluate(() => window.__recorded.length)).toBe(0);
+});
+
+for (const how of ['twice', 'held']) {
+  test(`Enter pressed ${how} on Start: the new take keeps recording`, async ({ page }) => {
+    await openApp(page);
+    await micLive(page);
+    await chooseScreen(page);
+    await page.waitForTimeout(600);
+    await page.locator('#btnStart').focus();
+    const seen = watchPhases(page, 3000);
+    if (how === 'twice') {
+      await page.keyboard.press('Enter');
+      await page.waitForTimeout(200);
+      await page.keyboard.press('Enter');
+    } else {
+      await page.keyboard.down('Enter');
+      await page.waitForTimeout(500);               // the usual auto-repeat delay
+      for (let i = 0; i < 6; i++) { await page.keyboard.down('Enter'); await page.waitForTimeout(33); }
+      await page.keyboard.up('Enter');
+    }
+    expect(await seen).not.toContain('stopping');
+    expect(await phase(page)).toBe('recording');
+  });
+}
+
+test('a camera switched off while it was still opening is not waited for', async ({ page }) => {
+  await openApp(page, {}, [slowCamera, { delay: 20_000 }]);
+  await micLive(page);
+  await chooseScreen(page);
+  await page.check('#cameraToggle');
+  await expect.poll(() => state(page, st => st.camera.status)).toBe('starting');
+  await page.uncheck('#cameraToggle');
+  await page.waitForTimeout(600);
+  const t0 = Date.now();
+  await page.click('#btnStart');
+  await expect.poll(() => phase(page), { timeout: 10_000 }).toBe('recording');
+  expect(Date.now() - t0).toBeLessThan(2000);
+});
+
+test('the floating controls show the start under way, with a Cancel that works', async ({ page }) => {
+  await openApp(page, { floatingControls: true }, [fakePip], [slowCamera, { delay: 20_000 }]);
+  await micLive(page);
+  await chooseScreen(page);
+  await recordAndStop(page);                        // Start opened the floating controls
+  await page.evaluate(() => { window.fullCapture.setCamera(true); });
+  await expect.poll(() => state(page, st => st.camera.status)).toBe('starting');
+  await page.evaluate(() => window.__pip.document.querySelector('[data-action="start"]').click());
+  await expect.poll(() => state(page, st => st.preparing)).toBe(true);
+  const pip = await page.evaluate(() => {
+    const d = window.__pip.document, b = d.querySelector('[data-action="start"]');
+    return { pill: d.querySelector('[data-field="pill"]').textContent, start: b.textContent.trim(), disabled: b.getAttribute('aria-disabled') };
+  });
+  expect(pip).toEqual({ pill: 'Starting…', start: 'Cancel', disabled: null });
+  await page.waitForTimeout(500);                   // past the 400 ms double-press guard
+  await page.evaluate(() => window.__pip.document.querySelector('[data-action="start"]').click());
+  await expect(page.locator('#toasts')).toContainText('Recording cancelled');
+  await expect.poll(() => state(page, st => st.preparing), { timeout: 5000 }).toBe(false);
+  expect(['ready', 'review']).toContain(await phase(page));
+});
+
+test('Discard confirmed after the take was thrown away elsewhere says it had already ended', async ({ page }) => {
+  await openApp(page);
+  await micLive(page);
+  await chooseScreen(page);
+  await page.click('#btnStart');
+  await expect.poll(() => phase(page), { timeout: 15_000 }).toBe('recording');
+  await page.waitForTimeout(700);
+  await page.click('#btnDiscard');
+  await expect(page.locator('#confirmDialog')).toBeVisible();
+  await page.evaluate(() => window.fullCapture.cancelTake());   // e.g. Discard in the floating controls
+  await expect.poll(() => phase(page)).not.toBe('recording');
+  await page.click('#btnConfirmOk');
+  await expect(page.locator('#toasts')).toContainText('had already ended');
+  await expect(page.locator('#toasts')).not.toContainText('already saved');
+});
+

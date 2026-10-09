@@ -10517,7 +10517,7 @@ ${list(win10)}
         st.onchange = () => {
           if (this.#settings.noVoice) return;
           if (st.state === "denied") this.#setMicError(BLOCKED);
-          else if (st.state === "granted" && this.#mic.status === "blocked" && !this.busy) this.enableMic();
+          else if (st.state === "granted" && this.#mic.status === "blocked") this.enableMic();
         };
         return st.state;
       } catch {
@@ -10534,7 +10534,7 @@ ${list(win10)}
       if (!this.#engine) return;
       this.#settings = saveSettings({ micEnabled: true, noVoice: false, micPermissionAsked: true });
       this.#micError = null;
-      this.#mic = { ...this.#mic, status: "starting" };
+      if (this.#mic.status !== "live") this.#mic = { ...this.#mic, status: "starting" };
       this.#changed();
       await this.firstGesture();
       try {
@@ -11094,10 +11094,11 @@ ${list(win10)}
             this.#notice({ kind: "warning", title: `This take will go to Downloads`, text: `Your “${this.#folder.name}” folder needs permission again. Click “Reconnect” at the top before the next take.`, timeoutMs: 1e4 });
           }
         }
-        if (this.#screenPick) await this.#screenPick;
-        else if (!this.#screen) await this.#pickScreen();
+        if (this.#screenPick) {
+          if (!await this.#screenPick) return;
+        } else if (!this.#screen) await this.#pickScreen();
         if (!this.#screen) return;
-        if (this.#cameraOpening && !this.#abortStart) await Promise.race([this.#cameraOpening, new Promise((r) => setTimeout(r, CAMERA_WAIT_MS))]);
+        if (this.#settings.camera && this.#cameraOpening && !this.#abortStart) await Promise.race([this.#cameraOpening, new Promise((r) => setTimeout(r, CAMERA_WAIT_MS))]);
         if (this.#abortStart) {
           this.#abortStart = false;
           this.#notice({ kind: "info", title: "Recording cancelled", text: "Nothing was recorded.", timeoutMs: 4e3 });
@@ -13035,7 +13036,8 @@ ${list(win10)}
       });
       const now2 = this.session.state;
       if (ok && now2.take?.id === id && ["recording", "paused"].includes(now2.phase)) this.session.cancelTake();
-      else if (ok) this.notices.toast({ kind: "info", title: "That take was already saved", text: "It stopped while you were deciding. Delete it from Your takes if you don’t want it." });
+      else if (ok && now2.library.some((t) => t.id === id)) this.notices.toast({ kind: "info", title: "That take was already saved", text: "It stopped while you were deciding. Delete it from Your takes if you don’t want it." });
+      else if (ok) this.notices.toast({ kind: "info", title: "That take had already ended", text: "There was nothing left to discard." });
     }
     #tickClock(now2) {
       const c = this.clock;
@@ -13790,7 +13792,7 @@ ${list(win10)}
       if (!root) return;
       const phase = st.phase;
       const active = ["recording", "paused", "stopping"].includes(phase);
-      const counting = phase === "countdown" || phase === "starting";
+      const counting = phase === "countdown" || phase === "starting" || st.preparing;
       const noSound = active && st.alerts.some((a) => a.id === "no-audio" || a.id === "mic-lost");
       if (!active) this.confirming = false;
       const part = (name) => root.querySelector(`[data-part="${name}"]`);
@@ -13834,7 +13836,7 @@ ${list(win10)}
         attr(b, "aria-disabled", phase === "stopping" ? "true" : null);
       }
       for (const b of root.querySelectorAll('[data-action="start"]')) {
-        label(b, phase === "countdown" ? `Cancel (${st.countdown})` : phase === "starting" ? "Cancel" : "Start recording");
+        label(b, phase === "countdown" ? `Cancel (${st.countdown})` : st.cancelling ? "Cancelling…" : counting ? "Cancel" : "Start recording");
         attr(b, "aria-disabled", !counting && (!st.screen || st.preparing || !!blocked) ? "true" : null);
       }
       for (const b of root.querySelectorAll('[data-action="stop"], [data-action="marker"], [data-action="more"]')) attr(b, "aria-disabled", phase === "stopping" ? "true" : null);
@@ -13973,12 +13975,13 @@ ${list(win10)}
     }
     let shownView = null, shownAt = -Infinity;
     const settling = (e) => {
-      if (!shownView || performance.now() - shownAt > VIEW_SETTLE_MS || !$(shownView).contains(e.target)) return;
-      if (e.type === "click" && e.detail === 0) return;
+      const held = e.type === "keydown" && e.repeat && (e.key === "Enter" || e.key === " ") && e.target.closest?.("button");
+      const early = shownView && performance.now() - shownAt <= VIEW_SETTLE_MS && $(shownView).contains(e.target) && (e.type !== "keydown" || e.key === "Enter" || e.key === " ");
+      if (!held && !early) return;
       e.preventDefault();
       e.stopImmediatePropagation();
     };
-    for (const type of ["pointerdown", "mousedown", "click"]) document.addEventListener(type, settling, { capture: true });
+    for (const type of ["pointerdown", "mousedown", "click", "keydown"]) document.addEventListener(type, settling, { capture: true });
     function renderAll(st) {
       const current = VIEW_FOR[st.phase] || "viewSetup";
       if (current !== shownView) {

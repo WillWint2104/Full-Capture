@@ -180,8 +180,8 @@ export class Session extends Emitter {
       st.onchange = () => {
         if (this.#settings.noVoice) return;   // "Record without my voice" stays as chosen
         if (st.state === 'denied') this.#setMicError(BLOCKED);
-        // Allowed again in the browser: open the mic, but never in the middle of a take.
-        else if (st.state === 'granted' && this.#mic.status === 'blocked' && !this.busy) this.enableMic();
+        // Allowed again in the browser: the voice comes back, mid-take too.
+        else if (st.state === 'granted' && this.#mic.status === 'blocked') this.enableMic();
       };
       return st.state;
     } catch {
@@ -200,7 +200,8 @@ export class Session extends Emitter {
     if (!this.#engine) return;
     this.#settings = saveSettings({ micEnabled: true, noVoice: false, micPermissionAsked: true });
     this.#micError = null;
-    this.#mic = { ...this.#mic, status: 'starting' };
+    // A live mic stays live (the engine keeps it and reports no change).
+    if (this.#mic.status !== 'live') this.#mic = { ...this.#mic, status: 'starting' };
     this.#changed();
     await this.firstGesture();
     try {
@@ -774,11 +775,12 @@ export class Session extends Emitter {
       }
       // A pick already under way (Choose screen, or Change) decides the screen: wait for it
       // rather than open a second picker. A pick that ends without a screen says why.
-      if (this.#screenPick) await this.#screenPick;
+      // (Cancelling a Change pick keeps the old screen, but this press doesn't start on it.)
+      if (this.#screenPick) { if (!(await this.#screenPick)) return; }
       else if (!this.#screen) await this.#pickScreen();
       if (!this.#screen) return;
       // A camera still opening (permission prompt, slow USB camera) gets a moment to join this take.
-      if (this.#cameraOpening && !this.#abortStart) await Promise.race([this.#cameraOpening, new Promise(r => setTimeout(r, CAMERA_WAIT_MS))]);
+      if (this.#settings.camera && this.#cameraOpening && !this.#abortStart) await Promise.race([this.#cameraOpening, new Promise(r => setTimeout(r, CAMERA_WAIT_MS))]);
       if (this.#abortStart) {
         this.#abortStart = false;
         this.#notice({ kind: 'info', title: 'Recording cancelled', text: 'Nothing was recorded.', timeoutMs: 4000 });

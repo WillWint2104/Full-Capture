@@ -176,7 +176,7 @@ export class Popout {
     if (!root) return;
     const phase = st.phase;
     const active = ['recording', 'paused', 'stopping'].includes(phase);
-    const counting = phase === 'countdown' || phase === 'starting';
+    const counting = phase === 'countdown' || phase === 'starting' || st.preparing;
     const noSound = active && st.alerts.some(a => a.id === 'no-audio' || a.id === 'mic-lost');
     if (!active) this.confirming = false;
 
@@ -222,7 +222,7 @@ export class Popout {
       attr(b, 'aria-disabled', phase === 'stopping' ? 'true' : null);
     }
     for (const b of root.querySelectorAll('[data-action="start"]')) {
-      label(b, phase === 'countdown' ? `Cancel (${st.countdown})` : phase === 'starting' ? 'Cancel' : 'Start recording');
+      label(b, phase === 'countdown' ? `Cancel (${st.countdown})` : st.cancelling ? 'Cancelling…' : counting ? 'Cancel' : 'Start recording');
       attr(b, 'aria-disabled', !counting && (!st.screen || st.preparing || !!blocked) ? 'true' : null);
     }
     for (const b of root.querySelectorAll('[data-action="stop"], [data-action="marker"], [data-action="more"]')) attr(b, 'aria-disabled', phase === 'stopping' ? 'true' : null);
