@@ -14,6 +14,7 @@
 
 import { tx, openDb } from '../lib/idb.js';
 import { patchWebmBlob, lastTimestampMs, readTimecodeScale } from '../media/webm.js';
+import { finalizeMp4Blob } from '../media/mp4.js';
 
 export const HEARTBEAT_STALE_MS = 10_000;
 /** How much of the end of a recording is scanned for its last timestamp. */
@@ -37,6 +38,7 @@ export function blobTypeFor(meta) {
 }
 
 const isWebm = type => /webm/i.test(type || '');
+const isMp4 = type => /mp4/i.test(type || '');
 
 /**
  * Where a (possibly cut-off) WebM recording ends, from the timestamps in its
@@ -57,7 +59,8 @@ export async function webmEndMs(blob, { tailBytes = TAIL_BYTES } = {}) {
 
 /**
  * Join chunk blobs into one playable file. WebM gets a Duration: from the
- * recording's own timestamps, else `fallbackMs`.
+ * recording's own timestamps, else `fallbackMs`. MP4 gets an index of every
+ * sample it holds, even when its last fragment was cut off.
  * @returns {Promise<{blob: Blob, durationMs: number}>}
  */
 export async function buildRecording(parts, type, fallbackMs = 0) {
@@ -67,6 +70,11 @@ export async function buildRecording(parts, type, fallbackMs = 0) {
     const end = await webmEndMs(blob);
     if (end) durationMs = end;
     if (durationMs > 0) blob = await patchWebmBlob(blob, durationMs);
+  }
+  if (isMp4(type) && blob.size) {
+    const mp4 = await finalizeMp4Blob(blob, { partial: true });
+    blob = mp4.blob;
+    if (mp4.finalized && mp4.durationMs > 0) durationMs = mp4.durationMs;
   }
   return { blob, durationMs: Math.round(durationMs) };
 }

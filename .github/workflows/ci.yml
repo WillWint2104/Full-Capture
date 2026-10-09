@@ -1,6 +1,8 @@
 # Checks every pull request (and main) with the project's own commands:
 # the committed full-capture.html matches its source, the page contract,
-# unit tests, and the browser tests (Chromium with fake camera, mic and screen).
+# unit tests, and the browser tests (Chromium with fake camera, mic and screen;
+# one test captures a real screen, on a virtual display). Saved recordings are
+# checked with ffmpeg and with GStreamer, a player stack independent of ffmpeg.
 name: CI
 
 on:
@@ -29,10 +31,12 @@ jobs:
       - run: npm ci
 
       # Before the checks: the page contract check opens the page in Chromium too.
-      - name: Install Chromium and ffmpeg
+      - name: Install Chromium, ffmpeg, GStreamer and a virtual display
         run: |
           npx playwright install --with-deps chromium
-          sudo apt-get install -y --no-install-recommends ffmpeg
+          sudo apt-get install -y --no-install-recommends ffmpeg xvfb \
+            gstreamer1.0-tools gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-libav \
+            python3-gi python3-gst-1.0 gir1.2-gstreamer-1.0 gir1.2-gst-plugins-base-1.0
 
       - name: Build (the committed full-capture.html must match src/)
         run: |
@@ -46,7 +50,7 @@ jobs:
         run: npm test
 
       - name: Browser tests
-        run: npx playwright test --reporter=line
+        run: xvfb-run -a npx playwright test --reporter=line
 
       - name: Keep the test results when something fails
         if: failure()

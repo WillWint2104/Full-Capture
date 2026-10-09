@@ -57,7 +57,7 @@ test('MemorySink joins the chunks and patches the WebM duration in the header on
   assert.ok(Math.abs(durationOf(out) - 2034) < 1e-6);
 });
 
-test('MemorySink leaves MP4 bytes untouched', async () => {
+test('MemorySink keeps MP4 bytes it can’t index exactly as recorded', async () => {
   const sink = new MemorySink();
   await sink.open({ filename: 'a.mp4', container: 'mp4', mimeType: '' });
   await sink.write(new Blob([new Uint8Array([1, 2, 3])]));

@@ -17,6 +17,7 @@ import { Emitter } from '../lib/emitter.js';
 import { markerTitle } from '../lib/chapters.js';
 import { formatClock } from '../lib/time.js';
 import { patchWebmBlob } from '../media/webm.js';
+import { finalizeMp4Blob } from '../media/mp4.js';
 import { takeLockName } from './journal.js';
 import { folderErrorMessage } from './folder.js';
 
@@ -723,6 +724,7 @@ export class TakeRecorder extends Emitter {
     const type = this.#mimeType || (this.#container === 'mp4' ? 'video/mp4' : 'video/webm');
     let blob = new Blob(parts, { type });
     if (this.#container === 'webm' && durationMs > 0) blob = await patchWebmBlob(blob, durationMs);
+    if (this.#container === 'mp4') blob = (await finalizeMp4Blob(blob, { partial: true })).blob;
     return { blob, missing: missing.length };
   }
 

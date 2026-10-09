@@ -42,7 +42,7 @@ src/styles/main.css          @imports the other stylesheets
 src/app/main.js              entry: boots Session + UI
 src/app/session.js           orchestrator: owns every subsystem, exposes actions + state snapshots
 src/app/lib/                 emitter.js, idb.js, settings.js, time.js, names.js, chapters.js
-src/app/media/               webm.js (header/duration), formats.js (mime, size, bitrate)
+src/app/media/               webm.js (header/duration), mp4.js (index on save), formats.js (mime, size, bitrate)
 src/app/audio/               dsp.js, engine.js, soundcheck.js
 src/app/video/               sources.js, compositor.js
 src/app/recording/           recorder.js, sinks.js, journal.js, folder.js, takes.js
@@ -85,6 +85,16 @@ legacy/                      v1 (lesson-recorder v13) for reference
   `encodeDurationPayload(ms, timecodeScale, size)`, `injectDuration(bytes, ms)`,
   `patchWebmBlob(blob, ms) -> Promise<Blob>` (reads only the head),
   `lastTimestampMs(tailBytes, timecodeScale)`, `readTimecodeScale(headBytes)`, `NeedMoreData`
+- `media/mp4.js` `new Mp4Indexer()`: `push(blob)` in order (never throws; reads only the moov/moof boxes),
+  `plan({partial}) -> {headerAt, header, moovAt, moov, durationMs, tracks} | null`; `applyPlanToBlob(blob, plan, type)`,
+  `finalizeMp4Blob(blob, {partial}) -> Promise<{blob, finalized, durationMs}>`, `mdatHeader(size)`, `Mp4Error`.
+  MediaRecorder's MP4 (Chrome, Edge) is fragmented: no duration, no seek index, so players that trust the header
+  (Windows Media Player, Films & TV, GStreamer) show the wrong length and can't scrub. The plan makes it an ordinary
+  `ftyp | mdat | moov` file without moving any media: a complete moov (each sample's time from its fragment's
+  `tfdt`, size, position, keyframe flag; edit lists kept or added so every track stays where the fragments put it)
+  is appended at the end, and the old moov's first 8 (16 past 4 GB) bytes become the header of one mdat spanning
+  everything before it. Anything else (not fragmented, samples already listed, unreadable) gets `null`: saved as
+  recorded. `partial` (recovery) also indexes a file that ends mid-box or has damaged bytes, up to its last whole sample.
 - `media/formats.js` `detectFormats() -> {mp4, webm, audio}`, `QUALITY_PRESETS {standard, high, smooth}` each `{label, note, maxHeight, fps, contentHint}`,
   `outputSize(w, h, maxHeight)`, `videoBitrate(...)`, `codecFromMime(mime)`,
   `recorderOptions({format, width, height, fps, supported}) -> {mimeType, container, ext, codec, videoBitsPerSecond, audioBitsPerSecond, note}`
@@ -432,7 +442,7 @@ export function mergeChunks(...lists)   // pure: [{seq, blob}] / Map(seq -> blob
   in memory (and keep all of them when there is no journal), so a later
   folder failure still loses nothing.
 - The folder failing mid-take or at finalize: the take is rebuilt from
-  journal chunks ∪ in-memory chunks (by seq), its WebM Duration patched,
+  journal chunks ∪ in-memory chunks (by seq), its WebM Duration patched or its MP4 indexed (`partial`),
   `savedTo: 'memory'` with a `warning`, and the partial file removed.
 - After saving: `savedTo 'folder'` => `journal.complete(id)`. `savedTo
   'memory'` with a complete journal => `journal.update(id, {elapsedMs,
@@ -476,7 +486,7 @@ export function mergeChunks(...lists)   // pure: [{seq, blob}] / Map(seq -> blob
 //   async abort()                     // delete partial output; safe to call twice
 export const HEADER_LIMIT_BYTES = 2 MiB
 export class MemorySink    // keeps Blob parts (Chrome pages large blobs to disk); finalize = new Blob(parts) then patchWebmBlob
-                           // for WebM. get size.
+                           // for WebM, or applyPlanToBlob for MP4 (indexed as it is written). get size.
 export class FolderSink    // constructor(folderStore). Streams to a FileSystemWritableFileStream from folderStore.createFile().
                            // get filename (final name, read after open()), get folderName, get size, get durationPatchable.
                            // WebM: buffer the first chunks until prepareStreamingHeader() succeeds (NeedMoreData => keep
@@ -484,6 +494,9 @@ export class FolderSink    // constructor(folderStore). Streams to a FileSystemW
                            // prepared header, remember durationOffset; at finalize write encodeDurationPayload() at that
                            // offset ({type:'write', position, data}) before close(). A header that never completed is
                            // flushed unpatched at finalize.
+                           // MP4: an Mp4Indexer reads each chunk after it is written; at finalize the plan's moov is
+                           // written at the end and its mdat header at headerAt (two positioned writes) before close().
+                           // No plan: closed as recorded. A failed write fails finalize (the recorder falls back).
                            // abort(): writable.abort() (discards Chrome's .crswap; close() if abort is missing), then
                            // folderStore.remove(name).
 ```
@@ -497,6 +510,7 @@ export function isStale(meta, now = Date.now(), staleMs = 10_000)   // pure hear
 export function blobTypeFor(meta)                                   // pure: meta.mimeType | v1 meta.mime | by container
 export async function webmEndMs(blob) -> ms | null                  // last block timestamp in the final 2 MB
 export async function buildRecording(parts, type, fallbackMs) -> { blob, durationMs }   // join + WebM Duration (tail, else fallback)
+                                                                    // or MP4 index (finalizeMp4Blob partial; its duration)
 export class Journal {
   static async open() -> Journal | null
   async begin(meta /* {id, lessonName, filename, container, mimeType, startedAt} */)   // status 'recording'; clears old chunks of a reused id

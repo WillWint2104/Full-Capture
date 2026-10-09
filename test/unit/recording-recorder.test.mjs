@@ -9,6 +9,7 @@ import { TakeRecorder } from '../../src/app/recording/recorder.js';
 import { MemorySink, FolderSink } from '../../src/app/recording/sinks.js';
 import { FolderStore } from '../../src/app/recording/folder.js';
 import { locateInfo } from '../../src/app/media/webm.js';
+import { finalizeMp4Blob } from '../../src/app/media/mp4.js';
 import { createFakeDirectory } from '../e2e/harness/recording-fakefs.entry.js';
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -598,6 +599,61 @@ test('the folder failing after Stop was pressed: no "keep recording" error, the 
   assert.equal(await text(r.blob), 'one-last');
   assert.match(r.warning, /disk .* is full.*Downloads folder instead/s);
   assert.deepEqual(dir.fileNames(), []);
+});
+
+/** Top-level MP4 box types. */
+function topBoxes(bytes) {
+  const out = [];
+  const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  for (let p = 0; p + 8 <= bytes.length;) {
+    const size = dv.getUint32(p);
+    out.push(String.fromCharCode(...bytes.subarray(p + 4, p + 8)));
+    if (size < 8) break;
+    p += size;
+  }
+  return out;
+}
+
+/** Feed a real MediaRecorder MP4 in 1 s-sized pieces. */
+async function recordFixture(mr, c, bytes) {
+  const n = 6;
+  const step = Math.ceil(bytes.length / n);
+  for (let i = 0; i < n - 1; i++) { c.advance(1000); mr().data(bytes.subarray(i * step, (i + 1) * step)); await sleep(2); }
+  mr().finalChunk = bytes.subarray((n - 1) * step);
+}
+
+test('an MP4 take saved into the folder is indexed (ftyp | mdat | moov)', async () => {
+  const bytes = await fixture('mediarecorder-h264-opus.mp4');
+  const store = await folderStore();
+  const { rec, mr, c } = make({ sink: new FolderSink(store) });
+  await rec.start();
+  await recordFixture(mr, c, bytes);
+  const r = await rec.stop();
+  assert.equal(r.savedTo, 'folder');
+  const saved = dir.bytes('Fractions.mp4');
+  assert.deepEqual(topBoxes(saved), ['ftyp', 'mdat', 'moov']);
+  const expected = await finalizeMp4Blob(new Blob([bytes]));
+  assert.deepEqual(saved, new Uint8Array(await expected.blob.arrayBuffer()));
+  assert.equal(r.size, saved.length);
+});
+
+test('a disk that fills up as an MP4 is indexed: the take comes from the safety copy, indexed too', async () => {
+  const bytes = await fixture('mediarecorder-h264-opus.mp4');
+  const store = await folderStore();
+  const sink = new FolderSink(store);
+  const { rec, mr, c } = make({ sink });
+  await rec.start();
+  await recordFixture(mr, c, bytes);
+  // Room for the recording itself, not for its index.
+  const finalize = sink.finalize.bind(sink);
+  sink.finalize = async o => { dir.failAfterBytes = dir.bytesWritten; return finalize(o); };
+  const r = await rec.stop();
+  assert.equal(r.savedTo, 'memory');
+  assert.match(r.warning, /disk .* is full.*Downloads folder instead/s);
+  const out = new Uint8Array(await r.blob.arrayBuffer());
+  assert.deepEqual(topBoxes(out), ['ftyp', 'mdat', 'moov']);
+  assert.equal(out.length, (await finalizeMp4Blob(new Blob([bytes]))).blob.size);
+  assert.deepEqual(dir.fileNames(), [], 'no half-written file is left in the folder');
 });
 
 test('when nothing can be rebuilt, stop() rejects, keeps the journal entry, releases the lock and leaves no empty file', async () => {

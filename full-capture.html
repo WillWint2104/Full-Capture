@@ -8690,6 +8690,579 @@ ${list(win10)}
     }
   }
 
+  // src/app/media/mp4.js
+  var MAX_BOX_BYTES = 16 * 1024 * 1024;
+  var U32 = 4294967296;
+  var TF_BASE_DATA_OFFSET = 1;
+  var TF_SAMPLE_DESCRIPTION = 2;
+  var TF_DEFAULT_DURATION = 8;
+  var TF_DEFAULT_SIZE = 16;
+  var TF_DEFAULT_FLAGS = 32;
+  var TF_DEFAULT_BASE_IS_MOOF = 131072;
+  var TR_DATA_OFFSET = 1;
+  var TR_FIRST_FLAGS = 4;
+  var TR_DURATION = 256;
+  var TR_SIZE = 512;
+  var TR_FLAGS = 1024;
+  var TR_CTO = 2048;
+  var NON_SYNC = 65536;
+  var Mp4Error = class extends Error {
+    constructor(message2, at = null) {
+      super(message2);
+      this.name = "Mp4Error";
+      this.at = at;
+    }
+  };
+  var u32 = (b, p) => (b[p] << 24 >>> 0) + (b[p + 1] << 16) + (b[p + 2] << 8) + b[p + 3];
+  var i32 = (b, p) => u32(b, p) | 0;
+  var u64 = (b, p) => u32(b, p) * U32 + u32(b, p + 4);
+  var i64 = (b, p) => i32(b, p) * U32 + u32(b, p + 4);
+  var fourcc = (b, p) => String.fromCharCode(b[p], b[p + 1], b[p + 2], b[p + 3]);
+  var PRINTABLE = /^[\x20-\x7e]{4}$/;
+  var Grow = class {
+    constructor(Type, capacity = 256) {
+      this.Type = Type;
+      this.a = new Type(capacity);
+      this.length = 0;
+    }
+    push(v) {
+      if (this.length === this.a.length) {
+        const b = new this.Type(this.a.length * 2);
+        b.set(this.a);
+        this.a = b;
+      }
+      this.a[this.length++] = v;
+    }
+    at(i) {
+      return this.a[i];
+    }
+  };
+  var Out = class {
+    constructor() {
+      this.b = new Uint8Array(1024);
+      this.n = 0;
+    }
+    #room(k) {
+      if (this.n + k <= this.b.length) return;
+      let cap = this.b.length * 2;
+      while (cap < this.n + k) cap *= 2;
+      const b = new Uint8Array(cap);
+      b.set(this.b.subarray(0, this.n));
+      this.b = b;
+    }
+    u8(v) {
+      this.#room(1);
+      this.b[this.n++] = v & 255;
+      return this;
+    }
+    u16(v) {
+      return this.u8(v >>> 8).u8(v);
+    }
+    u32(v) {
+      this.#room(4);
+      const x = v >>> 0;
+      this.b[this.n++] = x >>> 24;
+      this.b[this.n++] = x >>> 16 & 255;
+      this.b[this.n++] = x >>> 8 & 255;
+      this.b[this.n++] = x & 255;
+      return this;
+    }
+    u64(v) {
+      return this.u32(Math.floor(v / U32)).u32(v % U32);
+    }
+    i64(v) {
+      const hi = Math.floor(v / U32);
+      return this.u32(hi).u32(v - hi * U32);
+    }
+    bytes(a) {
+      this.#room(a.length);
+      this.b.set(a, this.n);
+      this.n += a.length;
+      return this;
+    }
+    done() {
+      return this.b.slice(0, this.n);
+    }
+  };
+  function box(type, ...parts) {
+    const len = parts.reduce((s, p) => s + p.length, 0);
+    const big = len + 8 > 4294967295;
+    const o = new Out();
+    if (big) o.u32(1);
+    else o.u32(len + 8);
+    for (let i = 0; i < 4; i++) o.u8(type.charCodeAt(i));
+    if (big) o.u64(len + 16);
+    for (const p of parts) o.bytes(p);
+    return o.done();
+  }
+  function children(b, start, end) {
+    const out = [];
+    let p = start;
+    while (p + 8 <= end) {
+      let size = u32(b, p);
+      const type = fourcc(b, p + 4);
+      let hl = 8;
+      if (size === 1) {
+        size = u64(b, p + 8);
+        hl = 16;
+      } else if (size === 0) size = end - p;
+      if (size < hl || p + size > end || !PRINTABLE.test(type)) throw new Mp4Error(`bad ${type} box at ${p}`);
+      out.push({ type, start: p, end: p + size, body: p + hl });
+      p += size;
+    }
+    return out;
+  }
+  var find = (list, type) => list.find((c) => c.type === type) || null;
+  var payload = (b) => u32(b, 0) === 1 ? 16 : 8;
+  function parseMoov(b) {
+    const top = children(b, payload(b), b.length);
+    const mvhd = find(top, "mvhd");
+    if (!mvhd) throw new Mp4Error("moov has no mvhd");
+    const mvhdV = b[mvhd.body];
+    const movieTimescale = u32(b, mvhd.body + (mvhdV === 1 ? 20 : 12));
+    const mvex = find(top, "mvex");
+    const trex = /* @__PURE__ */ new Map();
+    if (mvex) {
+      for (const t of children(b, mvex.body, mvex.end)) {
+        if (t.type !== "trex") continue;
+        const p = t.body + 4;
+        trex.set(u32(b, p), { sdi: u32(b, p + 4), duration: u32(b, p + 8), size: u32(b, p + 12), flags: u32(b, p + 16) });
+      }
+    }
+    const tracks = [];
+    for (const trak of top.filter((c) => c.type === "trak")) {
+      const tk = children(b, trak.body, trak.end);
+      const tkhd = find(tk, "tkhd");
+      const mdia = find(tk, "mdia");
+      if (!tkhd || !mdia) throw new Mp4Error("trak without tkhd or mdia");
+      const id = u32(b, tkhd.body + (b[tkhd.body] === 1 ? 20 : 12));
+      const md = children(b, mdia.body, mdia.end);
+      const mdhd = find(md, "mdhd");
+      const hdlr = find(md, "hdlr");
+      const minf = find(md, "minf");
+      if (!mdhd || !minf) throw new Mp4Error("mdia without mdhd or minf");
+      const timescale = u32(b, mdhd.body + (b[mdhd.body] === 1 ? 20 : 12));
+      const mi = children(b, minf.body, minf.end);
+      const stbl = find(mi, "stbl");
+      const st = stbl ? children(b, stbl.body, stbl.end) : [];
+      const stsd = find(st, "stsd");
+      if (!stsd || !timescale) throw new Mp4Error("track without sample description or timescale");
+      const stsz = find(st, "stsz") || find(st, "stz2");
+      if (stsz && u32(b, stsz.body + 8) > 0) throw new Mp4Error("the header already lists samples");
+      let edits = null;
+      const edts = find(tk, "edts");
+      const elst = edts ? find(children(b, edts.body, edts.end), "elst") : null;
+      if (elst) {
+        const v = b[elst.body];
+        const n = u32(b, elst.body + 4);
+        edits = [];
+        for (let i = 0, p = elst.body + 8; i < n; i++) {
+          if (v === 1) {
+            edits.push({ duration: u64(b, p), mediaTime: i64(b, p + 8), rate: b.subarray(p + 16, p + 20) });
+            p += 20;
+          } else {
+            edits.push({ duration: u32(b, p), mediaTime: i32(b, p + 4), rate: b.subarray(p + 8, p + 12) });
+            p += 12;
+          }
+        }
+      }
+      tracks.push({
+        id,
+        timescale,
+        handler: hdlr ? fourcc(b, hdlr.body + 8) : "",
+        edits,
+        trex: trex.get(id) || { sdi: 1, duration: 0, size: 0, flags: 0 },
+        raw: { trak, tk, tkhd, mdia, md, mdhd, minf, mi, stsd },
+        sizes: new Grow(Uint32Array),
+        dts: new Grow(Float64Array),
+        durations: new Grow(Uint32Array),
+        sync: new Grow(Uint8Array),
+        cto: new Grow(Int32Array),
+        anyCto: false,
+        chunks: [],
+        nextDts: 0
+      });
+    }
+    if (!tracks.length) throw new Mp4Error("moov has no tracks");
+    return { movieTimescale, fragmented: !!mvex, top, tracks };
+  }
+  function addFragment(b, moofStart, header) {
+    let prevDataEnd = moofStart;
+    for (const traf of children(b, payload(b), b.length)) {
+      if (traf.type !== "traf") continue;
+      const parts = children(b, traf.body, traf.end);
+      const tfhd = find(parts, "tfhd");
+      if (!tfhd) throw new Mp4Error("traf without tfhd");
+      const flags = u32(b, tfhd.body) & 16777215;
+      const track = header.tracks.find((t) => t.id === u32(b, tfhd.body + 4));
+      if (!track) throw new Mp4Error("fragment for an unknown track");
+      let p = tfhd.body + 8;
+      let base;
+      if (flags & TF_BASE_DATA_OFFSET) {
+        base = u64(b, p);
+        p += 8;
+      } else base = flags & TF_DEFAULT_BASE_IS_MOOF ? moofStart : prevDataEnd;
+      const sdi = flags & TF_SAMPLE_DESCRIPTION ? u32(b, (p += 4) - 4) : track.trex.sdi;
+      const defDuration = flags & TF_DEFAULT_DURATION ? u32(b, (p += 4) - 4) : track.trex.duration;
+      const defSize = flags & TF_DEFAULT_SIZE ? u32(b, (p += 4) - 4) : track.trex.size;
+      const defFlags = flags & TF_DEFAULT_FLAGS ? u32(b, (p += 4) - 4) : track.trex.flags;
+      const tfdt = find(parts, "tfdt");
+      let dts = tfdt ? b[tfdt.body] === 1 ? u64(b, tfdt.body + 4) : u32(b, tfdt.body + 4) : track.nextDts;
+      let dataPos = base;
+      let first = true;
+      for (const trun of parts) {
+        if (trun.type !== "trun") continue;
+        const version = b[trun.body];
+        const tf = u32(b, trun.body) & 16777215;
+        const count = u32(b, trun.body + 4);
+        let q = trun.body + 8;
+        if (tf & TR_DATA_OFFSET) {
+          dataPos = base + i32(b, q);
+          q += 4;
+        } else if (first) dataPos = base;
+        const firstFlags = tf & TR_FIRST_FLAGS ? u32(b, (q += 4) - 4) : null;
+        const per = [TR_DURATION, TR_SIZE, TR_FLAGS, TR_CTO].filter((f) => tf & f).length * 4;
+        if (q + count * per > trun.end) throw new Mp4Error("trun runs past its box");
+        if (count) track.chunks.push({ offset: dataPos, first: track.sizes.length, count, sdi });
+        for (let i = 0; i < count; i++) {
+          const duration = tf & TR_DURATION ? u32(b, (q += 4) - 4) : defDuration;
+          const size = tf & TR_SIZE ? u32(b, (q += 4) - 4) : defSize;
+          let sflags = tf & TR_FLAGS ? u32(b, (q += 4) - 4) : defFlags;
+          if (i === 0 && firstFlags !== null) sflags = firstFlags;
+          let cto = 0;
+          if (tf & TR_CTO) {
+            cto = version === 0 ? u32(b, q) : i32(b, q);
+            q += 4;
+          }
+          track.sizes.push(size);
+          track.dts.push(dts);
+          track.durations.push(duration);
+          track.sync.push(sflags & NON_SYNC ? 0 : 1);
+          track.cto.push(cto);
+          if (cto) track.anyCto = true;
+          dts += duration;
+          dataPos += size;
+        }
+        first = false;
+      }
+      track.nextDts = dts;
+      prevDataEnd = dataPos;
+    }
+  }
+  function withDuration(b, node, durationAt0, durationAt1, value2) {
+    const version = b[node.body];
+    const body = b.subarray(node.body, node.end);
+    if (version === 1) {
+      const out = body.slice();
+      new DataView(out.buffer).setBigUint64(durationAt1, BigInt(Math.round(value2)));
+      return box(fourcc(b, node.start + 4), out);
+    }
+    if (value2 <= 4294967295) {
+      const out = body.slice();
+      new DataView(out.buffer).setUint32(durationAt0, Math.round(value2));
+      return box(fourcc(b, node.start + 4), out);
+    }
+    const o = new Out().u8(1).bytes(body.subarray(1, 4)).u64(u32(body, 4)).u64(u32(body, 8));
+    if (durationAt0 === 16) o.bytes(body.subarray(12, 16)).u64(value2).bytes(body.subarray(20));
+    else o.bytes(body.subarray(12, 20)).u64(value2).bytes(body.subarray(24));
+    return box(fourcc(b, node.start + 4), o.done());
+  }
+  function runs(n, valueAt) {
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const v = valueAt(i);
+      if (out.length && out[out.length - 1][1] === v) out[out.length - 1][0]++;
+      else out.push([1, v]);
+    }
+    return out;
+  }
+  function sampleTables(b, t, n, deltas) {
+    const parts = [b.subarray(t.raw.stsd.start, t.raw.stsd.end)];
+    const stts = runs(n, (i) => deltas[i]);
+    const o = new Out().u32(0).u32(stts.length);
+    for (const [c, d] of stts) o.u32(c).u32(d);
+    parts.push(box("stts", o.done()));
+    if (t.anyCto) {
+      const ctts = runs(n, (i) => t.cto.at(i));
+      const signed = ctts.some(([, v]) => v < 0);
+      const c = new Out().u32(signed ? 16777216 : 0).u32(ctts.length);
+      for (const [k, v] of ctts) c.u32(k).u32(v);
+      parts.push(box("ctts", c.done()));
+    }
+    const syncs = [];
+    for (let i = 0; i < n; i++) if (t.sync.at(i)) syncs.push(i + 1);
+    if (syncs.length < n) {
+      const s = new Out().u32(0).u32(syncs.length);
+      for (const k of syncs) s.u32(k);
+      parts.push(box("stss", s.done()));
+    }
+    const chunks = [];
+    for (const c of t.chunks) {
+      const count = Math.min(c.count, n - c.first);
+      if (count > 0) chunks.push({ offset: c.offset, count, sdi: c.sdi });
+    }
+    const stsc = [];
+    chunks.forEach((c, i) => {
+      const last = stsc[stsc.length - 1];
+      if (!last || last.count !== c.count || last.sdi !== c.sdi) stsc.push({ first: i + 1, count: c.count, sdi: c.sdi });
+    });
+    const sc = new Out().u32(0).u32(stsc.length);
+    for (const e of stsc) sc.u32(e.first).u32(e.count).u32(e.sdi);
+    parts.push(box("stsc", sc.done()));
+    const sz = new Out().u32(0);
+    const same = n > 0 && t.sizes.a.subarray(0, n).every((v) => v === t.sizes.at(0));
+    if (same) sz.u32(t.sizes.at(0)).u32(n);
+    else {
+      sz.u32(0).u32(n);
+      for (let i = 0; i < n; i++) sz.u32(t.sizes.at(i));
+    }
+    parts.push(box("stsz", sz.done()));
+    const wide = chunks.some((c) => c.offset > 4294967295);
+    const co = new Out().u32(0).u32(chunks.length);
+    for (const c of chunks) {
+      if (wide) co.u64(c.offset);
+      else co.u32(c.offset);
+    }
+    parts.push(box(wide ? "co64" : "stco", co.done()));
+    return box("stbl", ...parts);
+  }
+  function editsFor(t, firstDts, end, toMovie) {
+    if (!t.edits) {
+      if (firstDts <= 0) return null;
+      return [{ duration: toMovie(firstDts), mediaTime: -1 }, { duration: toMovie(end - firstDts), mediaTime: 0 }];
+    }
+    const out = [];
+    const media = t.edits.filter((e) => e.mediaTime >= 0);
+    for (const e of t.edits) {
+      if (e.mediaTime < 0) {
+        out.push({ duration: e.duration, mediaTime: -1, rate: e.rate });
+        continue;
+      }
+      let mediaTime = e.mediaTime - firstDts;
+      if (mediaTime < 0) {
+        out.push({ duration: toMovie(-mediaTime), mediaTime: -1 });
+        mediaTime = 0;
+      }
+      const last = e === media[media.length - 1];
+      const duration = e.duration === 0 || last ? toMovie(Math.max(0, end - Math.max(e.mediaTime, firstDts))) : e.duration;
+      out.push({ duration, mediaTime, rate: e.rate });
+    }
+    return out;
+  }
+  function elstBox(edits) {
+    const wide = edits.some((e) => e.duration > 4294967295 || e.mediaTime > 2147483647);
+    const o = new Out().u32(wide ? 16777216 : 0).u32(edits.length);
+    for (const e of edits) {
+      if (wide) o.u64(e.duration).i64(e.mediaTime);
+      else o.u32(e.duration).u32(e.mediaTime);
+      o.bytes(e.rate || new Uint8Array([0, 1, 0, 0]));
+    }
+    return box("edts", box("elst", o.done()));
+  }
+  function buildMoov(b, header, limit) {
+    const { movieTimescale } = header;
+    let movieDuration = 0;
+    const summary = [];
+    const traks = /* @__PURE__ */ new Map();
+    for (const t of header.tracks) {
+      let n = 0;
+      for (const c of t.chunks) {
+        let end2 = c.offset;
+        let k = 0;
+        while (k < c.count && (end2 += t.sizes.at(c.first + k)) <= limit) k++;
+        if (c.first + k > n) n = c.first + k;
+        if (k < c.count) break;
+      }
+      const deltas = new Uint32Array(n);
+      for (let i2 = 0; i2 < n; i2++) {
+        const d = i2 + 1 < n ? t.dts.at(i2 + 1) - t.dts.at(i2) : t.durations.at(i2);
+        deltas[i2] = d > 0 && d <= 4294967295 ? d : t.durations.at(i2);
+      }
+      const mediaDuration = deltas.reduce((s, d) => s + d, 0);
+      const firstDts = n ? t.dts.at(0) : 0;
+      let end = firstDts + mediaDuration;
+      for (let i2 = 0; i2 < n; i2++) end = Math.max(end, t.dts.at(i2) + t.cto.at(i2) + deltas[i2]);
+      const toMovie = (v) => Math.round(v * movieTimescale / t.timescale);
+      const edits = n ? editsFor(t, firstDts, end, toMovie) : null;
+      const trackDuration = edits ? edits.reduce((s, e) => s + e.duration, 0) : toMovie(end - firstDts);
+      movieDuration = Math.max(movieDuration, trackDuration);
+      summary.push({ id: t.id, handler: t.handler, samples: n, seconds: mediaDuration / t.timescale });
+      const r = t.raw;
+      const stbl = sampleTables(b, t, n, deltas);
+      const minf = box("minf", ...r.mi.map((c) => c.type === "stbl" ? stbl : b.subarray(c.start, c.end)));
+      const mdhd = withDuration(b, r.mdhd, 16, 24, mediaDuration);
+      const mdia = box("mdia", ...r.md.map((c) => c.type === "mdhd" ? mdhd : c.type === "minf" ? minf : b.subarray(c.start, c.end)));
+      const tkhd = withDuration(b, r.tkhd, 20, 28, trackDuration);
+      const parts2 = [];
+      for (const c of r.tk) {
+        if (c.type === "tkhd") {
+          parts2.push(tkhd);
+          if (edits) parts2.push(elstBox(edits));
+        } else if (c.type === "mdia") parts2.push(mdia);
+        else if (c.type !== "edts") parts2.push(b.subarray(c.start, c.end));
+      }
+      traks.set(t, box("trak", ...parts2));
+    }
+    const mvhd = find(header.top, "mvhd");
+    const parts = [];
+    let i = 0;
+    for (const c of header.top) {
+      if (c.type === "mvhd") parts.push(withDuration(b, mvhd, 16, 24, movieDuration));
+      else if (c.type === "trak") parts.push(traks.get(header.tracks[i++]));
+      else if (c.type !== "mvex") parts.push(b.subarray(c.start, c.end));
+    }
+    return { moov: box("moov", ...parts), durationMs: Math.round(movieDuration * 1e3 / movieTimescale), tracks: summary };
+  }
+  function mdatHeader(size) {
+    const type = new Uint8Array([109, 100, 97, 116]);
+    return size > 4294967295 ? new Out().u32(1).bytes(type).u64(size).done() : new Out().u32(size).bytes(type).done();
+  }
+  var Mp4Indexer = class {
+    #size = 0;
+    // bytes pushed
+    #next = 0;
+    // where the next top-level box starts
+    #carry = null;
+    // { blob, need }: bytes from #next on, held while a box straddles pushes
+    #moovBytes = null;
+    #moovAt = -1;
+    #header = null;
+    #fragments = 0;
+    #error = null;
+    get size() {
+      return this.#size;
+    }
+    /** Why indexing stopped early, or null. */
+    get error() {
+      return this.#error;
+    }
+    async push(blob) {
+      const start = this.#size;
+      this.#size += blob?.size || 0;
+      if (this.#error || !blob?.size) return;
+      try {
+        await this.#scan(blob, start);
+      } catch (e) {
+        this.#error = e instanceof Mp4Error ? e : new Mp4Error(e?.message || String(e));
+        if (this.#error.at === null) this.#error.at = this.#next;
+        this.#carry = null;
+      }
+    }
+    async #read(blob, blobStart, n) {
+      const src = this.#carry ? new Blob([this.#carry.blob, blob]) : blob;
+      const from = this.#carry ? 0 : this.#next - blobStart;
+      return new Uint8Array(await src.slice(from, from + n).arrayBuffer());
+    }
+    /** Hold the bytes from #next on until `need` (an absolute offset) has arrived. */
+    #keep(blob, blobStart, need) {
+      const rest = blob.slice(Math.max(0, this.#next - blobStart));
+      const blobOut = this.#carry ? new Blob([this.#carry.blob, rest]) : rest;
+      if (blobOut.size > MAX_BOX_BYTES) throw new Mp4Error("box too large");
+      this.#carry = { blob: blobOut, need };
+    }
+    async #scan(blob, blobStart) {
+      const blobEnd = blobStart + blob.size;
+      if (this.#carry && blobEnd < this.#carry.need) {
+        this.#keep(blob, blobStart, this.#carry.need);
+        return;
+      }
+      while (this.#next < blobEnd) {
+        const at = this.#next;
+        const have = blobEnd - at;
+        if (have < 8) {
+          this.#keep(blob, blobStart, at + 8);
+          return;
+        }
+        const head = await this.#read(blob, blobStart, Math.min(16, have));
+        let size = u32(head, 0);
+        const type = fourcc(head, 4);
+        let hl = 8;
+        if (!PRINTABLE.test(type)) throw new Mp4Error(`unexpected bytes at ${at}`, at);
+        if (size === 1) {
+          if (have < 16) {
+            this.#keep(blob, blobStart, at + 16);
+            return;
+          }
+          size = u64(head, 8);
+          hl = 16;
+        } else if (size === 0) size = Infinity;
+        if (size < hl) throw new Mp4Error(`bad ${type} size at ${at}`, at);
+        if (type === "moov" || type === "moof") {
+          if (!Number.isFinite(size) || size > MAX_BOX_BYTES) throw new Mp4Error(`${type} too large`, at);
+          if (have < size) {
+            this.#keep(blob, blobStart, at + size);
+            return;
+          }
+          const bytes = await this.#read(blob, blobStart, size);
+          if (type === "moov") this.#onMoov(bytes, at);
+          else this.#onMoof(bytes, at);
+        } else if (type === "mdat" && !this.#header) {
+          throw new Mp4Error("media data before the header", at);
+        }
+        this.#carry = null;
+        this.#next = at + size;
+      }
+    }
+    #onMoov(bytes, at) {
+      if (this.#header) throw new Mp4Error("a second moov", at);
+      const header = parseMoov(bytes);
+      if (!header.fragmented) throw new Mp4Error("not a fragmented MP4: nothing to do", at);
+      this.#header = header;
+      this.#moovBytes = bytes;
+      this.#moovAt = at;
+    }
+    #onMoof(bytes, at) {
+      if (!this.#header) throw new Mp4Error("fragment before the header", at);
+      addFragment(bytes, at, this.#header);
+      this.#fragments++;
+    }
+    /**
+     * The edits that index the file, or null to leave it as it is.
+     * partial: also index a file that ends mid-box or has damaged bytes after
+     * some point (a recovered take); only the samples before that are indexed,
+     * and the rest of the bytes stay in the file.
+     * @returns {{ headerAt: number, header: Uint8Array, moovAt: number, moov: Uint8Array, durationMs: number, tracks: object[] } | null}
+     */
+    plan({ partial = false } = {}) {
+      if (!this.#header || !this.#fragments) return null;
+      const clean = !this.#error && !this.#carry && this.#next === this.#size;
+      if (!clean && !partial) return null;
+      const limit = this.#error ? Math.min(this.#size, this.#error.at ?? this.#size) : this.#size;
+      const b = this.#moovBytes;
+      for (const t of this.#header.tracks) {
+        if (t.chunks.some((c) => c.offset < this.#moovAt + b.length)) return null;
+      }
+      const { moov, durationMs, tracks } = buildMoov(b, this.#header, limit);
+      if (!tracks.some((t) => t.samples > 0)) return null;
+      const header = mdatHeader(this.#size - this.#moovAt);
+      return { headerAt: this.#moovAt, header, moovAt: this.#size, moov, durationMs, tracks };
+    }
+  };
+  function applyPlanToBlob(blob, plan, type = blob.type) {
+    if (blob.size !== plan.moovAt) throw new Error("the plan is for a different file");
+    return new Blob([
+      blob.slice(0, plan.headerAt),
+      plan.header,
+      blob.slice(plan.headerAt + plan.header.length, plan.moovAt),
+      plan.moov
+    ], { type });
+  }
+  async function finalizeMp4Blob(blob, { partial = false } = {}) {
+    const indexer = new Mp4Indexer();
+    await indexer.push(blob);
+    let plan = null;
+    try {
+      plan = indexer.plan({ partial });
+    } catch (e) {
+      console.warn("MP4 left as recorded:", e.message);
+    }
+    if (!plan) {
+      if (indexer.error) console.warn("MP4 left as recorded:", indexer.error.message);
+      return { blob, finalized: false, durationMs: 0 };
+    }
+    return { blob: applyPlanToBlob(blob, plan), finalized: true, durationMs: plan.durationMs };
+  }
+
   // src/app/lib/idb.js
   var DB_NAME = "full-capture";
   var DB_VERSION = 1;
@@ -8790,6 +9363,7 @@ ${list(win10)}
     return meta?.container === "mp4" ? "video/mp4" : "video/webm";
   }
   var isWebm = (type) => /webm/i.test(type || "");
+  var isMp4 = (type) => /mp4/i.test(type || "");
   async function webmEndMs(blob, { tailBytes = TAIL_BYTES } = {}) {
     if (!blob?.size) return null;
     try {
@@ -8809,6 +9383,11 @@ ${list(win10)}
       const end = await webmEndMs(blob);
       if (end) durationMs = end;
       if (durationMs > 0) blob = await patchWebmBlob(blob, durationMs);
+    }
+    if (isMp4(type) && blob.size) {
+      const mp4 = await finalizeMp4Blob(blob, { partial: true });
+      blob = mp4.blob;
+      if (mp4.finalized && mp4.durationMs > 0) durationMs = mp4.durationMs;
     }
     return { blob, durationMs: Math.round(durationMs) };
   }
@@ -10055,6 +10634,7 @@ ${list(win10)}
       const type = this.#mimeType || (this.#container === "mp4" ? "video/mp4" : "video/webm");
       let blob = new Blob(parts, { type });
       if (this.#container === "webm" && durationMs > 0) blob = await patchWebmBlob(blob, durationMs);
+      if (this.#container === "mp4") blob = (await finalizeMp4Blob(blob, { partial: true })).blob;
       return { blob, missing: missing.length };
     }
     async #cancel() {
@@ -10098,17 +10678,20 @@ ${list(win10)}
     #filename = "";
     #container = "webm";
     #type = "video/webm";
+    #mp4 = null;
     async open({ filename = "recording.webm", container = "webm", mimeType = "" } = {}) {
       this.#parts = [];
       this.#size = 0;
       this.#filename = filename;
       this.#container = container;
       this.#type = typeFor(container, mimeType);
+      this.#mp4 = container === "mp4" ? new Mp4Indexer() : null;
     }
     async write(blob) {
       if (!blob || !blob.size) return;
       this.#parts.push(blob);
       this.#size += blob.size;
+      await this.#mp4?.push(blob);
     }
     /** Bytes received so far. */
     get size() {
@@ -10117,14 +10700,30 @@ ${list(win10)}
     async finalize({ durationMs = 0 } = {}) {
       let blob = new Blob(this.#parts, { type: this.#type });
       if (this.#container === "webm" && durationMs > 0 && blob.size) blob = await patchWebmBlob(blob, durationMs);
+      if (this.#mp4) {
+        const plan = mp4Plan(this.#mp4);
+        if (plan && plan.moovAt === blob.size) blob = applyPlanToBlob(blob, plan, this.#type);
+        this.#mp4 = null;
+      }
       this.#parts = [];
       return { savedTo: "memory", size: blob.size, blob, filename: this.#filename };
     }
     async abort() {
       this.#parts = [];
       this.#size = 0;
+      this.#mp4 = null;
     }
   };
+  function mp4Plan(indexer) {
+    try {
+      const plan = indexer.plan();
+      if (!plan && indexer.error) console.warn("MP4 left as recorded:", indexer.error.message);
+      return plan;
+    } catch (e) {
+      console.warn("MP4 left as recorded:", e.message);
+      return null;
+    }
+  }
   var FolderSink = class {
     kind = "folder";
     #store;
@@ -10141,6 +10740,8 @@ ${list(win10)}
     #closed = false;
     #saved = false;
     // finalize() committed the file: it is the teacher's recording now
+    #mp4 = null;
+    // indexes an MP4 as it is written
     /** @param {import('./folder.js').FolderStore} folderStore */
     constructor(folderStore) {
       this.#store = folderStore;
@@ -10169,6 +10770,7 @@ ${list(win10)}
       this.#name = name;
       this.#container = container;
       this.#headerDone = container !== "webm";
+      this.#mp4 = container === "mp4" ? new Mp4Indexer() : null;
     }
     async write(blob) {
       if (!this.#writable || this.#closed) throw new Error("The file is not open.");
@@ -10176,6 +10778,7 @@ ${list(win10)}
       if (this.#headerDone) {
         await this.#writable.write(blob);
         this.#written += blob.size;
+        await this.#mp4?.push(blob);
         return;
       }
       this.#pending.push(blob);
@@ -10209,6 +10812,7 @@ ${list(win10)}
         const { offset, size: size2, timecodeScale } = this.#duration;
         await this.#writable.write({ type: "write", position: offset, data: encodeDurationPayload(durationMs, timecodeScale, size2) });
       }
+      if (this.#mp4) await this.#indexMp4();
       await this.#writable.close();
       this.#closed = true;
       this.#saved = true;
@@ -10218,6 +10822,20 @@ ${list(win10)}
       } catch {
       }
       return { savedTo: "folder", size, filename: this.#name, folderName: this.#store.name || "" };
+    }
+    /**
+     * Append the index (a few MB for an hour), then turn the old header into
+     * the start of one mdat. A write that fails here fails finalize() like any
+     * other write, and the recorder falls back to its safety copy, which is
+     * indexed the same way.
+     */
+    async #indexMp4() {
+      const plan = mp4Plan(this.#mp4);
+      this.#mp4 = null;
+      if (!plan || plan.moovAt !== this.#written) return;
+      await this.#writable.write({ type: "write", position: plan.moovAt, data: plan.moov });
+      this.#written += plan.moov.length;
+      await this.#writable.write({ type: "write", position: plan.headerAt, data: plan.header });
     }
     async abort() {
       if (this.#saved) return;
@@ -12166,10 +12784,10 @@ ${list(win10)}
     }
     /** Buttons for session actions, e.g. {label:'Record without my voice', action:'record', args:[…]}. */
     #actions(el, actions, done) {
-      const box = el.querySelector("[data-actions]");
-      if (!box) return;
-      box.replaceChildren();
-      show(box, actions.length > 0);
+      const box2 = el.querySelector("[data-actions]");
+      if (!box2) return;
+      box2.replaceChildren();
+      show(box2, actions.length > 0);
       for (const a of actions) {
         const b = document.createElement("button");
         b.type = "button";
@@ -12181,7 +12799,7 @@ ${list(win10)}
           if (typeof a.run === "function") a.run();
           else if (a.action && typeof this.session[a.action] === "function") this.session[a.action](...a.args || []);
         });
-        box.append(b);
+        box2.append(b);
       }
     }
     /** Toasts sit below the alerts and the paused banner, so they never cover their buttons. */
@@ -12349,17 +12967,17 @@ ${list(win10)}
     if (!msg) return;
     const el = fill(clone2("tplMessage"), { title: msg.title, text: msg.text });
     el.dataset.kind = msg.kind || "info";
-    const box = el.querySelector("[data-actions]");
-    if (box) {
-      box.replaceChildren();
-      show(box, !!msg.actions?.length);
+    const box2 = el.querySelector("[data-actions]");
+    if (box2) {
+      box2.replaceChildren();
+      show(box2, !!msg.actions?.length);
       for (const a of msg.actions || []) {
         const b = document.createElement("button");
         b.type = "button";
         b.className = "btn btn-secondary btn-small";
         b.textContent = a.label;
         b.addEventListener("click", () => onAct(a));
-        box.append(b);
+        box2.append(b);
       }
     }
     container.append(el);
@@ -12650,19 +13268,19 @@ ${list(win10)}
     }
     /** The other findings, below the one sentence the card leads with. */
     #renderVerdictTips(r, lead) {
-      const box = $("scTips");
+      const box2 = $("scTips");
       const sig = JSON.stringify([r.background, r.voice, lead?.advice]);
-      if (box.dataset.sig === sig) return;
-      box.dataset.sig = sig;
-      box.replaceChildren();
+      if (box2.dataset.sig === sig) return;
+      box2.dataset.sig = sig;
+      box2.replaceChildren();
       for (const row of [r.voice, r.background].filter(Boolean)) {
         if (row === lead || r.status === "ideal" && row.level === "good") continue;
         const el = fill(clone2("tplMessage"), { title: row.title, text: row.advice });
         el.dataset.kind = row.level === "good" ? "success" : row.level === "warn" ? "warning" : "error";
         el.querySelector("[data-actions]")?.setAttribute("hidden", "");
-        box.append(el);
+        box2.append(el);
       }
-      show(box, box.children.length > 0);
+      show(box2, box2.children.length > 0);
     }
     #renderFixSteps(r) {
       const { win11, win10 } = fixSteps(r);
@@ -12917,13 +13535,13 @@ ${list(win10)}
     }
     #placeBubble() {
       if (!this.bubbleState || this.bubble.hidden) return;
-      const box = this.#contentBox();
-      if (!box.width) return;
-      const r = bubbleRect({ width: box.width, height: box.height }, this.bubbleState);
+      const box2 = this.#contentBox();
+      if (!box2.width) return;
+      const r = bubbleRect({ width: box2.width, height: box2.height }, this.bubbleState);
       Object.assign(this.bubble.style, {
         position: "absolute",
-        left: `${box.left + r.x}px`,
-        top: `${box.top + r.y}px`,
+        left: `${box2.left + r.x}px`,
+        top: `${box2.top + r.y}px`,
         width: `${r.size}px`,
         height: `${r.size}px`
       });
@@ -12931,11 +13549,11 @@ ${list(win10)}
     #wireDrag() {
       let drag = null;
       const toNorm = (e) => {
-        const box = this.#contentBox();
+        const box2 = this.#contentBox();
         const rect = this.el.getBoundingClientRect();
         return {
-          x: Math.max(0, Math.min(1, (e.clientX - rect.left - box.left - drag.dx) / box.width)),
-          y: Math.max(0, Math.min(1, (e.clientY - rect.top - box.top - drag.dy) / box.height))
+          x: Math.max(0, Math.min(1, (e.clientX - rect.left - box2.left - drag.dx) / box2.width)),
+          y: Math.max(0, Math.min(1, (e.clientY - rect.top - box2.top - drag.dy) / box2.height))
         };
       };
       this.bubble.addEventListener("pointerdown", (e) => {

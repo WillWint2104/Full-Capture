@@ -9,8 +9,12 @@
 //
 // WebM from MediaRecorder has no Duration, so players can't show a length or
 // seek well. Both sinks add it while touching only the header.
+// MP4 from MediaRecorder is fragmented, with no duration or seek index in its
+// header, so many players show the wrong length and can't scrub. Both sinks
+// index it as it is written and finish it as an ordinary MP4 (media/mp4.js).
 
 import { prepareStreamingHeader, encodeDurationPayload, patchWebmBlob, NeedMoreData } from '../media/webm.js';
+import { Mp4Indexer, applyPlanToBlob } from '../media/mp4.js';
 
 /** Stop waiting for a parseable WebM header after this much data and write it unpatched. */
 export const HEADER_LIMIT_BYTES = 2 * 1024 * 1024;
@@ -29,6 +33,7 @@ export class MemorySink {
   #filename = '';
   #container = 'webm';
   #type = 'video/webm';
+  #mp4 = null;
 
   async open({ filename = 'recording.webm', container = 'webm', mimeType = '' } = {}) {
     this.#parts = [];
@@ -36,12 +41,14 @@ export class MemorySink {
     this.#filename = filename;
     this.#container = container;
     this.#type = typeFor(container, mimeType);
+    this.#mp4 = container === 'mp4' ? new Mp4Indexer() : null;
   }
 
   async write(blob) {
     if (!blob || !blob.size) return;
     this.#parts.push(blob);
     this.#size += blob.size;
+    await this.#mp4?.push(blob);
   }
 
   /** Bytes received so far. */
@@ -50,6 +57,11 @@ export class MemorySink {
   async finalize({ durationMs = 0 } = {}) {
     let blob = new Blob(this.#parts, { type: this.#type });
     if (this.#container === 'webm' && durationMs > 0 && blob.size) blob = await patchWebmBlob(blob, durationMs);
+    if (this.#mp4) {
+      const plan = mp4Plan(this.#mp4);
+      if (plan && plan.moovAt === blob.size) blob = applyPlanToBlob(blob, plan, this.#type);
+      this.#mp4 = null;
+    }
     this.#parts = [];
     return { savedTo: 'memory', size: blob.size, blob, filename: this.#filename };
   }
@@ -57,6 +69,19 @@ export class MemorySink {
   async abort() {
     this.#parts = [];
     this.#size = 0;
+    this.#mp4 = null;
+  }
+}
+
+/** The indexer's plan, or null (the file is then kept exactly as recorded). */
+function mp4Plan(indexer) {
+  try {
+    const plan = indexer.plan();
+    if (!plan && indexer.error) console.warn('MP4 left as recorded:', indexer.error.message);
+    return plan;
+  } catch (e) {
+    console.warn('MP4 left as recorded:', e.message);
+    return null;
   }
 }
 
@@ -85,6 +110,7 @@ export class FolderSink {
   #written = 0;
   #closed = false;
   #saved = false;            // finalize() committed the file: it is the teacher's recording now
+  #mp4 = null;               // indexes an MP4 as it is written
 
   /** @param {import('./folder.js').FolderStore} folderStore */
   constructor(folderStore) {
@@ -108,6 +134,7 @@ export class FolderSink {
     this.#name = name;
     this.#container = container;
     this.#headerDone = container !== 'webm';
+    this.#mp4 = container === 'mp4' ? new Mp4Indexer() : null;
   }
 
   async write(blob) {
@@ -116,6 +143,7 @@ export class FolderSink {
     if (this.#headerDone) {
       await this.#writable.write(blob);
       this.#written += blob.size;
+      await this.#mp4?.push(blob);
       return;
     }
     this.#pending.push(blob);
@@ -152,12 +180,28 @@ export class FolderSink {
       const { offset, size, timecodeScale } = this.#duration;
       await this.#writable.write({ type: 'write', position: offset, data: encodeDurationPayload(durationMs, timecodeScale, size) });
     }
+    if (this.#mp4) await this.#indexMp4();
     await this.#writable.close();
     this.#closed = true;
     this.#saved = true;
     let size = this.#written;
     try { size = (await this.#handle.getFile()).size; } catch { /* keep our count */ }
     return { savedTo: 'folder', size, filename: this.#name, folderName: this.#store.name || '' };
+  }
+
+  /**
+   * Append the index (a few MB for an hour), then turn the old header into
+   * the start of one mdat. A write that fails here fails finalize() like any
+   * other write, and the recorder falls back to its safety copy, which is
+   * indexed the same way.
+   */
+  async #indexMp4() {
+    const plan = mp4Plan(this.#mp4);
+    this.#mp4 = null;
+    if (!plan || plan.moovAt !== this.#written) return;
+    await this.#writable.write({ type: 'write', position: plan.moovAt, data: plan.moov });
+    this.#written += plan.moov.length;
+    await this.#writable.write({ type: 'write', position: plan.headerAt, data: plan.header });
   }
 
   async abort() {
