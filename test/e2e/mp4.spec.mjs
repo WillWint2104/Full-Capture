@@ -109,10 +109,13 @@ async function checkSavedMp4(page, file, recordedMs, testInfo) {
     expect(i, `the first frame after seeking to ${from}s is a frame of the file`).toBeGreaterThanOrEqual(0);
     expect(seen.firstVideo).toBeGreaterThanOrEqual(from - 0.001);
     expect(i === 0 || whole.frames[i - 1] < from + 0.001).toBe(true);
-    // Sound starts there too: at the seek point, or where the file's sound resumes if it has a gap there.
-    const covering = sound.find(p => p.pts <= from && from < p.end);
-    const expectedAudio = covering ? from : sound.find(p => p.pts > from)?.pts;
-    expect(Math.abs(seen.firstAudio - expectedAudio)).toBeLessThan(0.001);
+    // Sound starts there too: at the seek point (or where the file's sound resumes, if it has a gap
+    // there), and at most one packet and 20 ms later: ffmpeg starts reading at the video keyframe
+    // it seeks to, so the audio packet holding the seek point can be skipped, and its Opus decoder
+    // drops 20 ms after a jump while it warms up (a fragmented copy of the file does the same).
+    const at = sound.find(p => p.end > from);
+    expect(seen.firstAudio).toBeGreaterThanOrEqual(Math.max(from, at.pts) - 0.001);
+    expect(seen.firstAudio).toBeLessThanOrEqual(at.end + 0.021);
     const pairs = syncOffsets(seen);
     expect(pairs.length).toBeGreaterThanOrEqual(1);
     for (const p of pairs) {
