@@ -14377,6 +14377,11 @@ ${list(win10)}
   var HIDE_SETTLE_MS = 300;
   var MAX_CAPTURE2 = { width: 3840, height: 2160 };
   var SCALES = [1, 1.25, 1.5, 1.75, 2, 2.25, 2.5, 3, 3.5, 4];
+  var ZOOMS = [0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2];
+  function scalesFor(dpr) {
+    if (!(dpr > 0)) return SCALES;
+    return [dpr, ...SCALES.filter((s) => ZOOMS.some((z) => Math.abs(dpr / z - s) <= 0.02 * s))];
+  }
   var LATE_PRESS_MS = 1500;
   function controlsWouldBeRecorded(capture, display) {
     if (!capture || capture.surface !== "monitor") return false;
@@ -14386,8 +14391,7 @@ ${list(win10)}
     if (!(w > 0 && h > 0 && cw > 0 && ch > 0)) return true;
     const near = (a, b) => Math.abs(a - b) <= 0.02 * Math.max(a, b);
     const clamped = cw >= MAX_CAPTURE2.width * 0.98 || ch >= MAX_CAPTURE2.height * 0.98;
-    return [display.dpr, ...SCALES].some((s) => {
-      if (!(s > 0)) return false;
+    return scalesFor(display.dpr).some((s) => {
       const dw = w * s, dh = h * s;
       if (near(dw, cw) && near(dh, ch)) return true;
       return clamped && dw >= cw * 0.98 && dh >= ch * 0.98 && near(dw / dh, cw / ch);
@@ -14477,7 +14481,16 @@ ${list(win10)}
         this.hide();
         return;
       }
-      if (this.take?.hiddenAt && performance.now() - this.take.hiddenAt < LATE_PRESS_MS) return;
+      if (this.take?.hiddenAt && performance.now() - this.take.hiddenAt < LATE_PRESS_MS) {
+        this.toast?.({
+          id: "controls-hidden",
+          kind: "info",
+          title: "Floating controls hidden",
+          text: "They closed so they aren’t in your recording. Press again to show them anyway.",
+          timeoutMs: 6e3
+        });
+        return;
+      }
       this.open();
     }
     /**

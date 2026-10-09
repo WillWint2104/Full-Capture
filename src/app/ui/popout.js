@@ -23,6 +23,14 @@ const MAX_CAPTURE = { width: 3840, height: 2160 };
 // devicePixelRatio is the display's scale times the page zoom, so on its own it can't
 // say how many pixels a display has.
 const SCALES = [1, 1.25, 1.5, 1.75, 2, 2.25, 2.5, 3, 3.5, 4];
+// Chrome's page zoom levels people use (its default zoom applies in the floating window too).
+const ZOOMS = [0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2];
+
+/** The display scales a devicePixelRatio can stand for: itself, and every common scale some zoom level explains. */
+function scalesFor(dpr) {
+  if (!(dpr > 0)) return SCALES;
+  return [dpr, ...SCALES.filter(s => ZOOMS.some(z => Math.abs(dpr / z - s) <= 0.02 * s))];
+}
 // A show request this soon after the controls closed themselves is a late "hide" (the
 // teacher pressing Alt+H as they vanish), not a wish to record them.
 const LATE_PRESS_MS = 1500;
@@ -35,8 +43,9 @@ const LATE_PRESS_MS = 1500;
  * the recorded monitor. With several displays, one that could be the size of the
  * recorded monitor may be it (two identical monitors can't be told apart), so it
  * counts; one that can't be doesn't. The display's size is known in CSS pixels
- * only, and the page zoom hides its scale, so every common scale is tried: any
- * match counts. Anything unknown counts. In doubt, the controls hide.
+ * only, and devicePixelRatio mixes its scale with the page zoom, so every common
+ * scale some zoom level could explain is tried: any match counts. Anything
+ * unknown counts. In doubt, the controls hide.
  */
 export function controlsWouldBeRecorded(capture, display) {
   if (!capture || capture.surface !== 'monitor') return false;
@@ -47,8 +56,7 @@ export function controlsWouldBeRecorded(capture, display) {
   const near = (a, b) => Math.abs(a - b) <= 0.02 * Math.max(a, b);
   // A capture at the size limit may be a bigger monitor scaled down: then only its shape can match.
   const clamped = cw >= MAX_CAPTURE.width * 0.98 || ch >= MAX_CAPTURE.height * 0.98;
-  return [display.dpr, ...SCALES].some(s => {
-    if (!(s > 0)) return false;
+  return scalesFor(display.dpr).some(s => {
     const dw = w * s, dh = h * s;
     if (near(dw, cw) && near(dh, ch)) return true;
     return clamped && dw >= cw * 0.98 && dh >= ch * 0.98 && near(dw / dh, cw / ch);
@@ -128,7 +136,13 @@ export class Popout {
   /** Alt+H and the Floating controls button: hide them when shown, show them when hidden (needs the press). */
   toggle() {
     if (this.win || this.opening) { this.hide(); return; }
-    if (this.take?.hiddenAt && performance.now() - this.take.hiddenAt < LATE_PRESS_MS) return;
+    if (this.take?.hiddenAt && performance.now() - this.take.hiddenAt < LATE_PRESS_MS) {
+      this.toast?.({
+        id: 'controls-hidden', kind: 'info', title: 'Floating controls hidden',
+        text: 'They closed so they aren’t in your recording. Press again to show them anyway.', timeoutMs: 6000,
+      });
+      return;
+    }
     this.open();
   }
 

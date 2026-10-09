@@ -59,6 +59,15 @@ test('page zoom can’t hide the recorded monitor: devicePixelRatio includes it,
   }
 });
 
+test('only scales a page zoom could explain are tried, so screens next to a 4K monitor keep their controls', () => {
+  // A 4K monitor is recorded; the controls are on a 1080p or 1440p screen at 100 % (no zoom).
+  assert.equal(controlsWouldBeRecorded(monitor(3840, 2160), display(true, 1920, 1080, 1)), false);
+  assert.equal(controlsWouldBeRecorded(monitor(3840, 2160), display(true, 1366, 768, 1)), false);
+  // The 4K monitor itself at 150 % and 110 % zoom, or at 200 % and 90 % zoom, is still found.
+  assert.equal(controlsWouldBeRecorded(monitor(3840, 2160), display(true, 2560, 1440, 1.5 * 1.1)), true);
+  assert.equal(controlsWouldBeRecorded(monitor(3840, 2160), display(true, 1920, 1080, 2 * 0.9)), true);
+});
+
 test('a capture held to 3840×2160 matches a bigger display of the same shape, not a smaller or other-shaped one', () => {
   // A 5K panel (5120×2880) arrives scaled to 3840×2160.
   assert.equal(controlsWouldBeRecorded(monitor(3840, 2160), display(true, 5120, 2880)), true);
