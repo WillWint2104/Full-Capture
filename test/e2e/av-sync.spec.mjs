@@ -107,7 +107,8 @@ test.setTimeout(120_000);
 
 for (const camera of [false, true]) {
   test(`a saved take opens in ffmpeg with sound and picture in sync${camera ? ' (camera bubble on)' : ''}, across a pause`, async ({ page }, testInfo) => {
-    test.skip(!hasFfmpeg, 'ffmpeg and ffprobe are needed to open the saved file');
+    // Skipped on a machine without ffmpeg; in CI, where it is installed, it must run.
+    test.skip(!hasFfmpeg && !process.env.CI, 'ffmpeg and ffprobe are needed to open the saved file');
     await page.addInitScript(([key, value]) => {
       try { if (!localStorage.getItem('full-capture:test-seeded')) { localStorage.setItem(key, value); localStorage.setItem('full-capture:test-seeded', '1'); } } catch {}
     }, [SETTINGS_KEY, JSON.stringify({ countdown: false, floatingControls: false, hidePreview: true })]);

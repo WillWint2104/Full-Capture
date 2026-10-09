@@ -1,0 +1,56 @@
+# Checks every pull request (and main) with the project's own commands:
+# the committed full-capture.html matches its source, the page contract,
+# unit tests, and the browser tests (Chromium with fake camera, mic and screen).
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Build (the committed full-capture.html must match src/)
+        run: |
+          npm run build
+          git diff --exit-code -- full-capture.html
+
+      - name: Page contract
+        run: node scripts/check-contract.mjs
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Install Chromium and ffmpeg
+        run: |
+          npx playwright install --with-deps chromium
+          sudo apt-get install -y --no-install-recommends ffmpeg
+
+      - name: Browser tests
+        run: npx playwright test --reporter=line
+
+      - name: Keep the test results when something fails
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: test-results
+          path: test-results/
+          retention-days: 7

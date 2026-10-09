@@ -13,14 +13,16 @@ export const TARGET = ['chrome116', 'edge116'];
 export const workletPlugin = {
   name: 'worklet',
   setup(build) {
+    // Paths relative to the repository root, so the built file (which names
+    // its modules in comments) is the same on every machine.
     build.onResolve({ filter: /^worklet:/ }, args => ({
-      path: path.join(SRC, 'worklets', args.path.slice('worklet:'.length)),
+      path: path.relative(ROOT, path.join(SRC, 'worklets', args.path.slice('worklet:'.length))).split(path.sep).join('/'),
       namespace: 'worklet',
     }));
     build.onLoad({ filter: /.*/, namespace: 'worklet' }, async args => {
       const r = await esbuild.build({
-        entryPoints: [args.path], bundle: true, write: false, format: 'iife',
-        target: TARGET, metafile: true, logLevel: 'silent',
+        entryPoints: [path.resolve(ROOT, args.path)], bundle: true, write: false, format: 'iife',
+        target: TARGET, metafile: true, logLevel: 'silent', absWorkingDir: ROOT,
       });
       return {
         contents: r.outputFiles[0].text,
@@ -36,7 +38,7 @@ export async function bundle(entry, opts = {}) {
   const r = await esbuild.build({
     entryPoints: [entry], bundle: true, write: false, target: TARGET,
     charset: 'utf8', legalComments: 'none', logLevel: 'silent', metafile: true,
-    plugins: [workletPlugin], ...opts,
+    absWorkingDir: ROOT, plugins: [workletPlugin], ...opts,
   });
   return { text: r.outputFiles[0].text, inputs: Object.keys(r.metafile.inputs) };
 }

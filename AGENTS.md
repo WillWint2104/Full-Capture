@@ -19,6 +19,8 @@ node scripts/check-contract.mjs # the page has every id and template the code ex
 ```
 
 Build before running the browser tests: they open the built file.
+CI (`.github/workflows/ci.yml`) runs the build check, the contract check, the
+unit tests and the browser tests on every pull request.
 `docs/ARCHITECTURE.md` describes the design and each module's contract.
 
 ## What matters most
