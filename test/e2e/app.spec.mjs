@@ -458,9 +458,12 @@ test('settings dialog: theme switch applies and persists', async ({ page }) => {
   await expect.poll(() => page.evaluate(() => document.documentElement.dataset.theme)).toBe('dark');
   await page.click('#btnSettingsClose');
   await expect(page.locator('#settingsDialog')).toBeHidden();
+  const before = await page.evaluate(k => localStorage.getItem(k), SETTINGS_KEY);
   await page.reload();
   await page.waitForFunction(() => document.documentElement.dataset.ready === 'true');
-  expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe('dark');
+  // What storage held on each side of the reload, if this ever fails.
+  const after = await page.evaluate(k => ({ stored: localStorage.getItem(k), seeded: sessionStorage.getItem('seeded'), theme: document.documentElement.dataset.theme ?? null }), SETTINGS_KEY);
+  expect(after.theme, JSON.stringify({ before, after })).toBe('dark');
 });
 
 test('no horizontal scrolling at phone width in every view', async ({ page }) => {
