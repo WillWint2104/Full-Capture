@@ -1,7 +1,7 @@
 // The whole app, built (full-capture.html) and opened from file:// with
 // Chromium's fake mic, camera and screen. Run `npm run build` first.
 import { test, expect } from '@playwright/test';
-import { APP_URL, trackErrors } from './helpers.mjs';
+import { APP_URL, trackErrors, freeStorage } from './helpers.mjs';
 import { REQUIRED_IDS, RADIOS, SELECT_VALUES, TEMPLATE_PARTS, checkDocument } from '../../scripts/check-contract.mjs';
 
 const SETTINGS_KEY = 'full-capture:settings:v1';
@@ -65,7 +65,9 @@ test('microphone goes live (permission granted) and its meter moves', async ({ p
 });
 
 test('record → chapter → pause → resume → stop & save → review, then it is in the takes list', async ({ page }) => {
-  await openApp(page, { lessonName: 'Fractions – Week 3' });
+  // Enough free space: test browsers get under 1 GB, and the "Storage is nearly full"
+  // warning would take over the tab title checked below (controls.spec.mjs covers that).
+  await openApp(page, { lessonName: 'Fractions – Week 3' }, { init: freeStorage });
   await startRecording(page);
   await expect(page.locator('#viewRecording')).toBeVisible();
   await expect(page.locator('#recPill')).toContainText('Recording');

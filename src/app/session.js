@@ -32,7 +32,9 @@ const TALKING_WHILE_PAUSED_S = 5;
 // (double clicks, a held key).
 const TOGGLE_GUARD_MS = 400;
 const CAMERA_WAIT_MS = 3000;     // how long Start waits for a camera that is still opening
-const PREF_KEYS = ['beeps', 'floatingControls', 'hidePreview', 'shortcuts', 'theme'];
+// The longest a take waits for the interface before it starts (see setBeforeTake).
+const BEFORE_TAKE_MAX_MS = 2000;
+const PREF_KEYS = ['beeps', 'floatingControls', 'autoHideControls', 'hidePreview', 'shortcuts', 'theme'];
 const ACTIVE_PHASES = ['starting', 'recording', 'paused', 'stopping'];
 
 // getUserMedia failures, in the teacher's words. The blocked text matches the
@@ -95,6 +97,7 @@ export class Session extends Emitter {
   #camera = { status: 'off', stream: null, label: '', devices: [], activeId: '', error: '' };
   #cameraGen = 0;             // bumps on every camera change, so a slow open can't resurrect an old one
   #cameraOpening = null;      // the camera open in progress (Start waits a moment for it)
+  #beforeTake = null;         // the interface's last word before a take starts (setBeforeTake)
   #take = null;               // { id, filename, lessonName, elapsedMs, bytes, markers, savingTo, ... }
   #review = null;             // take id shown in review
   #takes = [];                // library rows
@@ -687,7 +690,7 @@ export class Session extends Emitter {
   setFormat(format) { if (['auto', 'mp4', 'webm'].includes(format)) { this.#settings = saveSettings({ format }); this.#changed(); } }
   setCountdown(on) { this.#settings = saveSettings({ countdown: !!on }); this.#changed(); }
   setNotes(notes) { this.#settings = saveSettings({ notes: String(notes ?? '') }); this.#changed(); }
-  /** Simple preferences: beeps, floatingControls, hidePreview, shortcuts, theme. */
+  /** Simple preferences: beeps, floatingControls, autoHideControls, hidePreview, shortcuts, theme. */
   setPref(key, value) {
     if (!PREF_KEYS.includes(key)) return;
     if (key === 'theme' && !['system', 'light', 'dark'].includes(value)) return;
@@ -821,10 +824,35 @@ export class Session extends Emitter {
     this.#changed();
   }
 
+  /**
+   * `fn(state)` runs once each time a take is about to start (after the countdown, in the
+   * 'starting' phase), and the take waits for the promise it returns, but never longer than
+   * BEFORE_TAKE_MAX_MS and never for one that fails. The interface uses it to get the floating
+   * controls off a screen that is about to be recorded before the first frame.
+   */
+  setBeforeTake(fn) { this.#beforeTake = typeof fn === 'function' ? fn : null; }
+
+  async #waitBeforeTake() {
+    const fn = this.#beforeTake;
+    if (!fn) return;
+    let timer = null;
+    try {
+      await Promise.race([
+        Promise.resolve().then(() => fn(this.state)),
+        new Promise(resolve => { timer = setTimeout(resolve, BEFORE_TAKE_MAX_MS); }),
+      ]);
+    } catch (e) {
+      console.warn('before-take step failed', e);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   /** The 'starting' phase covers the seconds a take needs to open its file and journal. */
   async #beginTake() {
     this.#phase = 'starting';
     this.#changed();
+    await this.#waitBeforeTake();
     const ok = await this.#startTake();
     if (!ok && this.#phase === 'starting') this.#phase = null;
     this.#changed();
@@ -1512,6 +1540,7 @@ export class Session extends Emitter {
       countdown: this.#countdown,
       screen: this.#screen && {
         label: this.#screen.label, surface: this.#screen.surface, width: this.#screen.width, height: this.#screen.height,
+        nativeWidth: this.#screen.nativeWidth || this.#screen.width, nativeHeight: this.#screen.nativeHeight || this.#screen.height,
         hasAudio: !!this.#screen.audioTrack, stream: this.#screen.stream,
       },
       mic: { enabled: s.micEnabled, status: s.micEnabled ? this.#mic.status : 'off', deviceId: s.micDeviceId, label: this.#mic.label, devices: this.#mic.devices },
@@ -1531,7 +1560,7 @@ export class Session extends Emitter {
         devices: this.#camera.devices, bubble: { ...s.bubble }, supported: isCompositingSupported(), previewStream: this.#camera.stream, error: this.#camera.error || '',
       },
       lesson: { name: s.lessonName, format: s.format, quality: s.quality, countdown: s.countdown, notes: s.notes, nextTake: this.#nextTakeNumber(s.lessonName) },
-      prefs: { beeps: s.beeps, floatingControls: s.floatingControls, hidePreview: s.hidePreview, shortcuts: s.shortcuts, noVoice: s.noVoice, theme: s.theme },
+      prefs: { beeps: s.beeps, floatingControls: s.floatingControls, autoHideControls: s.autoHideControls, hidePreview: s.hidePreview, shortcuts: s.shortcuts, noVoice: s.noVoice, theme: s.theme },
       estimate: this.#estimate(),
       formats: { mp4: this.#formats.mp4, webm: this.#formats.webm },
       take,

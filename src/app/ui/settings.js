@@ -29,6 +29,7 @@ export class SettingsView {
     on('countdownToggle', 'change', e => s.setCountdown(e.target.checked));
     on('beepsToggle', 'change', e => s.setPref('beeps', e.target.checked));
     on('floatingToggle', 'change', e => s.setPref('floatingControls', e.target.checked));
+    on('autoHideToggle', 'change', e => s.setPref('autoHideControls', e.target.checked));
     on('hidePreviewToggle', 'change', e => s.setPref('hidePreview', e.target.checked));
     on('shortcutsToggle', 'change', e => s.setPref('shortcuts', e.target.checked));
     on('themeSelect', 'change', e => s.setPref('theme', e.target.value));
@@ -78,6 +79,7 @@ export class SettingsView {
     value($('countdownToggle'), st.lesson.countdown);
     value($('beepsToggle'), st.prefs.beeps);
     value($('floatingToggle'), st.prefs.floatingControls);
+    value($('autoHideToggle'), st.prefs.autoHideControls);
     value($('hidePreviewToggle'), st.prefs.hidePreview);
     value($('shortcutsToggle'), st.prefs.shortcuts);
     value($('themeSelect'), st.prefs.theme);

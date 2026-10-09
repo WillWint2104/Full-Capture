@@ -36,7 +36,7 @@ export class RecordingView {
     $('btnPause').addEventListener('click', () => { if (enabled('btnPause')) session.togglePause(); });
     $('btnResumeBig').addEventListener('click', () => session.togglePause());
     $('btnMarker').addEventListener('click', () => { if (enabled('btnMarker')) session.addMarker(); });
-    $('btnPopout').addEventListener('click', () => (this.popout.isOpen ? this.popout.close() : this.popout.open()));
+    $('btnPopout').addEventListener('click', () => this.popout.toggle());
     $('btnDiscard').addEventListener('click', () => { if (enabled('btnDiscard')) this.discard(); });
     attr($('btnStop'), 'aria-keyshortcuts', 'Alt+R');
     attr($('btnPause'), 'aria-keyshortcuts', 'Alt+P');
@@ -108,7 +108,11 @@ export class RecordingView {
       const n = st.take.markers.length;
       text($('markerCount'), n ? String(n) : '');
       show($('markerCount'), n > 0);
-      attr($('btnPopout'), 'aria-pressed', this.popout.isOpen ? 'true' : 'false');
+      // Pressed = shown. The tag says it in words; hidden controls come back with this button or Alt+H.
+      const shown = this.popout.isOpen;
+      attr($('btnPopout'), 'aria-pressed', shown ? 'true' : 'false');
+      attr($('btnPopout'), 'title', `${shown ? 'Hide' : 'Show'} the floating controls${st.prefs.shortcuts ? ' (Alt+H)' : ''}`);
+      text($('btnPopout').querySelector('.on-tag'), shown ? 'Shown' : 'Hidden');
       show($('btnPopout'), this.popout.supported);
       attr($('btnDiscard'), 'aria-disabled', stopping ? 'true' : null);
       text($('recNotes'), st.lesson.notes);

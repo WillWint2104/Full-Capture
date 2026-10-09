@@ -1,7 +1,7 @@
 // Starting a take when the microphone or camera isn't quite ready, or the
 // screen's reported size is stale. Run `npm run build` first.
 import { test, expect } from '@playwright/test';
-import { APP_URL, trackErrors } from './helpers.mjs';
+import { APP_URL, trackErrors, fakePip } from './helpers.mjs';
 
 const SETTINGS_KEY = 'full-capture:settings:v1';
 
@@ -40,19 +40,6 @@ const slowCamera = ({ delay, reject }) => {
   };
 };
 
-/** Document Picture-in-Picture as an iframe, so the floating controls can be driven headlessly. */
-const fakePip = () => {
-  Object.defineProperty(window, 'documentPictureInPicture', { configurable: true, value: {
-    async requestWindow() {
-      const f = document.createElement('iframe');
-      f.style.cssText = 'position:fixed;right:0;bottom:0;width:320px;height:420px;border:0';
-      document.body.append(f);
-      await new Promise(r => setTimeout(r, 50));
-      window.__pip = f.contentWindow;
-      return f.contentWindow;
-    },
-  } });
-};
 
 /** Size of the next frame of the first recorded video track. */
 const recordedFrameSize = page => page.evaluate(async () => {
@@ -107,7 +94,9 @@ test('Alt+R on the Review screen with the microphone off goes back to Set up and
 });
 
 test('the floating controls say why Start can’t go ahead, and a press there says it out loud', async ({ page }) => {
-  await openApp(page, { floatingControls: true }, [fakePip]);
+  // The controls stay open through the take: the fake screen is a whole monitor on one
+  // display, so with auto-hide on they would close as it starts (test/e2e/controls.spec.mjs).
+  await openApp(page, { floatingControls: true, autoHideControls: false }, [fakePip]);
   await micLive(page);
   await chooseScreen(page);
   await recordAndStop(page);                        // Start opened the floating controls
@@ -438,7 +427,8 @@ test('a camera switched off while it was still opening is not waited for', async
 });
 
 test('the floating controls show the start under way, with a Cancel that works', async ({ page }) => {
-  await openApp(page, { floatingControls: true }, [fakePip], [slowCamera, { delay: 20_000 }]);
+  // Kept open through the first take (see above).
+  await openApp(page, { floatingControls: true, autoHideControls: false }, [fakePip], [slowCamera, { delay: 20_000 }]);
   await micLive(page);
   await chooseScreen(page);
   await recordAndStop(page);                        // Start opened the floating controls

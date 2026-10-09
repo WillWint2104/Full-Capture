@@ -8,6 +8,21 @@ import { formatDuration, formatBytes } from '../lib/time.js';
 const TOAST_MS = 6000;
 let bannerSeq = 0;
 
+/** Alerts that mean the microphone isn't being heard. */
+export const isNoSound = a => a.id === 'no-audio' || a.id === 'mic-lost';
+
+/**
+ * The alert that matters most right now, for places with room for one (the tab
+ * title, the floating controls): no sound first, then errors, then warnings,
+ * oldest first. Null when there is none.
+ */
+export function topAlert(alerts = []) {
+  const rank = a => (isNoSound(a) ? 0 : a.kind === 'error' ? 1 : a.kind === 'warning' ? 2 : 3);
+  let best = null;
+  for (const a of alerts) if (rank(a) < 3 && (!best || rank(a) < rank(best))) best = a;
+  return best;
+}
+
 export class Notices {
   constructor(session, { confirm }) {
     this.session = session;

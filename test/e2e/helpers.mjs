@@ -20,6 +20,61 @@ export async function openHarness(page, entry) {
   return page;
 }
 
+/**
+ * Page init script: Document Picture-in-Picture as an iframe, so the floating
+ * controls can be driven headlessly. `window.__pip` is the open window. Like a
+ * real one it closes: close() fires `pagehide` in it and removes it. Its
+ * screen is this page's (headless: one display) unless `window.__pipScreen =
+ * {isExtended, width, height}` and `window.__pipDpr` say otherwise (read live).
+ * `window.__pipCloseDelay` (ms) makes it slow to close; `Infinity` never closes.
+ * `window.__pipEvents` lists ['opened'|'closed', performance.now()].
+ */
+export const fakePip = () => {
+  window.__pipEvents = [];
+  Object.defineProperty(window, 'documentPictureInPicture', { configurable: true, value: {
+    window: null,
+    async requestWindow() {
+      const f = document.createElement('iframe');
+      f.style.cssText = 'position:fixed;right:0;bottom:0;width:320px;height:420px;border:0';
+      document.body.append(f);
+      await new Promise(r => setTimeout(r, 50));
+      const w = f.contentWindow;
+      const realScreen = window.screen;
+      Object.defineProperty(w, 'screen', { configurable: true, get: () => window.__pipScreen || realScreen });
+      Object.defineProperty(w, 'devicePixelRatio', { configurable: true, get: () => window.__pipDpr || window.devicePixelRatio });
+      const gone = () => {
+        if (!f.isConnected) return;
+        w.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: false }));
+        f.remove();
+        if (window.__pip === w) window.__pip = null;
+        if (this.window === w) this.window = null;
+        window.__pipEvents.push(['closed', performance.now()]);
+      };
+      w.close = () => {
+        const delay = window.__pipCloseDelay || 0;
+        if (delay === Infinity) return;
+        if (delay) setTimeout(gone, delay); else gone();
+      };
+      window.__pip = w;
+      this.window = w;
+      window.__pipEvents.push(['opened', performance.now()]);
+      return w;
+    },
+  } });
+};
+
+/**
+ * Page init script: report `window.__freeBytes` (default 50 GB) of free storage. Test
+ * browsers get under 1 GB, which raises the "Storage is nearly full" warning.
+ */
+export const freeStorage = () => {
+  const real = navigator.storage.estimate.bind(navigator.storage);
+  navigator.storage.estimate = async () => {
+    const est = await real();
+    return { ...est, quota: (est.usage || 0) + (window.__freeBytes ?? 50e9) };
+  };
+};
+
 /** Collect console errors and uncaught exceptions for later assertions. */
 export function trackErrors(page) {
   const errors = [];

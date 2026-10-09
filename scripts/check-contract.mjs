@@ -18,7 +18,7 @@ stage stageLabel screenVideo reviewVideo stageThumb stageEmpty btnChooseScreenBi
 recBanner btnResumeBig recLesson recPill recTimer recSafety recMicMeter recMicLabel recSysRow recSysMeter btnStop btnPause btnMarker markerCount btnPopout btnDiscard recNotes recTalkingHint
 reviewHeading reviewName reviewSaved reviewNotice chapterList chapterEmpty chapterIssues btnCopyChapters btnSaveChapters btnNewTake btnDownloadTake btnDeleteTake btnFinish
 library takeList libraryEmpty
-settingsDialog formatSelect formatNote qualitySelect qualityNote sizeEstimate countdownToggle beepsToggle floatingToggle hidePreviewToggle shortcutsToggle themeSelect
+settingsDialog formatSelect formatNote qualitySelect qualityNote sizeEstimate countdownToggle beepsToggle floatingToggle autoHideToggle hidePreviewToggle shortcutsToggle themeSelect
 folderStatus btnChooseFolder btnForgetFolder advancedAudio rawMicToggle speakersToggle gateToggle autoLevelToggle gainSlider gainLabel sysAudioLevel noVoiceToggle
 detailMeters spectrum statFloor statVoice statSnr statPeak btnResetSettings btnSettingsClose
 helpDialog btnHelpClose confirmDialog confirmTitle confirmText btnConfirmCancel btnConfirmOk
@@ -34,9 +34,9 @@ export const TEMPLATE_PARTS = {
   tplTake: { fields: ['thumb', 'name', 'date', 'duration', 'size', 'chapters', 'saved'], actions: ['open', 'download', 'copy-chapters', 'delete'], selectors: ['.take'] },
   tplChapter: { fields: ['time', 'title'], actions: ['delete'], selectors: ['.chapter'] },
   tplPopout: {
-    fields: ['pill', 'timer', 'lesson', 'micLabel', 'notes', 'countdown', 'meter'],
-    actions: ['start', 'stop', 'pause', 'marker', 'more', 'discard-yes', 'discard-no'],
-    selectors: ['[data-part="idle"]', '[data-part="active"]', '[data-part="confirm"]', '[data-part="nosound"]', '.meter'],
+    fields: ['pill', 'timer', 'lesson', 'micLabel', 'notes', 'countdown', 'meter', 'alertTitle', 'alertText'],
+    actions: ['start', 'stop', 'pause', 'marker', 'more', 'discard-yes', 'discard-no', 'hide'],
+    selectors: ['[data-part="idle"]', '[data-part="active"]', '[data-part="confirm"]', '[data-part="nosound"]', '[data-part="alert"]', '.meter'],
   },
 };
 

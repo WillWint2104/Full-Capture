@@ -34,6 +34,15 @@ body.popout { min-height: 100vh; overflow: hidden; background: var(--bg); color:
 .pop-pill[data-state="paused"] { background: var(--paused); color: var(--on-paused); }
 .pop-pill[data-state="countdown"] { background: var(--record-soft); color: var(--record-soft-text); }
 .pop-lesson { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-sm); font-weight: var(--fw-strong); color: var(--text-2); }
+/* Hide: closes this window (the only way to keep it out of a whole-screen recording) */
+.pop-hide { margin-left: auto; color: var(--text-2); box-shadow: inset 0 0 0 1px var(--line-strong); }
+
+/* The most important problem other than "no sound" (camera unplugged, storage nearly full…) */
+.pop-alert { display: flex; align-items: flex-start; gap: var(--s2); flex: none; padding: 10px 12px; border-radius: var(--r); background: var(--warn-soft); color: var(--warn); }
+.pop-alert[data-kind="error"] { background: var(--bad-soft); color: var(--bad); }
+.pop-alert .i { width: 22px; height: 22px; flex: none; }
+.pop-alert-title { font-size: var(--fs-sm); font-weight: var(--fw-strong); }
+.pop-alert-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; font-size: var(--fs-sm); color: var(--text); }
 
 .pop-idle { display: grid; gap: var(--s1); padding-top: var(--s2); }
 .pop-ready-title { font-size: var(--fs-lg); font-weight: var(--fw-strong); }
@@ -143,6 +152,6 @@ body.popout:is([data-alert="nosound"], :has([data-part="nosound"]:not([hidden]))
 body.popout:is([data-alert="nosound"], :has([data-part="nosound"]:not([hidden]))) .pop-stop { background: #ffffff; border-color: #ffffff; color: #1c1d1f; }
 body.popout:is([data-alert="nosound"], :has([data-part="nosound"]:not([hidden]))) .pop-stop .i { color: #b3261e; }
 body.popout:is([data-alert="nosound"], :has([data-part="nosound"]:not([hidden]))) .btn-secondary { background: rgba(255, 255, 255, .14); border-color: rgba(255, 255, 255, .55); color: #ffffff; box-shadow: none; }
-body.popout:is([data-alert="nosound"], :has([data-part="nosound"]:not([hidden]))) .pop-more { color: #ffffff; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .55); }
+body.popout:is([data-alert="nosound"], :has([data-part="nosound"]:not([hidden]))) :is(.pop-more, .pop-hide) { color: #ffffff; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .55); }
 body.popout:is([data-alert="nosound"], :has([data-part="nosound"]:not([hidden]))) .count { background: #ffffff; color: #b3261e; }
 body.popout:is([data-alert="nosound"], :has([data-part="nosound"]:not([hidden]))) :focus-visible { outline-color: #ffffff; }

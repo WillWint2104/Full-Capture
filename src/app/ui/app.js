@@ -11,7 +11,7 @@ import { RecordingView } from './recording.js';
 import { ReviewView } from './review.js';
 import { SettingsView } from './settings.js';
 import { Chrome } from './chrome.js';
-import { Popout } from './popout.js';
+import { Popout, controlsWouldBeRecorded } from './popout.js';
 
 const VIEW_FOR = {
   setup: 'viewSetup', ready: 'viewSetup', countdown: 'viewSetup', starting: 'viewSetup',
@@ -49,12 +49,14 @@ export function createUI(session) {
   const confirm = createConfirm();
   const notices = new Notices(session, { confirm });
   const render = () => renderAll(session.state);
-  const popout = new Popout(session, { notices, toast: n => notices.toast(n), onClose: render });
+  const popout = new Popout(session, { notices, toast: n => notices.toast(n), onOpen: render, onClose: render });
   const settings = new SettingsView(session, { meters, confirm });
   const startOrStop = source => controller.startOrStop(source);
   const chrome = new Chrome(session, { settings, popout, startOrStop });
   popout.keyHandler = e => chrome.handleKey(e);
   popout.startOrStop = startOrStop;
+  // A take starts only once floating controls that it would record have closed.
+  session.setBeforeTake(st => popout.prepareForTake(st));
   wireDialog('helpDialog', ['btnHelp'], 'btnHelpClose');
 
   const setup = new SetupView(session, { meters, notices, popout, settingsDialog: settings, startOrStop });
@@ -97,7 +99,11 @@ export function createUI(session) {
   function offerPopout(st) {
     if (prevPhase !== 'recording' && st.phase === 'recording' && offerPopoutOnStart) {
       offerPopoutOnStart = false;
-      if (st.prefs.floatingControls && popout.supported && !popout.isOpen) {
+      // Not when they would be recorded (judged from this tab's screen, where they would open).
+      const recorded = st.prefs.autoHideControls && controlsWouldBeRecorded(st.screen, {
+        isExtended: window.screen.isExtended, width: window.screen.width, height: window.screen.height, dpr: window.devicePixelRatio || 1,
+      });
+      if (st.prefs.floatingControls && popout.supported && !popout.isOpen && !recorded) {
         notices.toast({
           id: 'offer-popout', kind: 'info', title: 'Floating controls',
           text: 'Keep the timer, Pause and Stop & save on top of your slides.',

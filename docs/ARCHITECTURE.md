@@ -619,13 +619,15 @@ rate, not part of the snapshot), and `'notice'` for toasts
 (`action` names a Session method).
 
 Snapshot (`session.state`) — see `#buildSnapshot()` in session.js for the
-exact shape. Main fields: `phase`, `countdown`, `audioStarted`, `screen`,
+exact shape. Main fields: `phase`, `countdown`, `audioStarted`, `screen
+{label, surface, width, height, nativeWidth, nativeHeight, hasAudio, stream}`
+(native* = the shared surface's size before fitting the preset),
 `mic {enabled, status, deviceId, label, devices}`, `audio {mode, speakers,
 gain, gate, autoLevel, monitor, systemAudio, systemAudioLevel, calibrated,
 calibration, checkStale, silent, clipping}`, `soundCheck {running, phase,
 remainingMs, fraction, instruction, result, clipUrl}`, `camera`, `lesson
 {name, format, quality, countdown, notes}`, `prefs {beeps,
-floatingControls, hidePreview, shortcuts, noVoice, theme}`, `formats`,
+floatingControls, autoHideControls, hidePreview, shortcuts, noVoice, theme}`, `formats`,
 `take {id, filename, elapsedMs, bytes, markers, savingTo, safetyCopy,
 thumbnail, talkingWhilePaused}`, `review` (a TakeView, plus `endedBy:
 'share-ended'|null`), `library` (TakeViews), `folder {supported, status,
@@ -648,6 +650,12 @@ record() cancelCountdown() togglePause() stop() cancelTake() addMarker()` ·
 copyChapters saveChaptersFile openTake closeReview downloadTake deleteTake` ·
 `chooseFolder reconnectFolder forgetFolder` · `recover discardRecovery` ·
 `dismissAlert`.
+
+`setBeforeTake(fn)`: `fn(state)` runs once per take as it is about to start
+(phase `'starting'`, after the countdown, before the recorder opens its file
+and MediaRecorder starts); the take waits for the promise it returns, at most
+2 s, and goes ahead if it rejects. The UI uses it to close floating controls
+that the recording would include (see `tplPopout` below).
 
 ## UX blueprint (from the UX audit; this is the design brief)
 
@@ -732,14 +740,19 @@ disconnected, sharing stopped, storage low) and for recovery cards
 14:32, about 12 minutes. [Save it] [Delete it…]").
 
 Off-screen feedback: `document.title` mirrors state ("● 12:34 Recording –
-Fractions Week 3", "❚❚ Paused – …", "⚠ No sound! – …", "Starting in 3…"),
-the favicon switches (neutral / red dot / pause / warning, drawn on a canvas),
-and the **floating controls** (Document PiP) open automatically from the
-Start click (setting "Show floating controls while recording", default on).
+Fractions Week 3", "❚❚ Paused – …", "⚠ No sound! – …", "Starting in 3…"; during
+a take any error or warning alert shows as "⚠ <alert title> – …", most
+important first: no sound, then errors, then warnings), the favicon switches
+(neutral / red dot / pause / warning, drawn on a canvas), and the **floating
+controls** (Document PiP) open automatically from the Start click (setting
+"Show floating controls while recording", default on). They close themselves
+as a take starts when the recording would include them (setting "Hide
+floating controls if they'd be recorded", default on; see `tplPopout`).
 
 Settings (a `<dialog>`): File type (MP4 recommended / WebM smaller), Quality
 (with expected size per hour), 3-2-1 countdown, countdown beeps, floating
-controls, hide preview while recording, keyboard shortcuts, theme
+controls, hide floating controls if they'd be recorded, hide preview while
+recording, keyboard shortcuts, theme
 (System/Light/Dark), save location (folder chosen / choose / forget), and
 **Advanced**: use my mic's unprocessed sound (Studio), I'm using speakers,
 mute the mic between sentences (gate; off by default), adjust my mic level
@@ -752,7 +765,9 @@ another take · Floating controls · Check my sound · Mic level.
 
 Shortcuts (main window and floating controls; off while typing; listed in
 Help and `aria-keyshortcuts`): **Alt+R** start / stop & save, **Alt+P**
-pause/resume, **Alt+M** add chapter, **Esc** cancel countdown / close dialog.
+pause/resume, **Alt+M** add chapter, **Alt+H** hide the floating controls (in
+them) / hide or show them (in the tab; showing needs the key press's user
+activation), **Esc** cancel countdown / close dialog. A held key acts once.
 
 Accessibility and look: landmarks (`header`, `main`), one `section
 aria-labelledby` per step with an h2, `fieldset/legend` for option groups,
@@ -810,7 +825,7 @@ Required ids:
 | Recording | `recBanner` (paused banner, contains `btnResumeBig`), `recLesson`, `recPill`, `recTimer`, `recSafety`, `recMicMeter`, `recMicLabel`, `recSysRow` (contains `recSysMeter`), `btnStop`, `btnPause`, `btnMarker` (contains `markerCount`), `btnPopout`, `btnDiscard`, `recNotes`, `recTalkingHint` |
 | Review | `reviewHeading`, `reviewName` (input), `reviewSaved`, `reviewNotice`, `chapterList`, `chapterEmpty`, `chapterIssues`, `btnCopyChapters`, `btnSaveChapters`, `btnNewTake`, `btnDownloadTake`, `btnDeleteTake`, `btnFinish` |
 | Library | `library`, `takeList`, `libraryEmpty` |
-| Settings | `<dialog id="settingsDialog">`: `formatSelect`, `formatNote`, `qualitySelect`, `qualityNote`, `sizeEstimate`, `countdownToggle`, `beepsToggle`, `floatingToggle`, `hidePreviewToggle`, `shortcutsToggle`, `themeSelect` (`system`/`light`/`dark`), `folderStatus`, `btnChooseFolder`, `btnForgetFolder`, `advancedAudio` (`<details>`) with `rawMicToggle`, `speakersToggle`, `gateToggle`, `autoLevelToggle`, `gainSlider` (range 25–1600, percent), `gainLabel`, `sysAudioLevel` (range 0–150), `noVoiceToggle`, `detailMeters` (`<details>`) with `spectrum` (canvas), `statFloor`, `statVoice`, `statSnr`, `statPeak`; `btnResetSettings`, `btnSettingsClose` |
+| Settings | `<dialog id="settingsDialog">`: `formatSelect`, `formatNote`, `qualitySelect`, `qualityNote`, `sizeEstimate`, `countdownToggle`, `beepsToggle`, `floatingToggle`, `autoHideToggle`, `hidePreviewToggle`, `shortcutsToggle`, `themeSelect` (`system`/`light`/`dark`), `folderStatus`, `btnChooseFolder`, `btnForgetFolder`, `advancedAudio` (`<details>`) with `rawMicToggle`, `speakersToggle`, `gateToggle`, `autoLevelToggle`, `gainSlider` (range 25–1600, percent), `gainLabel`, `sysAudioLevel` (range 0–150), `noVoiceToggle`, `detailMeters` (`<details>`) with `spectrum` (canvas), `statFloor`, `statVoice`, `statSnr`, `statPeak`; `btnResetSettings`, `btnSettingsClose` |
 | Help | `<dialog id="helpDialog">` with `btnHelpClose` (shortcuts + how it works) |
 | Confirm | `<dialog id="confirmDialog">` with `confirmTitle`, `confirmText`, `btnConfirmCancel` (default focus), `btnConfirmOk` (danger style) |
 
@@ -820,6 +835,8 @@ Templates (`<template id>`; fields by `data-field`, buttons by `data-action`):
 - `tplMessage`: inline step message, root `.message[data-kind]`; fields `title`, `text`; `[data-actions]`.
 - `tplTake`: root `.take`; fields `thumb` (img), `name`, `date`, `duration`, `size`, `chapters`, `saved`; actions `open`, `download`, `copy-chapters`, `delete`.
 - `tplChapter`: root `.chapter`; field `time`; input `[data-field="title"]`; action `delete`.
-- `tplPopout`: the floating controls' whole body (rendered into the Document PiP window, whose `<body>` gets class `popout` and the theme attribute; its CSS lives in the main stylesheet under `.popout`). Fields `pill`, `timer`, `lesson`, `micLabel`, `notes`, `countdown`; a `.meter` with `data-field="meter"`; actions `start`, `stop`, `pause` (text Pause/Resume), `marker`, `more` (reveals discard), `discard-yes`, `discard-no`; containers `[data-part="idle|active|confirm|nosound"]` toggled with `hidden`. A "NO SOUND" state turns the whole window red.
+- `tplPopout`: the floating controls' whole body (rendered into the Document PiP window, whose `<body>` gets class `popout` and the theme attribute; its CSS lives in the main stylesheet under `.popout`). Fields `pill`, `timer`, `lesson`, `micLabel`, `notes`, `countdown`, `alertTitle`, `alertText`; a `.meter` with `data-field="meter"`; actions `start`, `stop`, `pause` (text Pause/Resume), `marker`, `more` (reveals discard), `discard-yes`, `discard-no`, `hide` (icon button "Hide controls", Alt+H); containers `[data-part="idle|active|confirm|nosound|alert"]` toggled with `hidden`. A "NO SOUND" state turns the whole window red; any other error or warning alert (the most important one) shows in `alert` (`data-kind`) and is announced in the window's own live region.
+
+  Hiding (`popout.js`). No web API keeps a window out of a whole-monitor capture, so hiding means closing the PiP window; the take carries on. `hide()` (the `hide` action, Alt+H in the window) closes it; `toggle()` (`#btnPopout`, Alt+H in the tab) closes or reopens it (reopening needs the click's or key press's user activation, so the controls never come back by themselves). Auto-hide is decided once per take, in `prepareForTake(state)` (registered with `session.setBeforeTake`, with `render` as a fallback when a take is seen in a later phase): when `prefs.autoHideControls` is on and the controls are open or still opening, `controlsWouldBeRecorded(capture, display)` decides with the capture `{surface, nativeWidth, nativeHeight}` and the PiP window's own screen `{isExtended, width, height, dpr}`: surface not `'monitor'` → keep; `isExtended` false or unknown → hide; extended → hide when the display's device-pixel size matches the captured monitor within 2 % (identical monitors can't be told apart), or when the capture is at the 3840×2160 limit and the display is at least that big with the same shape; otherwise keep. A hide waits for the window's `pagehide` plus `HIDE_SETTLE_MS` (300 ms, for frames the capture took before it went), so the session starts recording only after that; it shows a toast saying how to bring the controls back. Shown again during the take, they stay. The per-take state is dropped when the take has ended, so the next Start opens them as usual. (When Start had to open the screen picker and so couldn't open them, the "Open floating controls" offer is skipped if they would be recorded, judged from this tab's screen.) The tab title and favicon carry state and warnings while they are hidden. The window holds its own screen wake lock, which is released while they are hidden (the tab takes one while it is visible).
 
 Phase → view: `setup`/`ready`/`countdown` → `viewSetup`; `recording`/`paused`/`stopping` → `viewRecording`; `review` → `viewReview`.

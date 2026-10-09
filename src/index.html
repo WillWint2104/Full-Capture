@@ -560,14 +560,14 @@
             </button>
           </div>
           <button id="btnPopout" class="btn btn-quiet btn-block" type="button" aria-pressed="false">
-            <svg class="i" aria-hidden="true"><use href="#i-pip"/></svg>Floating controls<span class="on-tag" aria-hidden="true">On</span>
+            <svg class="i" aria-hidden="true"><use href="#i-pip"/></svg>Floating controls<span class="on-tag" aria-hidden="true">Hidden</span>
           </button>
 
           <div class="rec-foot">
             <button id="btnDiscard" class="btn-link btn-link-danger" type="button">
               <svg class="i" aria-hidden="true"><use href="#i-trash"/></svg>Discard take
             </button>
-            <span class="rec-keys" aria-hidden="true"><kbd>Alt</kbd>+<kbd>P</kbd> pause · <kbd>Alt</kbd>+<kbd>M</kbd> chapter</span>
+            <span class="rec-keys" aria-hidden="true"><kbd>Alt</kbd>+<kbd>P</kbd> pause · <kbd>Alt</kbd>+<kbd>M</kbd> chapter · <kbd>Alt</kbd>+<kbd>H</kbd> floating controls</span>
           </div>
         </div>
 
@@ -789,13 +789,17 @@
         <input id="floatingToggle" class="switch" type="checkbox" role="switch" checked>
       </label>
       <label class="switch-row">
+        <span class="switch-text"><span class="switch-title">Hide floating controls if they’d be recorded</span><span class="switch-note">Keeps them out of whole-screen recordings. Turn off if they sit on a screen you don’t record.</span></span>
+        <input id="autoHideToggle" class="switch" type="checkbox" role="switch" checked>
+      </label>
+      <label class="switch-row">
         <span class="switch-text"><span class="switch-title">Hide preview while recording</span><span class="switch-note">Saves power and avoids a mirror-in-a-mirror effect.</span></span>
         <input id="hidePreviewToggle" class="switch" type="checkbox" role="switch" checked>
       </label>
       <label class="switch-row">
         <span class="switch-text">
           <span class="switch-title">Keyboard shortcuts</span>
-          <span class="switch-note kbd-list"><span><kbd>Alt</kbd>+<kbd>R</kbd> start / stop</span><span><kbd>Alt</kbd>+<kbd>P</kbd> pause</span><span><kbd>Alt</kbd>+<kbd>M</kbd> chapter</span></span>
+          <span class="switch-note kbd-list"><span><kbd>Alt</kbd>+<kbd>R</kbd> start / stop</span><span><kbd>Alt</kbd>+<kbd>P</kbd> pause</span><span><kbd>Alt</kbd>+<kbd>M</kbd> chapter</span><span><kbd>Alt</kbd>+<kbd>H</kbd> floating controls</span></span>
         </span>
         <input id="shortcutsToggle" class="switch" type="checkbox" role="switch" checked>
       </label>
@@ -902,7 +906,7 @@
   <div class="dialog-body">
     <ol class="how">
       <li><span class="how-num">1</span><div><strong>Set up.</strong> Name the lesson, turn on your microphone and choose the screen you’ll teach from. <em>Check my sound</em> sets your mic level for you.</div></li>
-      <li><span class="how-num">2</span><div><strong>Record.</strong> The floating controls stay on top of your slides. Pause whenever you need to, and add a chapter at each new topic.</div></li>
+      <li><span class="how-num">2</span><div><strong>Record.</strong> The floating controls stay on top of your slides. If they’d be in a whole-screen recording, they hide as it starts; <kbd>Alt</kbd>+<kbd>H</kbd> brings them back. Pause whenever you need to, and add a chapter at each new topic.</div></li>
       <li><span class="how-num">3</span><div><strong>Review.</strong> Play the take back, fix the name, copy chapters for YouTube, or record another take.</div></li>
     </ol>
 
@@ -912,6 +916,7 @@
         <tr><th scope="row"><kbd>Alt</kbd> + <kbd>R</kbd></th><td>Start recording · Stop &amp; save</td></tr>
         <tr><th scope="row"><kbd>Alt</kbd> + <kbd>P</kbd></th><td>Pause · Resume</td></tr>
         <tr><th scope="row"><kbd>Alt</kbd> + <kbd>M</kbd></th><td>Add chapter</td></tr>
+        <tr><th scope="row"><kbd>Alt</kbd> + <kbd>H</kbd></th><td>Hide · show the floating controls</td></tr>
         <tr><th scope="row"><kbd>Esc</kbd></th><td>Cancel the countdown · close a window like this one</td></tr>
       </tbody>
     </table>
@@ -1038,6 +1043,17 @@
     <div class="pop-head">
       <span class="pop-pill" data-field="pill">Ready</span>
       <p class="pop-lesson" data-field="lesson"></p>
+      <button class="icon-btn icon-btn-sm pop-hide" type="button" data-action="hide" aria-label="Hide controls" aria-keyshortcuts="Alt+H" title="Hide controls (Alt+H)">
+        <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 12s3-5.5 8.5-5.5 8.5 5.5 8.5 5.5-3 5.5-8.5 5.5S3.5 12 3.5 12z"/><circle cx="12" cy="12" r="2.5"/><path d="M4.5 4.5l15 15"/></svg>
+      </button>
+    </div>
+
+    <div class="pop-alert" data-part="alert" hidden>
+      <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 4.5 3.1 17a2 2 0 0 0 1.7 3h14.4a2 2 0 0 0 1.7-3L13.7 4.5a2 2 0 0 0-3.4 0z"/><path d="M12 9.5v4"/><circle cx="12" cy="16.75" r="1" fill="currentColor" stroke="none"/></svg>
+      <div>
+        <p class="pop-alert-title" data-field="alertTitle"></p>
+        <p class="pop-alert-text" data-field="alertText"></p>
+      </div>
     </div>
 
     <div class="pop-idle" data-part="idle" hidden>

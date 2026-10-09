@@ -3439,15 +3439,16 @@ html[data-phase=paused] #btnPause .ico-resume {
   margin-top: calc(var(--s2) * -1);
 }
 .on-tag {
-  display: none;
+  display: inline-block;
   padding: 1px 8px;
   border-radius: var(--r-pill);
-  background: var(--good-soft);
-  color: var(--good);
+  background: var(--surface-3);
+  color: var(--text-2);
   font-size: var(--fs-sm);
 }
 #btnPopout[aria-pressed=true] .on-tag {
-  display: inline-block;
+  background: var(--good-soft);
+  color: var(--good);
 }
 .rec-foot {
   display: flex;
@@ -4268,6 +4269,42 @@ body.popout {
   font-weight: var(--fw-strong);
   color: var(--text-2);
 }
+.pop-hide {
+  margin-left: auto;
+  color: var(--text-2);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+.pop-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s2);
+  flex: none;
+  padding: 10px 12px;
+  border-radius: var(--r);
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+.pop-alert[data-kind=error] {
+  background: var(--bad-soft);
+  color: var(--bad);
+}
+.pop-alert .i {
+  width: 22px;
+  height: 22px;
+  flex: none;
+}
+.pop-alert-title {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-strong);
+}
+.pop-alert-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  font-size: var(--fs-sm);
+  color: var(--text);
+}
 .pop-idle {
   display: grid;
   gap: var(--s1);
@@ -4523,7 +4560,7 @@ body.popout:is([data-alert=nosound], :has([data-part=nosound]:not([hidden]))) .b
   color: #ffffff;
   box-shadow: none;
 }
-body.popout:is([data-alert=nosound], :has([data-part=nosound]:not([hidden]))) .pop-more {
+body.popout:is([data-alert=nosound], :has([data-part=nosound]:not([hidden]))) :is(.pop-more, .pop-hide) {
   color: #ffffff;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .55);
 }
@@ -4932,7 +4969,9 @@ html:has(.banners:not([hidden]) .banner[data-kind=error]) {
   .talking-hint,
   .veil-pill,
   .stage-label,
-  .take-duration {
+  .take-duration,
+  .pop-alert,
+  .on-tag {
     border: 1px solid CanvasText;
   }
   .btn,
@@ -5633,14 +5672,14 @@ html:has(.banners:not([hidden]) .banner[data-kind=error]) {
             </button>
           </div>
           <button id="btnPopout" class="btn btn-quiet btn-block" type="button" aria-pressed="false">
-            <svg class="i" aria-hidden="true"><use href="#i-pip"/></svg>Floating controls<span class="on-tag" aria-hidden="true">On</span>
+            <svg class="i" aria-hidden="true"><use href="#i-pip"/></svg>Floating controls<span class="on-tag" aria-hidden="true">Hidden</span>
           </button>
 
           <div class="rec-foot">
             <button id="btnDiscard" class="btn-link btn-link-danger" type="button">
               <svg class="i" aria-hidden="true"><use href="#i-trash"/></svg>Discard take
             </button>
-            <span class="rec-keys" aria-hidden="true"><kbd>Alt</kbd>+<kbd>P</kbd> pause · <kbd>Alt</kbd>+<kbd>M</kbd> chapter</span>
+            <span class="rec-keys" aria-hidden="true"><kbd>Alt</kbd>+<kbd>P</kbd> pause · <kbd>Alt</kbd>+<kbd>M</kbd> chapter · <kbd>Alt</kbd>+<kbd>H</kbd> floating controls</span>
           </div>
         </div>
 
@@ -5862,13 +5901,17 @@ html:has(.banners:not([hidden]) .banner[data-kind=error]) {
         <input id="floatingToggle" class="switch" type="checkbox" role="switch" checked>
       </label>
       <label class="switch-row">
+        <span class="switch-text"><span class="switch-title">Hide floating controls if they’d be recorded</span><span class="switch-note">Keeps them out of whole-screen recordings. Turn off if they sit on a screen you don’t record.</span></span>
+        <input id="autoHideToggle" class="switch" type="checkbox" role="switch" checked>
+      </label>
+      <label class="switch-row">
         <span class="switch-text"><span class="switch-title">Hide preview while recording</span><span class="switch-note">Saves power and avoids a mirror-in-a-mirror effect.</span></span>
         <input id="hidePreviewToggle" class="switch" type="checkbox" role="switch" checked>
       </label>
       <label class="switch-row">
         <span class="switch-text">
           <span class="switch-title">Keyboard shortcuts</span>
-          <span class="switch-note kbd-list"><span><kbd>Alt</kbd>+<kbd>R</kbd> start / stop</span><span><kbd>Alt</kbd>+<kbd>P</kbd> pause</span><span><kbd>Alt</kbd>+<kbd>M</kbd> chapter</span></span>
+          <span class="switch-note kbd-list"><span><kbd>Alt</kbd>+<kbd>R</kbd> start / stop</span><span><kbd>Alt</kbd>+<kbd>P</kbd> pause</span><span><kbd>Alt</kbd>+<kbd>M</kbd> chapter</span><span><kbd>Alt</kbd>+<kbd>H</kbd> floating controls</span></span>
         </span>
         <input id="shortcutsToggle" class="switch" type="checkbox" role="switch" checked>
       </label>
@@ -5975,7 +6018,7 @@ html:has(.banners:not([hidden]) .banner[data-kind=error]) {
   <div class="dialog-body">
     <ol class="how">
       <li><span class="how-num">1</span><div><strong>Set up.</strong> Name the lesson, turn on your microphone and choose the screen you’ll teach from. <em>Check my sound</em> sets your mic level for you.</div></li>
-      <li><span class="how-num">2</span><div><strong>Record.</strong> The floating controls stay on top of your slides. Pause whenever you need to, and add a chapter at each new topic.</div></li>
+      <li><span class="how-num">2</span><div><strong>Record.</strong> The floating controls stay on top of your slides. If they’d be in a whole-screen recording, they hide as it starts; <kbd>Alt</kbd>+<kbd>H</kbd> brings them back. Pause whenever you need to, and add a chapter at each new topic.</div></li>
       <li><span class="how-num">3</span><div><strong>Review.</strong> Play the take back, fix the name, copy chapters for YouTube, or record another take.</div></li>
     </ol>
 
@@ -5985,6 +6028,7 @@ html:has(.banners:not([hidden]) .banner[data-kind=error]) {
         <tr><th scope="row"><kbd>Alt</kbd> + <kbd>R</kbd></th><td>Start recording · Stop &amp; save</td></tr>
         <tr><th scope="row"><kbd>Alt</kbd> + <kbd>P</kbd></th><td>Pause · Resume</td></tr>
         <tr><th scope="row"><kbd>Alt</kbd> + <kbd>M</kbd></th><td>Add chapter</td></tr>
+        <tr><th scope="row"><kbd>Alt</kbd> + <kbd>H</kbd></th><td>Hide · show the floating controls</td></tr>
         <tr><th scope="row"><kbd>Esc</kbd></th><td>Cancel the countdown · close a window like this one</td></tr>
       </tbody>
     </table>
@@ -6111,6 +6155,17 @@ html:has(.banners:not([hidden]) .banner[data-kind=error]) {
     <div class="pop-head">
       <span class="pop-pill" data-field="pill">Ready</span>
       <p class="pop-lesson" data-field="lesson"></p>
+      <button class="icon-btn icon-btn-sm pop-hide" type="button" data-action="hide" aria-label="Hide controls" aria-keyshortcuts="Alt+H" title="Hide controls (Alt+H)">
+        <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 12s3-5.5 8.5-5.5 8.5 5.5 8.5 5.5-3 5.5-8.5 5.5S3.5 12 3.5 12z"/><circle cx="12" cy="12" r="2.5"/><path d="M4.5 4.5l15 15"/></svg>
+      </button>
+    </div>
+
+    <div class="pop-alert" data-part="alert" hidden>
+      <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 4.5 3.1 17a2 2 0 0 0 1.7 3h14.4a2 2 0 0 0 1.7-3L13.7 4.5a2 2 0 0 0-3.4 0z"/><path d="M12 9.5v4"/><circle cx="12" cy="16.75" r="1" fill="currentColor" stroke="none"/></svg>
+      <div>
+        <p class="pop-alert-title" data-field="alertTitle"></p>
+        <p class="pop-alert-text" data-field="alertText"></p>
+      </div>
     </div>
 
     <div class="pop-idle" data-part="idle" hidden>
@@ -6230,10 +6285,12 @@ html:has(.banners:not([hidden]) .banner[data-kind=error]) {
     // soft beeps during the countdown
     floatingControls: true,
     // open the floating controls (Document PiP) when recording starts
+    autoHideControls: true,
+    // close them as a take starts when a whole-screen recording would include them
     hidePreview: true,
     // still thumbnail instead of the live screen while recording
     shortcuts: true,
-    // Alt+R / Alt+P / Alt+M
+    // Alt+R / Alt+P / Alt+M / Alt+H
     noVoice: false,
     // deliberately record without the microphone
     micPermissionAsked: false
@@ -10973,7 +11030,8 @@ ${list(win10)}
   var TALKING_WHILE_PAUSED_S = 5;
   var TOGGLE_GUARD_MS = 400;
   var CAMERA_WAIT_MS = 3e3;
-  var PREF_KEYS = ["beeps", "floatingControls", "hidePreview", "shortcuts", "theme"];
+  var BEFORE_TAKE_MAX_MS = 2e3;
+  var PREF_KEYS = ["beeps", "floatingControls", "autoHideControls", "hidePreview", "shortcuts", "theme"];
   var ACTIVE_PHASES = ["starting", "recording", "paused", "stopping"];
   var BLOCKED = { status: "blocked", title: "Microphone blocked", text: "Click the icon at the left of the address bar, switch Microphone on, then click Reload." };
   var MIC_ERRORS = {
@@ -11038,6 +11096,8 @@ ${list(win10)}
     // bumps on every camera change, so a slow open can't resurrect an old one
     #cameraOpening = null;
     // the camera open in progress (Start waits a moment for it)
+    #beforeTake = null;
+    // the interface's last word before a take starts (setBeforeTake)
     #take = null;
     // { id, filename, lessonName, elapsedMs, bytes, markers, savingTo, ... }
     #review = null;
@@ -11632,7 +11692,7 @@ ${list(win10)}
       this.#settings = saveSettings({ notes: String(notes ?? "") });
       this.#changed();
     }
-    /** Simple preferences: beeps, floatingControls, hidePreview, shortcuts, theme. */
+    /** Simple preferences: beeps, floatingControls, autoHideControls, hidePreview, shortcuts, theme. */
     setPref(key, value2) {
       if (!PREF_KEYS.includes(key)) return;
       if (key === "theme" && !["system", "light", "dark"].includes(value2)) return;
@@ -11759,10 +11819,37 @@ ${list(win10)}
       this.#notice({ kind: "info", title: "Countdown cancelled", text: "Nothing was recorded.", timeoutMs: 3e3 });
       this.#changed();
     }
+    /**
+     * `fn(state)` runs once each time a take is about to start (after the countdown, in the
+     * 'starting' phase), and the take waits for the promise it returns, but never longer than
+     * BEFORE_TAKE_MAX_MS and never for one that fails. The interface uses it to get the floating
+     * controls off a screen that is about to be recorded before the first frame.
+     */
+    setBeforeTake(fn) {
+      this.#beforeTake = typeof fn === "function" ? fn : null;
+    }
+    async #waitBeforeTake() {
+      const fn = this.#beforeTake;
+      if (!fn) return;
+      let timer = null;
+      try {
+        await Promise.race([
+          Promise.resolve().then(() => fn(this.state)),
+          new Promise((resolve) => {
+            timer = setTimeout(resolve, BEFORE_TAKE_MAX_MS);
+          })
+        ]);
+      } catch (e) {
+        console.warn("before-take step failed", e);
+      } finally {
+        clearTimeout(timer);
+      }
+    }
     /** The 'starting' phase covers the seconds a take needs to open its file and journal. */
     async #beginTake() {
       this.#phase = "starting";
       this.#changed();
+      await this.#waitBeforeTake();
       const ok = await this.#startTake();
       if (!ok && this.#phase === "starting") this.#phase = null;
       this.#changed();
@@ -12471,6 +12558,8 @@ ${list(win10)}
           surface: this.#screen.surface,
           width: this.#screen.width,
           height: this.#screen.height,
+          nativeWidth: this.#screen.nativeWidth || this.#screen.width,
+          nativeHeight: this.#screen.nativeHeight || this.#screen.height,
           hasAudio: !!this.#screen.audioTrack,
           stream: this.#screen.stream
         },
@@ -12504,7 +12593,7 @@ ${list(win10)}
           error: this.#camera.error || ""
         },
         lesson: { name: s.lessonName, format: s.format, quality: s.quality, countdown: s.countdown, notes: s.notes, nextTake: this.#nextTakeNumber(s.lessonName) },
-        prefs: { beeps: s.beeps, floatingControls: s.floatingControls, hidePreview: s.hidePreview, shortcuts: s.shortcuts, noVoice: s.noVoice, theme: s.theme },
+        prefs: { beeps: s.beeps, floatingControls: s.floatingControls, autoHideControls: s.autoHideControls, hidePreview: s.hidePreview, shortcuts: s.shortcuts, noVoice: s.noVoice, theme: s.theme },
         estimate: this.#estimate(),
         formats: { mp4: this.#formats.mp4, webm: this.#formats.webm },
         take,
@@ -12719,6 +12808,13 @@ ${list(win10)}
   // src/app/ui/notices.js
   var TOAST_MS = 6e3;
   var bannerSeq = 0;
+  var isNoSound = (a) => a.id === "no-audio" || a.id === "mic-lost";
+  function topAlert(alerts = []) {
+    const rank2 = (a) => isNoSound(a) ? 0 : a.kind === "error" ? 1 : a.kind === "warning" ? 2 : 3;
+    let best = null;
+    for (const a of alerts) if (rank2(a) < 3 && (!best || rank2(a) < rank2(best))) best = a;
+    return best;
+  }
   var Notices = class {
     constructor(session, { confirm }) {
       this.session = session;
@@ -13631,7 +13727,7 @@ ${list(win10)}
       $("btnMarker").addEventListener("click", () => {
         if (enabled("btnMarker")) session.addMarker();
       });
-      $("btnPopout").addEventListener("click", () => this.popout.isOpen ? this.popout.close() : this.popout.open());
+      $("btnPopout").addEventListener("click", () => this.popout.toggle());
       $("btnDiscard").addEventListener("click", () => {
         if (enabled("btnDiscard")) this.discard();
       });
@@ -13710,7 +13806,10 @@ ${list(win10)}
         const n = st.take.markers.length;
         text($("markerCount"), n ? String(n) : "");
         show($("markerCount"), n > 0);
-        attr($("btnPopout"), "aria-pressed", this.popout.isOpen ? "true" : "false");
+        const shown = this.popout.isOpen;
+        attr($("btnPopout"), "aria-pressed", shown ? "true" : "false");
+        attr($("btnPopout"), "title", `${shown ? "Hide" : "Show"} the floating controls${st.prefs.shortcuts ? " (Alt+H)" : ""}`);
+        text($("btnPopout").querySelector(".on-tag"), shown ? "Shown" : "Hidden");
         show($("btnPopout"), this.popout.supported);
         attr($("btnDiscard"), "aria-disabled", stopping ? "true" : null);
         text($("recNotes"), st.lesson.notes);
@@ -13979,6 +14078,7 @@ ${list(win10)}
       on("countdownToggle", "change", (e) => s.setCountdown(e.target.checked));
       on("beepsToggle", "change", (e) => s.setPref("beeps", e.target.checked));
       on("floatingToggle", "change", (e) => s.setPref("floatingControls", e.target.checked));
+      on("autoHideToggle", "change", (e) => s.setPref("autoHideControls", e.target.checked));
       on("hidePreviewToggle", "change", (e) => s.setPref("hidePreview", e.target.checked));
       on("shortcutsToggle", "change", (e) => s.setPref("shortcuts", e.target.checked));
       on("themeSelect", "change", (e) => s.setPref("theme", e.target.value));
@@ -14025,6 +14125,7 @@ ${list(win10)}
       value($("countdownToggle"), st.lesson.countdown);
       value($("beepsToggle"), st.prefs.beeps);
       value($("floatingToggle"), st.prefs.floatingControls);
+      value($("autoHideToggle"), st.prefs.autoHideControls);
       value($("hidePreviewToggle"), st.prefs.hidePreview);
       value($("shortcutsToggle"), st.prefs.shortcuts);
       value($("themeSelect"), st.prefs.theme);
@@ -14162,11 +14263,12 @@ ${list(win10)}
       }
       if (!st.prefs.shortcuts || !e.altKey || e.ctrlKey || e.metaKey) return false;
       const k = e.key.toLowerCase();
-      if (!["r", "p", "m"].includes(k)) return false;
+      if (!["r", "p", "m", "h"].includes(k)) return false;
       if (e.repeat) return true;
       if (k === "r") this.startOrStop("keyboard");
       if (k === "p") this.session.togglePause();
       if (k === "m") this.session.addMarker();
+      if (k === "h") this.popout.toggle();
       return true;
     }
     #onKey(e) {
@@ -14177,7 +14279,7 @@ ${list(win10)}
       if (this.handleKey(e)) e.preventDefault();
     }
     render(st) {
-      for (const [id, keys] of [["btnStart", "Alt+R"], ["btnStop", "Alt+R"], ["btnPause", "Alt+P"], ["btnMarker", "Alt+M"], ["btnResumeBig", "Alt+P"]]) {
+      for (const [id, keys] of [["btnStart", "Alt+R"], ["btnStop", "Alt+R"], ["btnPause", "Alt+P"], ["btnMarker", "Alt+M"], ["btnResumeBig", "Alt+P"], ["btnPopout", "Alt+H"]]) {
         attr($(id), "aria-keyshortcuts", st.prefs.shortcuts ? keys : null);
       }
       const theme = st.prefs.theme;
@@ -14190,7 +14292,8 @@ ${list(win10)}
       attr(chip, "data-status", f.supported ? f.status : "unsupported");
       const lesson = st.lesson.name.trim();
       const suffix = lesson ? ` – ${lesson}` : "";
-      const noSound = st.alerts.some((a) => a.id === "no-audio" || a.id === "mic-lost");
+      const live = st.phase === "recording" || st.phase === "paused";
+      const top = live ? topAlert(st.alerts) : null;
       let title = this.baseTitle + suffix, fav = "idle";
       if (st.phase === "countdown") {
         title = `Starting in ${st.countdown}…${suffix}`;
@@ -14198,8 +14301,8 @@ ${list(win10)}
       } else if (st.phase === "starting") {
         title = `Starting…${suffix}`;
         fav = "live";
-      } else if ((st.phase === "recording" || st.phase === "paused") && noSound) {
-        title = `⚠ No sound!${suffix}`;
+      } else if (top) {
+        title = `⚠ ${isNoSound(top) ? "No sound!" : top.title}${suffix}`;
         fav = "alert";
       } else if (st.phase === "recording") {
         title = `● ${formatClock(st.take?.elapsedMs || 0)} Recording${suffix}`;
@@ -14246,16 +14349,34 @@ ${list(win10)}
   };
 
   // src/app/ui/popout.js
+  var TAKE_PHASES = ["starting", "recording", "paused", "stopping"];
+  var HIDE_SETTLE_MS = 300;
+  var MAX_CAPTURE2 = { width: 3840, height: 2160 };
+  function controlsWouldBeRecorded(capture, display) {
+    if (!capture || capture.surface !== "monitor") return false;
+    if (typeof display?.isExtended !== "boolean" || !display.isExtended) return true;
+    const dw = display.width * display.dpr, dh = display.height * display.dpr;
+    const cw = capture.nativeWidth, ch = capture.nativeHeight;
+    if (!(dw > 0 && dh > 0 && cw > 0 && ch > 0)) return true;
+    const near = (a, b) => Math.abs(a - b) <= 0.02 * Math.max(a, b);
+    if (near(dw, cw) && near(dh, ch)) return true;
+    const clamped = cw >= MAX_CAPTURE2.width * 0.98 || ch >= MAX_CAPTURE2.height * 0.98;
+    return clamped && dw >= cw * 0.98 && dh >= ch * 0.98 && near(dw / dh, cw / ch);
+  }
   var Popout = class {
-    constructor(session, { notices, toast, onClose } = {}) {
+    constructor(session, { notices, toast, onOpen, onClose } = {}) {
       this.session = session;
       this.notices = notices;
       this.toast = toast;
+      this.onOpen = onOpen;
       this.onClose = onClose;
       this.keyHandler = null;
       this.startOrStop = null;
       this.win = null;
       this.opening = false;
+      this.openPromise = null;
+      this.take = null;
+      this.prevAlert = "";
       this.meter = null;
       this.loop = null;
       this.confirming = false;
@@ -14271,7 +14392,7 @@ ${list(win10)}
     get isOpen() {
       return !!this.win;
     }
-    /** Must be called from a click (it needs the click's user activation). */
+    /** Must be called from a click or key press (it needs its user activation). */
     async open() {
       if (this.win) {
         try {
@@ -14286,6 +14407,10 @@ ${list(win10)}
         return false;
       }
       this.opening = true;
+      this.openPromise = this.#requestWindow();
+      return this.openPromise;
+    }
+    async #requestWindow() {
       try {
         this.win = await documentPictureInPicture.requestWindow({ width: 320, height: 420, disallowReturnToOpener: false });
       } catch (e) {
@@ -14295,6 +14420,7 @@ ${list(win10)}
       }
       this.opening = false;
       this.#build();
+      this.onOpen?.();
       return true;
     }
     close() {
@@ -14302,6 +14428,69 @@ ${list(win10)}
         this.win?.close();
       } catch {
       }
+    }
+    /**
+     * Close the floating controls (Hide, Alt+H, or a take that would record them).
+     * Recording carries on. Resolves once the window has gone.
+     */
+    async hide() {
+      if (this.opening) await this.openPromise;
+      const w = this.win;
+      if (!w) return;
+      const gone = new Promise((resolve) => w.addEventListener("pagehide", resolve, { once: true }));
+      this.close();
+      await gone;
+    }
+    /** Alt+H and the Floating controls button: hide them when shown, show them when hidden (needs the press). */
+    toggle() {
+      if (this.win || this.opening) this.hide();
+      else this.open();
+    }
+    /**
+     * Once per take, as it is about to begin ('starting'): close the controls if the
+     * recording would include them. The session waits for this before it records
+     * (session.setBeforeTake), so they are gone from the very first frame. Shown
+     * again later in the take, they stay: that is the teacher's choice.
+     */
+    prepareForTake(st) {
+      if (!TAKE_PHASES.includes(st.phase)) return Promise.resolve();
+      if (!this.take) this.take = { decided: false, hiding: null };
+      const take = this.take;
+      if (take.decided) return take.hiding || Promise.resolve();
+      take.decided = true;
+      if (!st.prefs.autoHideControls || !this.win && !this.opening) return Promise.resolve();
+      take.hiding = this.#autoHide(st, take);
+      return take.hiding;
+    }
+    async #autoHide(st, take) {
+      try {
+        if (this.opening) await this.openPromise;
+        const w = this.win;
+        if (!w || this.take !== take) return;
+        const s = w.screen;
+        const capture = st.screen && { surface: st.screen.surface, nativeWidth: st.screen.nativeWidth, nativeHeight: st.screen.nativeHeight };
+        if (!controlsWouldBeRecorded(capture, { isExtended: s?.isExtended, width: s?.width, height: s?.height, dpr: w.devicePixelRatio || 1 })) return;
+        await this.hide();
+        const keys = st.prefs.shortcuts ? "Alt+H or " : "";
+        this.toast?.({
+          id: "controls-hidden",
+          kind: "info",
+          title: "Floating controls hidden",
+          text: `So they aren’t in your recording of the whole screen. To bring them back, press ${keys}Floating controls.`,
+          timeoutMs: 1e4
+        });
+        await new Promise((resolve) => setTimeout(resolve, HIDE_SETTLE_MS));
+      } catch (e) {
+        console.warn("could not hide the floating controls", e);
+      }
+    }
+    /** Per-take state: made as a take begins, dropped once it has ended. */
+    #followTake(st) {
+      if (!TAKE_PHASES.includes(st.phase)) {
+        this.take = null;
+        return;
+      }
+      this.prepareForTake(st);
     }
     #build() {
       const w = this.win, d = w.document;
@@ -14366,6 +14555,8 @@ ${list(win10)}
       this.status = null;
       this.alert = null;
       this.confirming = false;
+      this.prevAlert = "";
+      this.prevNoSound = false;
       this.onClose?.();
     }
     #say(message2, urgent = false) {
@@ -14408,6 +14599,9 @@ ${list(win10)}
         case "discard-no":
           this.#closeConfirm();
           break;
+        case "hide":
+          this.hide();
+          break;
         case "discard-yes": {
           this.confirming = false;
           const st = s.state;
@@ -14426,18 +14620,28 @@ ${list(win10)}
       if (timer) text(timer, formatClock(ms));
     }
     render(st) {
+      this.#followTake(st);
       const root = this.root;
       if (!root) return;
       const phase = st.phase;
       const active = ["recording", "paused", "stopping"].includes(phase);
       const counting = phase === "countdown" || phase === "starting" || st.preparing;
-      const noSound = active && st.alerts.some((a) => a.id === "no-audio" || a.id === "mic-lost");
+      const noSound = active && st.alerts.some(isNoSound);
+      const top = topAlert(st.alerts);
+      const other = !noSound && top ? top : null;
       if (!active) this.confirming = false;
       const part = (name) => root.querySelector(`[data-part="${name}"]`);
       show(part("idle"), !active && !counting);
       show(part("active"), active && !this.confirming);
       show(part("confirm"), active && this.confirming);
       show(part("nosound"), noSound);
+      show(part("alert"), !!other);
+      attr(part("alert"), "data-kind", other?.kind || null);
+      fill(root, { alertTitle: other?.title || "", alertText: other?.text || "" });
+      for (const b of root.querySelectorAll('[data-action="hide"]')) {
+        attr(b, "aria-keyshortcuts", st.prefs.shortcuts ? "Alt+H" : null);
+        attr(b, "title", st.prefs.shortcuts ? "Hide controls (Alt+H)" : "Hide controls");
+      }
       const body = this.win.document.body;
       attr(body, "data-phase", phase);
       attr(body, "data-alert", noSound ? "nosound" : null);
@@ -14496,6 +14700,9 @@ ${list(win10)}
       }
       if (noSound && !this.prevNoSound) this.#say("No sound from your microphone.", true);
       this.prevNoSound = noSound;
+      const alertKey = other ? `${other.id}|${other.title}` : "";
+      if (other && alertKey !== this.prevAlert) this.#say(`${other.title}. ${other.text}`, other.kind === "error");
+      this.prevAlert = alertKey;
       this.prevPhase = phase;
     }
   };
@@ -14533,12 +14740,13 @@ ${list(win10)}
     const confirm = createConfirm();
     const notices = new Notices(session, { confirm });
     const render = () => renderAll(session.state);
-    const popout = new Popout(session, { notices, toast: (n) => notices.toast(n), onClose: render });
+    const popout = new Popout(session, { notices, toast: (n) => notices.toast(n), onOpen: render, onClose: render });
     const settings = new SettingsView(session, { meters, confirm });
     const startOrStop = (source) => controller.startOrStop(source);
     const chrome = new Chrome(session, { settings, popout, startOrStop });
     popout.keyHandler = (e) => chrome.handleKey(e);
     popout.startOrStop = startOrStop;
+    session.setBeforeTake((st) => popout.prepareForTake(st));
     wireDialog("helpDialog", ["btnHelp"], "btnHelpClose");
     const setup = new SetupView(session, { meters, notices, popout, settingsDialog: settings, startOrStop });
     const stage = new Stage(session, { notices });
@@ -14575,7 +14783,13 @@ ${list(win10)}
     function offerPopout(st) {
       if (prevPhase !== "recording" && st.phase === "recording" && offerPopoutOnStart) {
         offerPopoutOnStart = false;
-        if (st.prefs.floatingControls && popout.supported && !popout.isOpen) {
+        const recorded = st.prefs.autoHideControls && controlsWouldBeRecorded(st.screen, {
+          isExtended: window.screen.isExtended,
+          width: window.screen.width,
+          height: window.screen.height,
+          dpr: window.devicePixelRatio || 1
+        });
+        if (st.prefs.floatingControls && popout.supported && !popout.isOpen && !recorded) {
           notices.toast({
             id: "offer-popout",
             kind: "info",

@@ -123,8 +123,9 @@ html[data-phase="paused"] #btnPause .ico-resume { display: block; }
 :is(#btnPause, #btnMarker)[aria-disabled="true"] { opacity: 1; }
 
 #btnPopout { margin-top: calc(var(--s2) * -1); }
-.on-tag { display: none; padding: 1px 8px; border-radius: var(--r-pill); background: var(--good-soft); color: var(--good); font-size: var(--fs-sm); }
-#btnPopout[aria-pressed="true"] .on-tag { display: inline-block; }
+/* "Shown" (green) or "Hidden" (grey): Alt+H and this button bring hidden controls back */
+.on-tag { display: inline-block; padding: 1px 8px; border-radius: var(--r-pill); background: var(--surface-3); color: var(--text-2); font-size: var(--fs-sm); }
+#btnPopout[aria-pressed="true"] .on-tag { background: var(--good-soft); color: var(--good); }
 
 .rec-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); flex-wrap: wrap; padding-top: var(--s3); border-top: 1px solid var(--line); }
 .rec-keys { font-size: var(--fs-sm); color: var(--muted); }

@@ -4,6 +4,7 @@
 
 import { $, text, attr, label as setLabel } from './dom.js';
 import { formatClock } from '../lib/time.js';
+import { topAlert, isNoSound } from './notices.js';
 
 const ICON_COLORS = { idle: '#5b6b7f', live: '#c0392b', paused: '#d99a1f', alert: '#c0392b' };
 
@@ -60,12 +61,14 @@ export class Chrome {
     if (e.key === 'Escape' && (st.phase === 'countdown' || st.phase === 'starting' || st.preparing)) { this.session.cancelCountdown(); return true; }
     if (!st.prefs.shortcuts || !e.altKey || e.ctrlKey || e.metaKey) return false;
     const k = e.key.toLowerCase();
-    if (!['r', 'p', 'm'].includes(k)) return false;
+    if (!['r', 'p', 'm', 'h'].includes(k)) return false;
     // A held key repeats; act once per press.
     if (e.repeat) return true;
     if (k === 'r') this.startOrStop('keyboard');
     if (k === 'p') this.session.togglePause();
     if (k === 'm') this.session.addMarker();
+    // In the floating controls this hides them; here it also shows them again (the key press lets them open).
+    if (k === 'h') this.popout.toggle();
     return true;
   }
 
@@ -81,7 +84,7 @@ export class Chrome {
 
   render(st) {
     // Shortcut hints only while shortcuts work.
-    for (const [id, keys] of [['btnStart', 'Alt+R'], ['btnStop', 'Alt+R'], ['btnPause', 'Alt+P'], ['btnMarker', 'Alt+M'], ['btnResumeBig', 'Alt+P']]) {
+    for (const [id, keys] of [['btnStart', 'Alt+R'], ['btnStop', 'Alt+R'], ['btnPause', 'Alt+P'], ['btnMarker', 'Alt+M'], ['btnResumeBig', 'Alt+P'], ['btnPopout', 'Alt+H']]) {
       attr($(id), 'aria-keyshortcuts', st.prefs.shortcuts ? keys : null);
     }
 
@@ -103,11 +106,13 @@ export class Chrome {
     // Tab title and favicon.
     const lesson = st.lesson.name.trim();
     const suffix = lesson ? ` – ${lesson}` : '';
-    const noSound = st.alerts.some(a => a.id === 'no-audio' || a.id === 'mic-lost');
+    // During a take the title is often all the teacher can see (the floating controls may be hidden).
+    const live = st.phase === 'recording' || st.phase === 'paused';
+    const top = live ? topAlert(st.alerts) : null;
     let title = this.baseTitle + suffix, fav = 'idle';
     if (st.phase === 'countdown') { title = `Starting in ${st.countdown}…${suffix}`; fav = 'live'; }
     else if (st.phase === 'starting') { title = `Starting…${suffix}`; fav = 'live'; }
-    else if ((st.phase === 'recording' || st.phase === 'paused') && noSound) { title = `⚠ No sound!${suffix}`; fav = 'alert'; }
+    else if (top) { title = `⚠ ${isNoSound(top) ? 'No sound!' : top.title}${suffix}`; fav = 'alert'; }
     else if (st.phase === 'recording') { title = `● ${formatClock(st.take?.elapsedMs || 0)} Recording${suffix}`; fav = 'live'; }
     else if (st.phase === 'paused') { title = `❚❚ Paused${suffix}`; fav = 'paused'; }
     else if (st.phase === 'stopping') { title = `Saving…${suffix}`; fav = 'live'; }

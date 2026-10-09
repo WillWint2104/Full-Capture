@@ -12,7 +12,7 @@
 @media (forced-colors: active) {
   .step, .card, .banner, .toast, .message, .sc-run, .sc-result, .fix, .dialog, .take-list, .rec-meters, .tip, .notice,
   .chapter-issues, .rec-banner, .chip, .audio-chip, .pill, .pop-pill, .size-estimate, .count, .start-card, .howto, .chapter-time,
-  .talking-hint, .veil-pill, .stage-label, .take-duration {
+  .talking-hint, .veil-pill, .stage-label, .take-duration, .pop-alert, .on-tag {
     border: 1px solid CanvasText;
   }
   .btn, .btn-link, .icon-btn, .chip-btn, .folder-chip, [data-actions] > button { border: 1px solid ButtonText; }

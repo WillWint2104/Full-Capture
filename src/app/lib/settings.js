@@ -26,8 +26,9 @@ export const DEFAULT_SETTINGS = Object.freeze({
   theme: 'system',           // 'system' | 'light' | 'dark'
   beeps: false,              // soft beeps during the countdown
   floatingControls: true,    // open the floating controls (Document PiP) when recording starts
+  autoHideControls: true,    // close them as a take starts when a whole-screen recording would include them
   hidePreview: true,         // still thumbnail instead of the live screen while recording
-  shortcuts: true,           // Alt+R / Alt+P / Alt+M
+  shortcuts: true,           // Alt+R / Alt+P / Alt+M / Alt+H
   noVoice: false,            // deliberately record without the microphone
   micPermissionAsked: false, // the teacher has pressed "Turn on microphone" before
 });

@@ -2,21 +2,60 @@
 // of other apps, so the teacher can see the timer and sound level, and pause,
 // add chapters or stop without coming back to this tab. Its markup comes
 // from <template id="tplPopout">; its styles are copied from this page.
+//
+// Nothing can keep an ordinary window out of a recording of the whole screen,
+// so the controls close themselves as a take starts when they'd be in it
+// (controlsWouldBeRecorded), and Hide / Alt+H close them at any time. The take
+// carries on; Alt+H or the Floating controls button brings them back.
 
 import { clone, fill, show, text, attr, onAction, label } from './dom.js';
 import { Meter, MeterLoop } from './meters.js';
+import { topAlert, isNoSound } from './notices.js';
 import { formatClock, formatDuration } from '../lib/time.js';
 
+const TAKE_PHASES = ['starting', 'recording', 'paused', 'stopping'];
+// Once the controls have closed, the take waits this long before it starts: the
+// screen capture can still hand over frames it took while they were on screen.
+export const HIDE_SETTLE_MS = 300;
+// Captures are limited to this size (video/sources.js), so a bigger monitor arrives scaled down.
+const MAX_CAPTURE = { width: 3840, height: 2160 };
+
+/**
+ * Would a recording of this capture include the floating controls? Pure.
+ *   capture: the shared screen { surface, nativeWidth, nativeHeight } (its size before fitting a preset)
+ *   display: the controls' own screen { isExtended, width, height (CSS px), dpr }
+ * A window or tab capture never contains them. On a single display they are on
+ * the recorded monitor. With several displays, one the size of the recorded
+ * monitor may be it (two identical monitors can't be told apart), so it counts;
+ * one of a different size doesn't. Anything unknown counts.
+ */
+export function controlsWouldBeRecorded(capture, display) {
+  if (!capture || capture.surface !== 'monitor') return false;
+  if (typeof display?.isExtended !== 'boolean' || !display.isExtended) return true;
+  const dw = display.width * display.dpr, dh = display.height * display.dpr;
+  const cw = capture.nativeWidth, ch = capture.nativeHeight;
+  if (!(dw > 0 && dh > 0 && cw > 0 && ch > 0)) return true;
+  const near = (a, b) => Math.abs(a - b) <= 0.02 * Math.max(a, b);
+  if (near(dw, cw) && near(dh, ch)) return true;
+  // A capture at the size limit may be a bigger monitor scaled down: then only its shape can match.
+  const clamped = cw >= MAX_CAPTURE.width * 0.98 || ch >= MAX_CAPTURE.height * 0.98;
+  return clamped && dw >= cw * 0.98 && dh >= ch * 0.98 && near(dw / dh, cw / ch);
+}
+
 export class Popout {
-  constructor(session, { notices, toast, onClose } = {}) {
+  constructor(session, { notices, toast, onOpen, onClose } = {}) {
     this.session = session;
     this.notices = notices;
     this.toast = toast;
+    this.onOpen = onOpen;
     this.onClose = onClose;
     this.keyHandler = null;   // set by the app: shared shortcut handler
     this.startOrStop = null;  // set by the app: the one Start path (same microphone rule as the big button)
     this.win = null;
     this.opening = false;
+    this.openPromise = null;  // the window being opened (resolves true once it is built)
+    this.take = null;         // per take: { decided, hiding }; null between takes
+    this.prevAlert = '';
     this.meter = null;
     this.loop = null;
     this.confirming = false;
@@ -30,7 +69,7 @@ export class Popout {
   get supported() { return 'documentPictureInPicture' in window; }
   get isOpen() { return !!this.win; }
 
-  /** Must be called from a click (it needs the click's user activation). */
+  /** Must be called from a click or key press (it needs its user activation). */
   async open() {
     if (this.win) { try { this.win.focus(); } catch { /* ignore */ } return true; }
     if (this.opening) return false;
@@ -39,6 +78,12 @@ export class Popout {
       return false;
     }
     this.opening = true;
+    // Asked for before anything awaits, while the press still counts.
+    this.openPromise = this.#requestWindow();
+    return this.openPromise;
+  }
+
+  async #requestWindow() {
     try {
       this.win = await documentPictureInPicture.requestWindow({ width: 320, height: 420, disallowReturnToOpener: false });
     } catch (e) {
@@ -48,10 +93,76 @@ export class Popout {
     }
     this.opening = false;
     this.#build();
+    this.onOpen?.();
     return true;
   }
 
   close() { try { this.win?.close(); } catch { /* already closed */ } }
+
+  /**
+   * Close the floating controls (Hide, Alt+H, or a take that would record them).
+   * Recording carries on. Resolves once the window has gone.
+   */
+  async hide() {
+    if (this.opening) await this.openPromise;
+    const w = this.win;
+    if (!w) return;
+    const gone = new Promise(resolve => w.addEventListener('pagehide', resolve, { once: true }));
+    this.close();
+    await gone;
+  }
+
+  /** Alt+H and the Floating controls button: hide them when shown, show them when hidden (needs the press). */
+  toggle() {
+    if (this.win || this.opening) this.hide();
+    else this.open();
+  }
+
+  /**
+   * Once per take, as it is about to begin ('starting'): close the controls if the
+   * recording would include them. The session waits for this before it records
+   * (session.setBeforeTake), so they are gone from the very first frame. Shown
+   * again later in the take, they stay: that is the teacher's choice.
+   */
+  prepareForTake(st) {
+    if (!TAKE_PHASES.includes(st.phase)) return Promise.resolve();
+    if (!this.take) this.take = { decided: false, hiding: null };
+    const take = this.take;
+    if (take.decided) return take.hiding || Promise.resolve();
+    take.decided = true;
+    if (!st.prefs.autoHideControls || (!this.win && !this.opening)) return Promise.resolve();
+    take.hiding = this.#autoHide(st, take);
+    return take.hiding;
+  }
+
+  async #autoHide(st, take) {
+    try {
+      // Still opening (Start opens them): decide once the window is there, from its own screen.
+      if (this.opening) await this.openPromise;
+      const w = this.win;
+      if (!w || this.take !== take) return;
+      const s = w.screen;
+      const capture = st.screen && { surface: st.screen.surface, nativeWidth: st.screen.nativeWidth, nativeHeight: st.screen.nativeHeight };
+      if (!controlsWouldBeRecorded(capture, { isExtended: s?.isExtended, width: s?.width, height: s?.height, dpr: w.devicePixelRatio || 1 })) return;
+      await this.hide();
+      const keys = st.prefs.shortcuts ? 'Alt+H or ' : '';
+      this.toast?.({
+        id: 'controls-hidden', kind: 'info', title: 'Floating controls hidden',
+        text: `So they aren’t in your recording of the whole screen. To bring them back, press ${keys}Floating controls.`,
+        timeoutMs: 10000,
+      });
+      await new Promise(resolve => setTimeout(resolve, HIDE_SETTLE_MS));
+    } catch (e) {
+      console.warn('could not hide the floating controls', e);
+    }
+  }
+
+  /** Per-take state: made as a take begins, dropped once it has ended. */
+  #followTake(st) {
+    if (!TAKE_PHASES.includes(st.phase)) { this.take = null; return; }
+    // Normally decided in the 'starting' step; if that was missed, decide now.
+    this.prepareForTake(st);
+  }
 
   #build() {
     const w = this.win, d = w.document;
@@ -114,6 +225,8 @@ export class Popout {
     this.loop?.stop(); this.loop = null;
     this.wakeLock?.release().catch(() => {}); this.wakeLock = null;
     this.win = null; this.root = null; this.meter = null; this.status = null; this.alert = null; this.confirming = false;
+    // Shown again later, the new window says what is still wrong.
+    this.prevAlert = ''; this.prevNoSound = false;
     this.onClose?.();
   }
 
@@ -152,6 +265,7 @@ export class Popout {
         this.root?.querySelector('[data-action="discard-no"]')?.focus();
         break;
       case 'discard-no': this.#closeConfirm(); break;
+      case 'hide': this.hide(); break;
       case 'discard-yes': {
         this.confirming = false;
         const st = s.state;
@@ -172,12 +286,16 @@ export class Popout {
   }
 
   render(st) {
+    this.#followTake(st);
     const root = this.root;
     if (!root) return;
     const phase = st.phase;
     const active = ['recording', 'paused', 'stopping'].includes(phase);
     const counting = phase === 'countdown' || phase === 'starting' || st.preparing;
-    const noSound = active && st.alerts.some(a => a.id === 'no-audio' || a.id === 'mic-lost');
+    const noSound = active && st.alerts.some(isNoSound);
+    // Any other problem (camera unplugged, storage nearly full…) shows here too: the tab may be out of sight.
+    const top = topAlert(st.alerts);
+    const other = !noSound && top ? top : null;
     if (!active) this.confirming = false;
 
     const part = name => root.querySelector(`[data-part="${name}"]`);
@@ -185,6 +303,13 @@ export class Popout {
     show(part('active'), active && !this.confirming);
     show(part('confirm'), active && this.confirming);
     show(part('nosound'), noSound);
+    show(part('alert'), !!other);
+    attr(part('alert'), 'data-kind', other?.kind || null);
+    fill(root, { alertTitle: other?.title || '', alertText: other?.text || '' });
+    for (const b of root.querySelectorAll('[data-action="hide"]')) {
+      attr(b, 'aria-keyshortcuts', st.prefs.shortcuts ? 'Alt+H' : null);
+      attr(b, 'title', st.prefs.shortcuts ? 'Hide controls (Alt+H)' : 'Hide controls');
+    }
     const body = this.win.document.body;
     attr(body, 'data-phase', phase);
     attr(body, 'data-alert', noSound ? 'nosound' : null);
@@ -243,6 +368,9 @@ export class Popout {
     }
     if (noSound && !this.prevNoSound) this.#say('No sound from your microphone.', true);
     this.prevNoSound = noSound;
+    const alertKey = other ? `${other.id}|${other.title}` : '';
+    if (other && alertKey !== this.prevAlert) this.#say(`${other.title}. ${other.text}`, other.kind === 'error');
+    this.prevAlert = alertKey;
     this.prevPhase = phase;
   }
 }
