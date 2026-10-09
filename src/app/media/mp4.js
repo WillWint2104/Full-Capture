@@ -14,6 +14,11 @@
 // The file then reads ftyp | mdat | moov, the usual layout of a finished MP4.
 // No sample moves: the index points at the positions the samples already
 // have, so finalising costs two small writes, never a copy of the recording.
+//
+// Timing is kept exactly as the fragments give it. (Chrome's MP4 muxer starts
+// each track at 0, so if the first video frame reached MediaRecorder later
+// than the first sound, that delay is already a constant offset in the
+// fragments; WebM keeps the gap instead. It can't be recovered from the file.)
 
 const MAX_BOX_BYTES = 16 * 1024 * 1024;   // a moov or moof bigger than this isn't MediaRecorder's
 const READ_AHEAD = 64 * 1024;              // one read covers a box header, a moof and the next header

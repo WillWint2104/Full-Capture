@@ -17,14 +17,21 @@ Nothing is installed, nothing is uploaded, and it works offline.
 5. Press **Start recording**. After a 3-2-1 countdown you're recording.
 
 While recording, the **floating controls** stay on top of your other
-windows: the timer, a sound meter, Pause, Add chapter and Stop & save. The
-browser tab's title also shows the state (`● 12:34 Recording – Fractions…`).
+windows: the timer, a sound meter, Pause, Add chapter and Stop & save. When
+you record the whole screen they're on, they hide as recording starts, so
+they never appear in the video; bring them back with Alt+H or the *Floating
+controls* button (they're recorded while shown). The browser tab's title
+also shows the state (`● 12:34 Recording – Fractions…`) and any warning.
+
+Shortcuts work while the Full Capture tab or its floating controls are the
+active window.
 
 | Shortcut | Action |
 |---|---|
 | Alt + R | Start recording / Stop & save |
 | Alt + P | Pause / Resume |
 | Alt + M | Add a chapter marker |
+| Alt + H | Hide / show the floating controls |
 | Esc | Cancel the countdown, close a dialog |
 
 ## Where recordings go

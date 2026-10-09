@@ -29,17 +29,49 @@ doesn't happen as written is a failure. Note it with a screenshot.
 
 ## 2. Record
 
-- [ ] *Start recording*. After the 3-2-1 countdown the page says
-      *Recording*, the tab title starts with `●`, and the floating controls
-      window appears on top (Chrome/Edge 116+).
+- [ ] *Start recording*. The floating controls window opens on top and
+      shows the 3-2-1 countdown. As recording starts it **closes by itself**
+      (it would otherwise be in your whole-screen recording), and the
+      Full Capture tab says *Floating controls hidden*. The page says
+      *Recording* and the tab title starts with `●`.
 - [ ] **Sync test, part 1:** within the first 5 seconds, clap your hands
       three times where the camera can see them.
-- [ ] Switch to HGL Studio and teach normally for about 2 minutes. Press
-      *Add chapter* (or Alt+M) once. The count shows 1.
-- [ ] **Pause:** *Pause* in the floating controls (or Alt+P). They say
-      *Paused*. Speak for a moment: *You're talking – press Resume* appears.
-      *Resume*, then teach for another 30 seconds.
+- [ ] Switch to HGL Studio and teach normally for about 2 minutes. Come back
+      to the Full Capture tab and press *Add chapter* (or Alt+M) once. The
+      count shows 1.
+- [ ] **Pause:** in the tab, *Pause* (or Alt+P). The page says *Paused*.
+      Speak for a moment: *You're talking – press Resume* appears. *Resume*,
+      then teach for another 30 seconds.
 - [ ] **Sync test, part 2:** clap three times again, then *Stop & save*.
+
+## 2b. Floating controls and whole-screen recording
+
+Shortcuts only work while the Full Capture tab or its floating controls are
+the active window: browsers don't let a web page hear keys pressed in other
+programs.
+
+- [ ] In the saved 2-minute video, **no frame shows the floating controls**,
+      not even the first.
+- [ ] Start a short take. In the Full Capture tab press **Alt+H** (or
+      *Floating controls*): the controls come back on top and stay. They are
+      now in the recording, as expected while shown. Press the eye button
+      (*Hide controls*) or Alt+H in the controls: they close and the timer
+      keeps running. Alt+P, Alt+M and Alt+R still work in the tab. Stop.
+- [ ] Press *Start recording* again: the controls open again for the
+      countdown, then hide as recording starts.
+- [ ] With the controls hidden, unplug the camera (or the headset)
+      mid-take: the tab title shows a ⚠ warning. Show the controls (Alt+H in
+      the tab): they show the warning too. Plug it back in and stop.
+- [ ] *(Two monitors only)* Put Full Capture and its floating controls on the
+      monitor you **don't** record, and record the other one: the controls
+      stay open and are not in the video. If your two monitors are the same
+      size, the controls hide anyway. Turn off Settings → *Hide floating
+      controls if they'd be recorded* and they stay.
+- [ ] *(Alternative)* Choose HGL Studio's **window** (the *Window* tab in the
+      picker) instead of the entire screen: the controls stay open and are
+      not in the video.
+- [ ] Record about 20 minutes with the controls hidden and Full Capture in the
+      background. The display doesn't dim or go to sleep while you teach.
 
 ## 3. The saved file
 
@@ -92,4 +124,6 @@ doesn't happen as written is a failure. Note it with a screenshot.
 Send the browser and version, the microphone and camera models, which lines
 failed (with screenshots), and the name and size of the 2-minute file. If
 you can, share that file as well. I can check its streams and length with
-ffmpeg and look at the clap sync frame by frame.
+ffmpeg and look at the clap sync frame by frame. If a file still can't be
+scrubbed, keep it and say which player you used (Media Player, Films & TV,
+VLC or Chrome).
