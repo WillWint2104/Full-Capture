@@ -24,7 +24,10 @@ controls* button (they're recorded while shown). The browser tab's title
 also shows the state (`● 12:34 Recording – Fractions…`) and any warning.
 
 Shortcuts work while the Full Capture tab or its floating controls are the
-active window.
+active window, not in other apps such as HGL Studio. On a single screen,
+recording the whole screen means switching back to Full Capture to pause, add
+a chapter or stop, and that moment is in the video; Set up says so before you
+start.
 
 | Shortcut | Action |
 |---|---|

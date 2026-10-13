@@ -429,6 +429,11 @@
                 </svg>
                 <span>Move this window to your other screen – anything on the recorded screen appears in the video.</span>
               </p>
+              <!-- The only screen is recorded: say before Start how pausing and stopping work (shortcuts don't reach other apps) -->
+              <p id="screenOneTip" class="tip" hidden>
+                <svg class="i" aria-hidden="true"><use href="#i-info"/></svg>
+                <span id="screenOneTipText"></span>
+              </p>
               <div class="step-actions">
                 <button id="btnChooseScreen" class="btn btn-secondary btn-lg step-action" type="button">
                   <svg class="i" aria-hidden="true"><use href="#i-monitor"/></svg><span data-field="label">Choose screen</span>
@@ -687,6 +692,8 @@
             <span><strong>A 3-2-1 countdown</strong> gives you a moment to get ready. Press <kbd>Esc</kbd> to cancel.</span></li>
           <li id="tipFloating"><span class="tip-icon" aria-hidden="true"><svg class="i"><use href="#i-pip"/></svg></span>
             <span><strong>Floating controls</strong> stay on top of your slides: the timer, Pause, Add chapter and Stop &amp; save.</span></li>
+          <li id="tipFloatingHides" hidden><span class="tip-icon" aria-hidden="true"><svg class="i"><use href="#i-pip"/></svg></span>
+            <span><strong>Floating controls</strong> hide as recording starts, so they stay out of the video of your only screen. To pause or stop, switch back to this tab.</span></li>
           <li><span class="tip-icon" aria-hidden="true"><svg class="i"><use href="#i-shield"/></svg></span>
             <span><strong>A safety copy</strong> is kept while you teach. If the browser closes, you can get the lesson back.</span></li>
         </ol>
@@ -906,7 +913,7 @@
   <div class="dialog-body">
     <ol class="how">
       <li><span class="how-num">1</span><div><strong>Set up.</strong> Name the lesson, turn on your microphone and choose the screen you’ll teach from. <em>Check my sound</em> sets your mic level for you.</div></li>
-      <li><span class="how-num">2</span><div><strong>Record.</strong> The floating controls stay on top of your slides. If they’d be in a whole-screen recording, they hide as it starts; <kbd>Alt</kbd>+<kbd>H</kbd> brings them back. Pause whenever you need to, and add a chapter at each new topic.</div></li>
+      <li><span class="how-num">2</span><div><strong>Record.</strong> The floating controls stay on top of your slides. If they’d be in a whole-screen recording, they hide as it starts; <kbd>Alt</kbd>+<kbd>H</kbd> brings them back (into the video). Pause whenever you need to, and add a chapter at each new topic. On a single screen, switch back to Full Capture to pause or stop: that moment is recorded.</div></li>
       <li><span class="how-num">3</span><div><strong>Review.</strong> Play the take back, fix the name, copy chapters for YouTube, or record another take.</div></li>
     </ol>
 
@@ -920,7 +927,7 @@
         <tr><th scope="row"><kbd>Esc</kbd></th><td>Cancel the countdown · close a window like this one</td></tr>
       </tbody>
     </table>
-    <p class="help-text">Shortcuts work here and in the floating controls, but not while you’re typing.</p>
+    <p class="help-text">Shortcuts work only while Full Capture or its floating controls are the active window: not in other apps such as HGL Studio, and not while you’re typing.</p>
 
     <h3 class="set-title">If something goes wrong</h3>
     <p class="help-body">A safety copy is kept while you record. If the browser or computer closes mid-lesson, open Full Capture again and choose <strong>Save it</strong> on the card at the top.</p>
@@ -1057,6 +1064,7 @@
     </div>
 
     <div class="pop-idle" data-part="idle" hidden>
+      <p class="pop-saved" data-field="saved" hidden></p>
       <p class="pop-ready-title">Ready when you are</p>
       <p class="pop-ready-text">Start from here and keep teaching – this window stays on top.</p>
       <p class="pop-blocked" data-field="blocked" hidden></p>
@@ -1073,6 +1081,10 @@
         <p class="pop-mic-label" data-field="micLabel"></p>
       </div>
       <p class="pop-talking" data-field="talking" hidden>You’re talking – press Resume</p>
+      <!-- Paused: Resume is the big button; Stop & save stays, smaller in emphasis -->
+      <button class="btn btn-record btn-block pop-resume" type="button" data-action="resume" aria-keyshortcuts="Alt+P" hidden>
+        <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.75v12.5a.75.75 0 0 0 1.14.64l10.1-6.25a.75.75 0 0 0 0-1.28L9.14 5.11A.75.75 0 0 0 8 5.75z" fill="currentColor" stroke="none"/></svg>Resume
+      </button>
       <button class="btn btn-primary btn-block pop-stop" type="button" data-action="stop" aria-keyshortcuts="Alt+R">
         <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="6.5" width="11" height="11" rx="2" fill="currentColor" stroke="none"/></svg>Stop &amp; save
       </button>

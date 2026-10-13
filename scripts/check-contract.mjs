@@ -11,7 +11,7 @@ stepLesson lessonChip lessonName lessonSuggest fileNamePreview notes
 stepMic micChip micIntro btnMicOn micControls micSelect micSuggest micMeter micMeterLabel noiseToggle micMessage
 btnSoundCheck scRun scStep scInstruction scLine scProgress scResult scHeadline scText scTips scApplied btnScPlay scAudio btnScAgain
 scFix scFixWin11 scFixWin10 btnScCopySteps btnScCopyPrompt micSummary
-stepScreen screenChip screenIntro btnChooseScreen screenSummary screenLabel screenDetail sysAudioChip screenMessage screenTip
+stepScreen screenChip screenIntro btnChooseScreen screenSummary screenLabel screenDetail sysAudioChip screenMessage screenTip screenOneTip screenOneTipText tipFloatingHides
 stepCamera cameraChip cameraToggle cameraControls cameraSelect bubbleMirror btnCornerTL btnCornerTR btnCornerBL btnCornerBR cameraMessage
 readiness btnStart startHint
 stage stageLabel screenVideo reviewVideo stageThumb stageEmpty btnChooseScreenBig bubblePreview cameraVideo countdown countdownNum stageHint
@@ -34,8 +34,8 @@ export const TEMPLATE_PARTS = {
   tplTake: { fields: ['thumb', 'name', 'date', 'duration', 'size', 'chapters', 'saved'], actions: ['open', 'download', 'copy-chapters', 'delete'], selectors: ['.take'] },
   tplChapter: { fields: ['time', 'title'], actions: ['delete'], selectors: ['.chapter'] },
   tplPopout: {
-    fields: ['pill', 'timer', 'lesson', 'micLabel', 'notes', 'countdown', 'meter', 'alertTitle', 'alertText'],
-    actions: ['start', 'stop', 'pause', 'marker', 'more', 'discard-yes', 'discard-no', 'hide'],
+    fields: ['pill', 'timer', 'lesson', 'micLabel', 'notes', 'countdown', 'meter', 'alertTitle', 'alertText', 'saved'],
+    actions: ['start', 'stop', 'pause', 'resume', 'marker', 'more', 'discard-yes', 'discard-no', 'hide'],
     selectors: ['[data-part="idle"]', '[data-part="active"]', '[data-part="confirm"]', '[data-part="nosound"]', '[data-part="alert"]', '.meter'],
   },
 };

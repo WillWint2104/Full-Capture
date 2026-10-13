@@ -146,7 +146,12 @@ export function createUI(session) {
 
   function renderAll(st) {
     const current = VIEW_FOR[st.phase] || 'viewSetup';
-    if (current !== shownView) { if (shownView) shownAt = performance.now(); shownView = current; }
+    if (current !== shownView) {
+      // A new view opens at its top, where its state is (the timer and "Recording", "Saved").
+      // Otherwise it keeps the old view's scroll, e.g. Set up scrolled down to the Screen step.
+      if (shownView) { shownAt = performance.now(); window.scrollTo({ top: 0, behavior: 'instant' }); }
+      shownView = current;
+    }
     for (const id of new Set(Object.values(VIEW_FOR))) show($(id), id === current);
     for (const p of parts) {
       try { p.render(st); } catch (e) { console.error('render failed in', p.constructor.name, e); }

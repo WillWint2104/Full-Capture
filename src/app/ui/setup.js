@@ -19,6 +19,10 @@ export function friendlyMicLabel(d) {
 }
 
 const shortLabel = l => (l || '').replace(/^(Default|Communications) - /, '').replace(/\s*\([^)]*\)\s*$/, '') || 'Microphone';
+/** The microphone is open but sending pure silence (the session's "no-audio" alert). */
+const silentMic = st => st.alerts.some(a => a.id === 'no-audio');
+/** The whole of the only display is (or will be) recorded: Full Capture can't stay in view during the lesson. */
+const onlyScreen = sc => (!sc || sc.surface === 'monitor') && globalThis.screen?.isExtended === false;
 
 function setOptions(select, items, selected, labelOf) {
   const sig = JSON.stringify(items.map(i => [i.deviceId, i.label]));
@@ -302,7 +306,9 @@ export class SetupView {
     else if (['blocked', 'notfound', 'busy', 'error', 'lost'].includes(mic.status)) { status = 'attention'; chip = mic.status === 'blocked' ? 'Blocked' : 'Needs attention'; }
     else if (live) {
       const name = shortLabel(mic.label);
-      if (st.micWarning) { status = 'attention'; chip = 'Check the mic'; }
+      // Open but sending pure silence (a muted headset): the banner says so, and so does this step.
+      if (silentMic(st)) { status = 'attention'; chip = 'No sound'; }
+      else if (st.micWarning) { status = 'attention'; chip = 'Check the mic'; }
       else if (failed) { status = 'attention'; chip = 'Needs attention'; }
       else if (audio.checkStale) { status = 'attention'; chip = 'Settings changed – check again'; }
       else if (cal && (cal.status === 'ideal' || cal.status === 'usable')) {
@@ -385,6 +391,14 @@ export class SetupView {
       attr(sysChip, 'data-status', included ? 'done' : 'todo');
     }
     show($('screenTip'), !!sc && !!globalThis.screen?.isExtended && sc.surface === 'monitor');
+    const only = !!sc && onlyScreen(sc);
+    show($('screenOneTip'), only);
+    if (only) {
+      const hides = st.prefs.floatingControls && st.prefs.autoHideControls;
+      text($('screenOneTipText'), 'This is your only screen, so Full Capture can’t stay in view while you teach. '
+        + (hides ? 'The floating controls hide as recording starts, so they stay out of the video. ' : '')
+        + 'Keyboard shortcuts work only in Full Capture: to pause, add a chapter or stop, switch back to this tab. That moment is recorded.');
+    }
     const collapsed = status === 'done' && !this.expanded.has('stepScreen');
     this.#step('stepScreen', status, collapsed);
     text($('screenChip'), chip);
@@ -420,7 +434,10 @@ export class SetupView {
   /** The "what happens when you press Start" card matches the settings. */
   #renderTips(st) {
     show($('tipCountdown'), st.lesson.countdown);
-    show($('tipFloating'), st.prefs.floatingControls);
+    // On the only screen they hide as recording starts: don't promise they stay on top.
+    const hides = st.prefs.floatingControls && st.prefs.autoHideControls && onlyScreen(st.screen);
+    show($('tipFloating'), st.prefs.floatingControls && !hides);
+    show($('tipFloatingHides'), hides);
   }
 
   #renderStart(st) {
@@ -430,6 +447,7 @@ export class SetupView {
     if (prefs.noVoice) parts.push('✓ Voice off');
     else if (mic.status === 'blocked') parts.push('✗ Microphone blocked');
     else if (!micReady) parts.push('✗ Microphone not on yet');
+    else if (silentMic(st)) parts.push(`! Microphone: ${shortLabel(mic.label)} – no sound`);
     else parts.push(`✓ Microphone: ${shortLabel(mic.label)}${this.micStepStatus === 'attention' ? ' (check it)' : ''}`);
     if (screen) parts.push(`${screen.surface === 'monitor' ? '✓' : '!'} ${surfaceName(screen.surface)}`);
     else parts.push('Screen: you’ll pick it next');

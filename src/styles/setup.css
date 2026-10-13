@@ -400,6 +400,9 @@ html:has(#takeList > .take) .screen-intro:has(.howto-check:checked) .share-howto
 }
 /* During the 10-second sound check the sentence matters more than Start */
 html:has(#scRun:not([hidden])) .start-bar { position: static; }
+/* Until the microphone is ready (e.g. a first visit), Start waits under the steps:
+   pinned, it would cover "Turn on microphone". It pins again once the mic is on. */
+.start-bar:has(#btnStart[aria-disabled="true"][data-state="idle"]) { position: static; }
 /* Short windows (or high zoom): a pinned bar would hide most of the steps */
 @media (max-height: 480px) { .start-bar { position: static; } }
 /* Keyboard focus and scrollIntoView keep clear of the sticky bar */

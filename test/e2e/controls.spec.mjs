@@ -161,11 +161,19 @@ test('Hide closes the floating controls and the take carries on; the tab’s sho
   await expect(page.locator('#chapterList .chapter')).toHaveCount(1);
 });
 
-test('a whole-screen take on one display closes the floating controls before it records, says so, and the next Start opens them again', async ({ page }) => {
+test('a whole-screen take on one display closes the floating controls before it records, says so (once a visit), and the next Start opens them again', async ({ page }) => {
   await openApp(page, { countdown: true }, [logRecorderStarts]);
   await micLive(page);
   await chooseScreen(page);
   expect(await page.evaluate(() => [screen.isExtended, window.fullCapture.state.screen.surface])).toEqual([false, 'monitor']);
+  // Every toast shown, by title.
+  await page.evaluate(() => {
+    window.__toastTitles = [];
+    new MutationObserver(list => {
+      for (const m of list) for (const n of m.addedNodes) if (n.classList?.contains('toast')) window.__toastTitles.push(n.querySelector('[data-field="title"]')?.textContent);
+    }).observe(document.getElementById('toasts'), { childList: true });
+  });
+  const hiddenToasts = () => page.evaluate(() => window.__toastTitles.filter(t => t === 'Floating controls hidden').length);
 
   for (const take of [1, 2]) {
     if (take === 2) await newTake(page);
@@ -178,8 +186,13 @@ test('a whole-screen take on one display closes the floating controls before it 
     // Gone before the first frame: the recorder started only after they had closed.
     const [closedAt, recAt] = await page.evaluate(() => [window.__pipEvents.filter(e => e[0] === 'closed').at(-1)?.[1], window.__recStarts.at(-1)]);
     expect(closedAt).toBeLessThan(recAt);
-    await expect(page.locator('#toasts')).toContainText('Floating controls hidden');
-    await expect(page.locator('#toasts')).toContainText('press Alt+H or Floating controls');
+    // Explained the first time (bringing them back puts them in the video); later takes keep the "Hidden" tag.
+    if (take === 1) {
+      await expect(page.locator('#toasts')).toContainText('Floating controls hidden');
+      await expect(page.locator('#toasts')).toContainText('press Alt+H or Floating controls');
+      await expect(page.locator('#toasts')).toContainText('in the video');
+    }
+    expect(await hiddenToasts()).toBe(1);
     await expect(page.locator('#btnPopout')).toHaveAttribute('aria-pressed', 'false');
     await expect(page.locator('#btnPopout .on-tag')).toHaveText('Hidden');
 
@@ -365,4 +378,81 @@ test('Alt+H pressed as the controls close themselves doesn’t bring them back i
   await page.keyboard.press('Alt+h');
   await expect.poll(() => pipOpen(page)).toBe(true);
   await stopTake(page);
+});
+
+test('paused, the floating controls make Resume the big button and keep Stop & save below it; Resume only ever resumes', async ({ page }) => {
+  await openApp(page, { autoHideControls: false });
+  await micLive(page);
+  await chooseScreen(page);
+  await startTake(page);
+  await expect.poll(() => pipOpen(page)).toBe(true);
+  const resume = pip(page).locator('[data-action="resume"]');
+  const pause = pip(page).locator('[data-action="pause"]');
+  const stop = pip(page).locator('[data-action="stop"]');
+  await expect(resume).toBeHidden();
+  await expect(pause).toBeVisible();
+
+  await settle(page);
+  await pause.click();
+  await expect.poll(() => phase(page)).toBe('paused');
+  await expect(resume).toBeVisible();
+  await expect(pause).toBeHidden();
+  await expect(stop).toBeVisible();
+  // Resume is the larger of the two, and above Stop & save; focus moved to it from Pause.
+  const [r, s] = [await resume.boundingBox(), await stop.boundingBox()];
+  expect(r.height).toBeGreaterThan(s.height);
+  expect(r.y).toBeLessThan(s.y);
+  expect(await pip(page).locator(':focus').getAttribute('data-action')).toBe('resume');
+
+  // A double click on Resume resumes once: the second press neither pauses again nor lands on
+  // Stop & save, which has moved up under the pointer.
+  await page.waitForTimeout(600);
+  await resume.dblclick();
+  await expect.poll(() => phase(page)).toBe('recording');
+  await page.waitForTimeout(800);
+  expect(await phase(page)).toBe('recording');
+  await expect(resume).toBeHidden();
+  await expect(pause).toBeVisible();
+  // A double click on Pause pauses once, and doesn't add a chapter with the button that moved under it.
+  await page.waitForTimeout(600);
+  await pause.dblclick();
+  await expect.poll(() => phase(page)).toBe('paused');
+  await page.waitForTimeout(800);
+  expect(await phase(page)).toBe('paused');
+  expect(await state(page, st => st.take.markers.length)).toBe(0);
+  await page.waitForTimeout(600);
+  await resume.click();
+  await expect.poll(() => phase(page)).toBe('recording');
+  await stopTake(page);
+});
+
+test('after Stop & save the floating controls say what was saved, once it is filed, until the next take', async ({ page }) => {
+  await openApp(page, { autoHideControls: false });
+  await micLive(page);
+  await chooseScreen(page);
+  await startTake(page);
+  await expect.poll(() => pipOpen(page)).toBe(true);
+  const saved = pip(page).locator('[data-field="saved"]');
+  await expect(saved).toBeHidden();
+  await page.waitForTimeout(1500);
+  await settle(page);
+  await expect.poll(() => state(page, st => st.take?.bytes ?? 0), { timeout: 15_000 }).toBeGreaterThan(0);
+  // Never before the take is filed: while saving the line stays hidden.
+  await page.evaluate(() => {
+    window.__savedEarly = false;
+    window.fullCapture.on('change', st => { if (st.phase === 'stopping' && !window.__pip?.document.querySelector('[data-field="saved"]')?.hidden) window.__savedEarly = true; });
+  });
+  const download = page.waitForEvent('download');
+  await pip(page).locator('[data-action="stop"]').click();
+  await download;
+  await expect.poll(() => phase(page), { timeout: 20_000 }).toBe('review');
+  await expect(saved).toBeVisible();
+  await expect(saved).toHaveText(/^Saved · \d+ s · in Downloads$/);
+  const seconds = Number((await saved.textContent()).match(/(\d+) s/)[1]);
+  expect(seconds).toBe(Math.floor(await state(page, st => st.review.durationMs) / 1000));
+  expect(await page.evaluate(() => window.__savedEarly)).toBe(false);
+
+  // Record another take: the line goes with the old take.
+  await newTake(page);
+  await expect(saved).toBeHidden();
 });

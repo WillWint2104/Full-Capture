@@ -34,6 +34,8 @@ function scalesFor(dpr) {
 // A show request this soon after the controls closed themselves is a late "hide" (the
 // teacher pressing Alt+H as they vanish), not a wish to record them.
 const LATE_PRESS_MS = 1500;
+// Windows' default double-click time: how long a moved button ignores presses after Pause or Resume.
+const LAYOUT_SETTLE_MS = 500;
 
 /**
  * Would a recording of this capture include the floating controls? Pure.
@@ -76,6 +78,8 @@ export class Popout {
     this.opening = false;
     this.openPromise = null;  // the window being opened (resolves true once it is built)
     this.take = null;         // per take: { decided, hiding }; null between takes
+    this.hideExplained = false; // the "Floating controls hidden" toast has been shown this visit
+    this.toggledAt = -Infinity; // last Pause or Resume press here (see #justToggled)
     this.prevAlert = '';
     this.meter = null;
     this.loop = null;
@@ -174,15 +178,21 @@ export class Popout {
       if (!controlsWouldBeRecorded(capture, { isExtended: s?.isExtended, width: s?.width, height: s?.height, dpr: w.devicePixelRatio || 1 })) return;
       await this.hide();
       take.hiddenAt = performance.now();
-      const keys = st.prefs.shortcuts ? 'Alt+H or ' : '';
-      const elsewhere = s?.isExtended
-        ? ' If they were on a screen you aren’t recording, turn off “Hide floating controls if they’d be recorded” in Settings.'
-        : '';
-      this.toast?.({
-        id: 'controls-hidden', kind: 'info', title: 'Floating controls hidden',
-        text: `So they aren’t in your recording of the whole screen. To bring them back, press ${keys}Floating controls.${elsewhere}`,
-        timeoutMs: 10000,
-      });
+      // Explained once per visit; later takes show the "Hidden" tag, and screen readers still hear it.
+      if (!this.hideExplained) {
+        this.hideExplained = true;
+        const keys = st.prefs.shortcuts ? 'Alt+H or ' : '';
+        const elsewhere = s?.isExtended
+          ? ' If they were on a screen you aren’t recording, turn off “Hide floating controls if they’d be recorded” in Settings.'
+          : ' They’re then in the video.';
+        this.toast?.({
+          id: 'controls-hidden', kind: 'info', title: 'Floating controls hidden',
+          text: `So they aren’t in your recording of the whole screen. To bring them back, press ${keys}Floating controls.${elsewhere}`,
+          timeoutMs: 10000,
+        });
+      } else {
+        this.notices?.announce('Floating controls hidden, so they aren’t in your recording.');
+      }
       await new Promise(resolve => setTimeout(resolve, HIDE_SETTLE_MS));
     } catch (e) {
       console.warn('could not hide the floating controls', e);
@@ -287,10 +297,13 @@ export class Popout {
       case 'start':
         if (this.startOrStop) this.startOrStop('popout'); else s.toggleRecord();
         break;
-      case 'stop': s.stop(); break;
-      case 'pause': s.togglePause(); break;
-      case 'marker': if (!e || e.detail <= 1) s.addMarker(); break;
+      case 'stop': if (!this.#justToggled()) s.stop(); break;
+      case 'pause': this.toggledAt = performance.now(); s.togglePause(); break;
+      // Only ever resumes: a second press can't pause again.
+      case 'resume': this.toggledAt = performance.now(); if (s.state.phase === 'paused') s.togglePause(); break;
+      case 'marker': if ((!e || e.detail <= 1) && !this.#justToggled()) s.addMarker(); break;
       case 'more':
+        if (this.#justToggled()) break;
         this.confirming = true;
         this.render(s.state);
         // The safe choice gets focus.
@@ -307,6 +320,13 @@ export class Popout {
       }
     }
   }
+
+  /**
+   * Pause and Resume rearrange the buttons (paused, Resume is the big one above Stop & save),
+   * so the second press of a double click would land on whatever moved under the pointer:
+   * Stop & save, Add chapter or More. Those ignore presses this soon after Pause or Resume.
+   */
+  #justToggled() { return performance.now() - this.toggledAt < LAYOUT_SETTLE_MS; }
 
   #tickClock(now) {
     if (!this.root) return;
@@ -374,10 +394,25 @@ export class Popout {
     const timer = root.querySelector('[data-field="timer"]');
     if (timer) text(timer, formatClock(this.clock.elapsedMs));
 
+    // Paused: the big button resumes (as on the main page); Pause leaves the row and Stop & save
+    // stays, quieter. Focus follows the button that replaced the one pressed.
+    const focused = this.win.document.activeElement;
+    const paused = phase === 'paused';
     for (const b of root.querySelectorAll('[data-action="pause"]')) {
-      label(b, phase === 'paused' ? 'Resume' : 'Pause');
+      label(b, paused ? 'Resume' : 'Pause');
       attr(b, 'aria-disabled', phase === 'stopping' ? 'true' : null);
+      show(b, !paused);
     }
+    for (const b of root.querySelectorAll('[data-action="resume"]')) show(b, paused);
+    if (paused && focused?.matches?.('[data-action="pause"]')) root.querySelector('[data-action="resume"]')?.focus();
+    if (!paused && focused?.matches?.('[data-action="resume"]')) root.querySelector('[data-action="pause"]')?.focus();
+
+    // After Stop & save: what was saved and where, once the take is filed (never before).
+    const r = st.review;
+    const saved = phase === 'review' && r?.justSaved
+      ? `Saved · ${formatDuration(r.durationMs)} · ${r.savedTo === 'folder' ? `in “${r.folderName || 'your folder'}”` : 'in Downloads'}`
+      : '';
+    for (const el of root.querySelectorAll('[data-field="saved"]')) { text(el, saved); show(el, !!saved); }
     for (const b of root.querySelectorAll('[data-action="start"]')) {
       label(b, phase === 'countdown' ? `Cancel (${st.countdown})` : st.cancelling ? 'Cancelling…' : counting ? 'Cancel' : 'Start recording');
       attr(b, 'aria-disabled', !counting && (!st.screen || st.preparing || !!blocked) ? 'true' : null);
@@ -396,7 +431,7 @@ export class Popout {
       if (phase === 'recording') this.#say(prev === 'paused' ? 'Recording resumed.' : 'Recording started.');
       else if (phase === 'paused') this.#say('Paused. Not recording.');
       else if (phase === 'stopping') this.#say('Saving…');
-      else if (phase === 'review') this.#say('Saved.');
+      else if (phase === 'review') this.#say(saved ? `${saved.replaceAll(' · ', ', ')}.` : 'Saved.');
     }
     if (noSound && !this.prevNoSound) this.#say('No sound from your microphone.', true);
     this.prevNoSound = noSound;

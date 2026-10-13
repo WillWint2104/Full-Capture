@@ -2729,6 +2729,9 @@ html:has(#takeList > .take) .screen-intro:has(.howto-check:checked) .share-howto
 html:has(#scRun:not([hidden])) .start-bar {
   position: static;
 }
+.start-bar:has(#btnStart[aria-disabled=true][data-state=idle]) {
+  position: static;
+}
 @media (max-height: 480px) {
   .start-bar {
     position: static;
@@ -4313,6 +4316,18 @@ body.popout {
   gap: var(--s1);
   padding-top: var(--s2);
 }
+.pop-saved {
+  margin-bottom: var(--s2);
+  padding: 8px 12px;
+  border-radius: var(--r);
+  background: var(--good-soft);
+  color: var(--good);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-strong);
+}
+.pop-saved::before {
+  content: "✓ ";
+}
 .pop-ready-title {
   font-size: var(--fs-lg);
   font-weight: var(--fw-strong);
@@ -4398,10 +4413,15 @@ body.popout[data-phase=paused] .pop-timer {
 .pop-stop .i {
   color: var(--stop-square);
 }
+.pop-resume {
+  min-height: 48px;
+}
 body.popout[data-phase=paused] .pop-stop {
+  min-height: 40px;
   background: var(--surface);
   border-color: var(--line-strong);
   color: var(--text);
+  box-shadow: none;
 }
 body.popout[data-phase=paused] .pop-stop .i {
   color: currentColor;
@@ -4452,15 +4472,6 @@ body.popout[data-phase=paused] .pop-stop .i {
       currentColor 0 34%,
       transparent 34% 66%,
       currentColor 66%);
-}
-body[data-phase=paused] .pop-pause::before {
-  background: currentColor;
-  clip-path: polygon(0 0, 100% 50%, 0 100%);
-}
-body[data-phase=paused] .pop-pause {
-  background: var(--record-fill);
-  border-color: var(--record-fill);
-  color: var(--on-record);
 }
 .pop-confirm {
   display: grid;
@@ -5544,6 +5555,11 @@ html:has(.banners:not([hidden]) .banner[data-kind=error]) {
                 </svg>
                 <span>Move this window to your other screen – anything on the recorded screen appears in the video.</span>
               </p>
+              <!-- The only screen is recorded: say before Start how pausing and stopping work (shortcuts don't reach other apps) -->
+              <p id="screenOneTip" class="tip" hidden>
+                <svg class="i" aria-hidden="true"><use href="#i-info"/></svg>
+                <span id="screenOneTipText"></span>
+              </p>
               <div class="step-actions">
                 <button id="btnChooseScreen" class="btn btn-secondary btn-lg step-action" type="button">
                   <svg class="i" aria-hidden="true"><use href="#i-monitor"/></svg><span data-field="label">Choose screen</span>
@@ -5802,6 +5818,8 @@ html:has(.banners:not([hidden]) .banner[data-kind=error]) {
             <span><strong>A 3-2-1 countdown</strong> gives you a moment to get ready. Press <kbd>Esc</kbd> to cancel.</span></li>
           <li id="tipFloating"><span class="tip-icon" aria-hidden="true"><svg class="i"><use href="#i-pip"/></svg></span>
             <span><strong>Floating controls</strong> stay on top of your slides: the timer, Pause, Add chapter and Stop &amp; save.</span></li>
+          <li id="tipFloatingHides" hidden><span class="tip-icon" aria-hidden="true"><svg class="i"><use href="#i-pip"/></svg></span>
+            <span><strong>Floating controls</strong> hide as recording starts, so they stay out of the video of your only screen. To pause or stop, switch back to this tab.</span></li>
           <li><span class="tip-icon" aria-hidden="true"><svg class="i"><use href="#i-shield"/></svg></span>
             <span><strong>A safety copy</strong> is kept while you teach. If the browser closes, you can get the lesson back.</span></li>
         </ol>
@@ -6021,7 +6039,7 @@ html:has(.banners:not([hidden]) .banner[data-kind=error]) {
   <div class="dialog-body">
     <ol class="how">
       <li><span class="how-num">1</span><div><strong>Set up.</strong> Name the lesson, turn on your microphone and choose the screen you’ll teach from. <em>Check my sound</em> sets your mic level for you.</div></li>
-      <li><span class="how-num">2</span><div><strong>Record.</strong> The floating controls stay on top of your slides. If they’d be in a whole-screen recording, they hide as it starts; <kbd>Alt</kbd>+<kbd>H</kbd> brings them back. Pause whenever you need to, and add a chapter at each new topic.</div></li>
+      <li><span class="how-num">2</span><div><strong>Record.</strong> The floating controls stay on top of your slides. If they’d be in a whole-screen recording, they hide as it starts; <kbd>Alt</kbd>+<kbd>H</kbd> brings them back (into the video). Pause whenever you need to, and add a chapter at each new topic. On a single screen, switch back to Full Capture to pause or stop: that moment is recorded.</div></li>
       <li><span class="how-num">3</span><div><strong>Review.</strong> Play the take back, fix the name, copy chapters for YouTube, or record another take.</div></li>
     </ol>
 
@@ -6035,7 +6053,7 @@ html:has(.banners:not([hidden]) .banner[data-kind=error]) {
         <tr><th scope="row"><kbd>Esc</kbd></th><td>Cancel the countdown · close a window like this one</td></tr>
       </tbody>
     </table>
-    <p class="help-text">Shortcuts work here and in the floating controls, but not while you’re typing.</p>
+    <p class="help-text">Shortcuts work only while Full Capture or its floating controls are the active window: not in other apps such as HGL Studio, and not while you’re typing.</p>
 
     <h3 class="set-title">If something goes wrong</h3>
     <p class="help-body">A safety copy is kept while you record. If the browser or computer closes mid-lesson, open Full Capture again and choose <strong>Save it</strong> on the card at the top.</p>
@@ -6172,6 +6190,7 @@ html:has(.banners:not([hidden]) .banner[data-kind=error]) {
     </div>
 
     <div class="pop-idle" data-part="idle" hidden>
+      <p class="pop-saved" data-field="saved" hidden></p>
       <p class="pop-ready-title">Ready when you are</p>
       <p class="pop-ready-text">Start from here and keep teaching – this window stays on top.</p>
       <p class="pop-blocked" data-field="blocked" hidden></p>
@@ -6188,6 +6207,10 @@ html:has(.banners:not([hidden]) .banner[data-kind=error]) {
         <p class="pop-mic-label" data-field="micLabel"></p>
       </div>
       <p class="pop-talking" data-field="talking" hidden>You’re talking – press Resume</p>
+      <!-- Paused: Resume is the big button; Stop & save stays, smaller in emphasis -->
+      <button class="btn btn-record btn-block pop-resume" type="button" data-action="resume" aria-keyshortcuts="Alt+P" hidden>
+        <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.75v12.5a.75.75 0 0 0 1.14.64l10.1-6.25a.75.75 0 0 0 0-1.28L9.14 5.11A.75.75 0 0 0 8 5.75z" fill="currentColor" stroke="none"/></svg>Resume
+      </button>
       <button class="btn btn-primary btn-block pop-stop" type="button" data-action="stop" aria-keyshortcuts="Alt+R">
         <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="6.5" width="11" height="11" rx="2" fill="currentColor" stroke="none"/></svg>Stop &amp; save
       </button>
@@ -13067,6 +13090,8 @@ ${list(win10)}
     return label2 || "Microphone";
   }
   var shortLabel = (l) => (l || "").replace(/^(Default|Communications) - /, "").replace(/\s*\([^)]*\)\s*$/, "") || "Microphone";
+  var silentMic = (st) => st.alerts.some((a) => a.id === "no-audio");
+  var onlyScreen = (sc) => (!sc || sc.surface === "monitor") && globalThis.screen?.isExtended === false;
   function setOptions(select, items, selected, labelOf) {
     const sig = JSON.stringify(items.map((i) => [i.deviceId, i.label]));
     if (select.dataset.sig !== sig) {
@@ -13355,7 +13380,10 @@ ${list(win10)}
         chip = mic.status === "blocked" ? "Blocked" : "Needs attention";
       } else if (live) {
         const name = shortLabel(mic.label);
-        if (st.micWarning) {
+        if (silentMic(st)) {
+          status = "attention";
+          chip = "No sound";
+        } else if (st.micWarning) {
           status = "attention";
           chip = "Check the mic";
         } else if (failed) {
@@ -13451,6 +13479,12 @@ ${list(win10)}
         attr(sysChip, "data-status", included ? "done" : "todo");
       }
       show($("screenTip"), !!sc && !!globalThis.screen?.isExtended && sc.surface === "monitor");
+      const only = !!sc && onlyScreen(sc);
+      show($("screenOneTip"), only);
+      if (only) {
+        const hides = st.prefs.floatingControls && st.prefs.autoHideControls;
+        text($("screenOneTipText"), "This is your only screen, so Full Capture can’t stay in view while you teach. " + (hides ? "The floating controls hide as recording starts, so they stay out of the video. " : "") + "Keyboard shortcuts work only in Full Capture: to pause, add a chapter or stop, switch back to this tab. That moment is recorded.");
+      }
       const collapsed = status === "done" && !this.expanded.has("stepScreen");
       this.#step("stepScreen", status, collapsed);
       text($("screenChip"), chip);
@@ -13492,7 +13526,9 @@ ${list(win10)}
     /** The "what happens when you press Start" card matches the settings. */
     #renderTips(st) {
       show($("tipCountdown"), st.lesson.countdown);
-      show($("tipFloating"), st.prefs.floatingControls);
+      const hides = st.prefs.floatingControls && st.prefs.autoHideControls && onlyScreen(st.screen);
+      show($("tipFloating"), st.prefs.floatingControls && !hides);
+      show($("tipFloatingHides"), hides);
     }
     #renderStart(st) {
       const { mic, screen, lesson, prefs, folder } = st;
@@ -13501,6 +13537,7 @@ ${list(win10)}
       if (prefs.noVoice) parts.push("✓ Voice off");
       else if (mic.status === "blocked") parts.push("✗ Microphone blocked");
       else if (!micReady) parts.push("✗ Microphone not on yet");
+      else if (silentMic(st)) parts.push(`! Microphone: ${shortLabel(mic.label)} – no sound`);
       else parts.push(`✓ Microphone: ${shortLabel(mic.label)}${this.micStepStatus === "attention" ? " (check it)" : ""}`);
       if (screen) parts.push(`${screen.surface === "monitor" ? "✓" : "!"} ${surfaceName(screen.surface)}`);
       else parts.push("Screen: you’ll pick it next");
@@ -14383,6 +14420,7 @@ ${list(win10)}
     return [dpr, ...SCALES.filter((s) => ZOOMS.some((z) => Math.abs(dpr / z - s) <= 0.02 * s))];
   }
   var LATE_PRESS_MS = 1500;
+  var LAYOUT_SETTLE_MS = 500;
   function controlsWouldBeRecorded(capture, display) {
     if (!capture || capture.surface !== "monitor") return false;
     if (typeof display?.isExtended !== "boolean" || !display.isExtended) return true;
@@ -14410,6 +14448,8 @@ ${list(win10)}
       this.opening = false;
       this.openPromise = null;
       this.take = null;
+      this.hideExplained = false;
+      this.toggledAt = -Infinity;
       this.prevAlert = "";
       this.meter = null;
       this.loop = null;
@@ -14519,15 +14559,20 @@ ${list(win10)}
         if (!controlsWouldBeRecorded(capture, { isExtended: s?.isExtended, width: s?.width, height: s?.height, dpr: w.devicePixelRatio || 1 })) return;
         await this.hide();
         take.hiddenAt = performance.now();
-        const keys = st.prefs.shortcuts ? "Alt+H or " : "";
-        const elsewhere = s?.isExtended ? " If they were on a screen you aren’t recording, turn off “Hide floating controls if they’d be recorded” in Settings." : "";
-        this.toast?.({
-          id: "controls-hidden",
-          kind: "info",
-          title: "Floating controls hidden",
-          text: `So they aren’t in your recording of the whole screen. To bring them back, press ${keys}Floating controls.${elsewhere}`,
-          timeoutMs: 1e4
-        });
+        if (!this.hideExplained) {
+          this.hideExplained = true;
+          const keys = st.prefs.shortcuts ? "Alt+H or " : "";
+          const elsewhere = s?.isExtended ? " If they were on a screen you aren’t recording, turn off “Hide floating controls if they’d be recorded” in Settings." : " They’re then in the video.";
+          this.toast?.({
+            id: "controls-hidden",
+            kind: "info",
+            title: "Floating controls hidden",
+            text: `So they aren’t in your recording of the whole screen. To bring them back, press ${keys}Floating controls.${elsewhere}`,
+            timeoutMs: 1e4
+          });
+        } else {
+          this.notices?.announce("Floating controls hidden, so they aren’t in your recording.");
+        }
         await new Promise((resolve) => setTimeout(resolve, HIDE_SETTLE_MS));
       } catch (e) {
         console.warn("could not hide the floating controls", e);
@@ -14632,15 +14677,22 @@ ${list(win10)}
           else s.toggleRecord();
           break;
         case "stop":
-          s.stop();
+          if (!this.#justToggled()) s.stop();
           break;
         case "pause":
+          this.toggledAt = performance.now();
           s.togglePause();
           break;
+        // Only ever resumes: a second press can't pause again.
+        case "resume":
+          this.toggledAt = performance.now();
+          if (s.state.phase === "paused") s.togglePause();
+          break;
         case "marker":
-          if (!e || e.detail <= 1) s.addMarker();
+          if ((!e || e.detail <= 1) && !this.#justToggled()) s.addMarker();
           break;
         case "more":
+          if (this.#justToggled()) break;
           this.confirming = true;
           this.render(s.state);
           this.root?.querySelector('[data-action="discard-no"]')?.focus();
@@ -14659,6 +14711,14 @@ ${list(win10)}
           break;
         }
       }
+    }
+    /**
+     * Pause and Resume rearrange the buttons (paused, Resume is the big one above Stop & save),
+     * so the second press of a double click would land on whatever moved under the pointer:
+     * Stop & save, Add chapter or More. Those ignore presses this soon after Pause or Resume.
+     */
+    #justToggled() {
+      return performance.now() - this.toggledAt < LAYOUT_SETTLE_MS;
     }
     #tickClock(now2) {
       if (!this.root) return;
@@ -14722,9 +14782,21 @@ ${list(win10)}
       }
       const timer = root.querySelector('[data-field="timer"]');
       if (timer) text(timer, formatClock(this.clock.elapsedMs));
+      const focused = this.win.document.activeElement;
+      const paused = phase === "paused";
       for (const b of root.querySelectorAll('[data-action="pause"]')) {
-        label(b, phase === "paused" ? "Resume" : "Pause");
+        label(b, paused ? "Resume" : "Pause");
         attr(b, "aria-disabled", phase === "stopping" ? "true" : null);
+        show(b, !paused);
+      }
+      for (const b of root.querySelectorAll('[data-action="resume"]')) show(b, paused);
+      if (paused && focused?.matches?.('[data-action="pause"]')) root.querySelector('[data-action="resume"]')?.focus();
+      if (!paused && focused?.matches?.('[data-action="resume"]')) root.querySelector('[data-action="pause"]')?.focus();
+      const r = st.review;
+      const saved = phase === "review" && r?.justSaved ? `Saved · ${formatDuration(r.durationMs)} · ${r.savedTo === "folder" ? `in “${r.folderName || "your folder"}”` : "in Downloads"}` : "";
+      for (const el of root.querySelectorAll('[data-field="saved"]')) {
+        text(el, saved);
+        show(el, !!saved);
       }
       for (const b of root.querySelectorAll('[data-action="start"]')) {
         label(b, phase === "countdown" ? `Cancel (${st.countdown})` : st.cancelling ? "Cancelling…" : counting ? "Cancel" : "Start recording");
@@ -14745,7 +14817,7 @@ ${list(win10)}
         if (phase === "recording") this.#say(prev === "paused" ? "Recording resumed." : "Recording started.");
         else if (phase === "paused") this.#say("Paused. Not recording.");
         else if (phase === "stopping") this.#say("Saving…");
-        else if (phase === "review") this.#say("Saved.");
+        else if (phase === "review") this.#say(saved ? `${saved.replaceAll(" · ", ", ")}.` : "Saved.");
       }
       if (noSound && !this.prevNoSound) this.#say("No sound from your microphone.", true);
       this.prevNoSound = noSound;
@@ -14886,7 +14958,10 @@ ${list(win10)}
     function renderAll(st) {
       const current = VIEW_FOR[st.phase] || "viewSetup";
       if (current !== shownView) {
-        if (shownView) shownAt = performance.now();
+        if (shownView) {
+          shownAt = performance.now();
+          window.scrollTo({ top: 0, behavior: "instant" });
+        }
         shownView = current;
       }
       for (const id of new Set(Object.values(VIEW_FOR))) show($(id), id === current);

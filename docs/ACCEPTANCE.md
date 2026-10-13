@@ -50,6 +50,9 @@ Shortcuts only work while the Full Capture tab or its floating controls are
 the active window: browsers don't let a web page hear keys pressed in other
 programs.
 
+- [ ] *(One screen)* Before you start, Set up says that this is your only
+      screen, that the floating controls will hide, and that pausing or
+      stopping means switching back to Full Capture (which is recorded).
 - [ ] In the saved 2-minute video, **no frame shows the floating controls**,
       not even the first.
 - [ ] Start a short take. In the Full Capture tab press **Alt+H** (or

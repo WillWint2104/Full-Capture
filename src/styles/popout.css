@@ -45,6 +45,9 @@ body.popout { min-height: 100vh; overflow: hidden; background: var(--bg); color:
 .pop-alert-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; font-size: var(--fs-sm); color: var(--text); }
 
 .pop-idle { display: grid; gap: var(--s1); padding-top: var(--s2); }
+/* After Stop & save: the take was filed (its length and where it went) */
+.pop-saved { margin-bottom: var(--s2); padding: 8px 12px; border-radius: var(--r); background: var(--good-soft); color: var(--good); font-size: var(--fs-sm); font-weight: var(--fw-strong); }
+.pop-saved::before { content: "✓ "; }
 .pop-ready-title { font-size: var(--fs-lg); font-weight: var(--fw-strong); }
 .pop-ready-text { font-size: var(--fs-sm); color: var(--muted); }
 .pop-blocked { font-size: var(--fs-sm); font-weight: var(--fw-strong); color: var(--bad); }
@@ -90,7 +93,9 @@ body.popout[data-phase="paused"] .pop-timer { color: var(--paused-text); }
 }
 .pop-stop { min-height: 48px; }
 .pop-stop .i { color: var(--stop-square); }
-body.popout[data-phase="paused"] .pop-stop { background: var(--surface); border-color: var(--line-strong); color: var(--text); }
+/* Paused: Resume is the big button; Stop & save stays below it, quieter */
+.pop-resume { min-height: 48px; }
+body.popout[data-phase="paused"] .pop-stop { min-height: 40px; background: var(--surface); border-color: var(--line-strong); color: var(--text); box-shadow: none; }
 body.popout[data-phase="paused"] .pop-stop .i { color: currentColor; }
 .pop-row { display: flex; gap: var(--s2); }
 .pop-row .btn { flex: 1 1 auto; min-width: 0; padding: 0 10px; font-size: var(--fs-sm); gap: 6px; overflow: hidden; }
@@ -106,9 +111,6 @@ body.popout[data-phase="paused"] .pop-stop .i { color: currentColor; }
   flex: none;
   background: linear-gradient(to right, currentColor 0 34%, transparent 34% 66%, currentColor 66%);
 }
-body[data-phase="paused"] .pop-pause::before { background: currentColor; clip-path: polygon(0 0, 100% 50%, 0 100%); }
-/* Paused: Resume is the button to press */
-body[data-phase="paused"] .pop-pause { background: var(--record-fill); border-color: var(--record-fill); color: var(--on-record); }
 
 /* Discard: Keep recording first and filled; Discard second and quieter */
 .pop-confirm { display: grid; gap: var(--s2); flex: none; padding-top: var(--s2); }
