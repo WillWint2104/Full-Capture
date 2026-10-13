@@ -18,7 +18,12 @@ doesn't happen as written is a failure. Note it with a screenshot.
 
 - [ ] **Microphone:** *Turn on microphone* → the browser asks → *Allow*.
       Pick your microphone. The meter moves when you speak and stays low
-      when you're quiet.
+      when you're quiet. *(First visit only)* The *Turn on microphone*
+      button is in plain view, not hidden under the *Start recording* bar.
+- [ ] **Muted microphone:** mute the headset (its switch, or Windows sound
+      settings) for about 10 seconds. A red *No sound from your microphone*
+      banner appears, and the Microphone step says *No sound*, not *All set*.
+      Unmute: both clear.
 - [ ] **Sound check:** *Check my sound*, then follow it. It ends in a verdict
       card, and *Hear it back* plays your voice clearly.
 - [ ] **Camera:** turn on *Show me in a bubble* → *Allow*. Your face is in the
@@ -29,6 +34,9 @@ doesn't happen as written is a failure. Note it with a screenshot.
 
 ## 2. Record
 
+- [ ] Scroll down to the Screen or Camera step before you press *Start
+      recording*: the recording page opens at its top, with the timer and
+      *Recording* in view.
 - [ ] *Start recording*. The floating controls window opens on top and
       shows the 3-2-1 countdown. As recording starts it **closes by itself**
       (it would otherwise be in your whole-screen recording), and the
@@ -61,7 +69,9 @@ programs.
       (*Hide controls*) or Alt+H in the controls: they close and the timer
       keeps running. Alt+P, Alt+M and Alt+R still work in the tab. Stop.
 - [ ] Press *Start recording* again: the controls open again for the
-      countdown, then hide as recording starts.
+      countdown, then hide as recording starts. The *Floating controls hidden*
+      message shows only on the first take of the visit. Later takes keep
+      the *Hidden* tag beside *Floating controls*.
 - [ ] With the controls hidden, unplug the camera (or the headset)
       mid-take: the tab title shows a ⚠ warning. Show the controls (Alt+H in
       the tab): they show the warning too. Plug it back in and stop.
@@ -70,6 +80,10 @@ programs.
       stay open and are not in the video. If your two monitors are the same
       size, the controls hide anyway. Turn off Settings → *Hide floating
       controls if they'd be recorded* and they stay.
+- [ ] *(Floating controls in view)* Press *Pause* in them: *Resume* becomes the
+      big button, with *Stop & save* smaller below it. Double-clicking *Resume*
+      resumes once and doesn't stop the take. After *Stop & save*, the
+      controls show *✓ Saved · … · in Downloads* (or your folder).
 - [ ] *(Alternative)* Choose HGL Studio's **window** (the *Window* tab in the
       picker) instead of the entire screen: the controls stay open and are
       not in the video.
