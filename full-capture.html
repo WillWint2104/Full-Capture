@@ -2729,7 +2729,7 @@ html:has(#takeList > .take) .screen-intro:has(.howto-check:checked) .share-howto
 html:has(#scRun:not([hidden])) .start-bar {
   position: static;
 }
-.start-bar:has(#btnStart[aria-disabled=true][data-state=idle]) {
+.start-bar[data-unpinned] {
   position: static;
 }
 @media (max-height: 480px) {
@@ -4231,6 +4231,7 @@ body.popout {
   height: 100vh;
   margin: 0 auto;
   padding: var(--s4);
+  overflow-y: auto;
 }
 .pop-head {
   display: flex;
@@ -4416,6 +4417,9 @@ body.popout[data-phase=paused] .pop-timer {
 .pop-resume {
   min-height: 48px;
 }
+body.popout[data-phase=paused] .pop-level {
+  display: none;
+}
 body.popout[data-phase=paused] .pop-stop {
   min-height: 40px;
   background: var(--surface);
@@ -4567,6 +4571,22 @@ body.popout:is([data-alert=nosound], :has([data-part=nosound]:not([hidden]))) .p
 }
 body.popout:is([data-alert=nosound], :has([data-part=nosound]:not([hidden]))) .pop-stop .i {
   color: #b3261e;
+}
+body.popout:is([data-alert=nosound], :has([data-part=nosound]:not([hidden]))) .pop-resume {
+  background: #ffffff;
+  border-color: #ffffff;
+  color: #b3261e;
+}
+body.popout[data-phase=paused]:is([data-alert=nosound], :has([data-part=nosound]:not([hidden]))) .pop-stop {
+  background: rgba(255, 255, 255, .14);
+  border-color: rgba(255, 255, 255, .55);
+  color: #ffffff;
+}
+body.popout[data-phase=paused]:is([data-alert=nosound], :has([data-part=nosound]:not([hidden]))) .pop-stop .i {
+  color: currentColor;
+}
+body.popout:is([data-alert=nosound], :has([data-part=nosound]:not([hidden]))) .pop-timer {
+  color: #ffffff;
 }
 body.popout:is([data-alert=nosound], :has([data-part=nosound]:not([hidden]))) .btn-secondary {
   background: rgba(255, 255, 255, .14);
@@ -13482,8 +13502,8 @@ ${list(win10)}
       const only = !!sc && onlyScreen(sc);
       show($("screenOneTip"), only);
       if (only) {
-        const hides = st.prefs.floatingControls && st.prefs.autoHideControls;
-        text($("screenOneTipText"), "This is your only screen, so Full Capture can’t stay in view while you teach. " + (hides ? "The floating controls hide as recording starts, so they stay out of the video. " : "") + "Keyboard shortcuts work only in Full Capture: to pause, add a chapter or stop, switch back to this tab. That moment is recorded.");
+        const { floatingControls, autoHideControls } = st.prefs;
+        text($("screenOneTipText"), floatingControls && !autoHideControls ? "This is your only screen. The floating controls stay on top while you record, so they’ll be in the video. Keyboard shortcuts work only in Full Capture." : "This is your only screen, so Full Capture can’t stay in view while you teach. " + (floatingControls ? "The floating controls hide as recording starts, so they stay out of the video. " : "") + "Keyboard shortcuts work only in Full Capture: to pause, add a chapter or stop, switch back to this tab. That moment is recorded.");
       }
       const collapsed = status === "done" && !this.expanded.has("stepScreen");
       this.#step("stepScreen", status, collapsed);
@@ -13554,6 +13574,8 @@ ${list(win10)}
       attr(btn, "aria-disabled", !counting && !micReady || starting ? "true" : null);
       attr(btn, "data-state", counting ? "countdown" : starting ? "starting" : "idle");
       if (micReady) show($("startHint"), false);
+      const unpinned = !micReady && !counting && !starting && mic.status !== "starting" && $("startHint").hidden;
+      attr(btn.closest(".start-bar"), "data-unpinned", unpinned ? "" : null);
     }
     #announce(st, inSetup) {
       const sc = st.soundCheck;
@@ -14817,7 +14839,7 @@ ${list(win10)}
         if (phase === "recording") this.#say(prev === "paused" ? "Recording resumed." : "Recording started.");
         else if (phase === "paused") this.#say("Paused. Not recording.");
         else if (phase === "stopping") this.#say("Saving…");
-        else if (phase === "review") this.#say(saved ? `${saved.replaceAll(" · ", ", ")}.` : "Saved.");
+        else if (phase === "review" && prev === "stopping") this.#say(saved ? `${saved.replaceAll(" · ", ", ")}.` : "Saved.");
       }
       if (noSound && !this.prevNoSound) this.#say("No sound from your microphone.", true);
       this.prevNoSound = noSound;

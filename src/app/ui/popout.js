@@ -431,7 +431,8 @@ export class Popout {
       if (phase === 'recording') this.#say(prev === 'paused' ? 'Recording resumed.' : 'Recording started.');
       else if (phase === 'paused') this.#say('Paused. Not recording.');
       else if (phase === 'stopping') this.#say('Saving…');
-      else if (phase === 'review') this.#say(saved ? `${saved.replaceAll(' · ', ', ')}.` : 'Saved.');
+      // Only a take that just finished saving (a start cancelled from Review also comes back here).
+      else if (phase === 'review' && prev === 'stopping') this.#say(saved ? `${saved.replaceAll(' · ', ', ')}.` : 'Saved.');
     }
     if (noSound && !this.prevNoSound) this.#say('No sound from your microphone.', true);
     this.prevNoSound = noSound;

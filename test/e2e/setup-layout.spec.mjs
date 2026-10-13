@@ -126,6 +126,45 @@ test('first visit: the pinned Start bar never covers Turn on microphone, and pin
   await expect.poll(() => page.locator('.start-bar').evaluate(el => getComputedStyle(el).position)).toBe('sticky');
 });
 
+/** Hold back microphone opens by window.__micDelay ms (a device that is slow to switch). */
+const slowMicOpens = () => {
+  const md = navigator.mediaDevices;
+  const real = md.getUserMedia.bind(md);
+  md.getUserMedia = async c => {
+    if (c?.audio && !c.video && window.__micDelay) await new Promise(r => setTimeout(r, window.__micDelay));
+    return real(c);
+  };
+};
+
+test('Start pressed before the microphone is on pins the bar with the reason in view; a microphone switching devices keeps it pinned', async ({ page }) => {
+  await page.setViewportSize(LAPTOP);
+  await openApp(page, {}, [micNotAsked], [slowMicOpens]);
+  expect(await page.locator('.start-bar').evaluate(el => getComputedStyle(el).position)).toBe('static');
+  await page.keyboard.press('Alt+r');
+  // Says why, in the (now pinned) Start bar, and points at the fix.
+  await expect(page.locator('#startHint')).toBeVisible();
+  await expect(page.locator('#startHint')).toContainText('microphone');
+  await expect.poll(() => page.locator('.start-bar').evaluate(el => getComputedStyle(el).position)).toBe('sticky');
+  await expect(page.locator('#btnMicOn')).toBeFocused();
+  await page.waitForTimeout(800);   // the smooth scroll to the fix
+  const hint = await page.locator('#startHint').evaluate(el => { const r = el.getBoundingClientRect(); return [r.top, r.bottom, innerHeight]; });
+  expect(hint[0]).toBeGreaterThanOrEqual(0);
+  expect(hint[1]).toBeLessThanOrEqual(hint[2]);
+  expect(await uncovered(page, '#btnMicOn')).toBe(true);
+
+  await page.click('#btnMicOn');
+  await expect.poll(() => state(page, st => st.mic.status)).toBe('live');
+  await expect.poll(() => page.locator('.start-bar').evaluate(el => getComputedStyle(el).position)).toBe('sticky');
+  // Another microphone: it reopens ("starting") without the bar dropping out of view.
+  await page.evaluate(() => { window.__micDelay = 1500; });
+  const options = await page.locator('#micSelect option').evaluateAll(os => os.map(o => o.value));
+  const current = await page.locator('#micSelect').inputValue();
+  await page.locator('#micSelect').selectOption(options.find(v => v !== current));
+  await expect.poll(() => state(page, st => st.mic.status)).toBe('starting');
+  expect(await page.locator('.start-bar').evaluate(el => getComputedStyle(el).position)).toBe('sticky');
+  await expect.poll(() => state(page, st => st.mic.status), { timeout: 10_000 }).toBe('live');
+});
+
 test('a microphone sending pure silence: Set up says No sound instead of All set, and Start still works', async ({ page }) => {
   await openApp(page, {}, [silentMic]);
   await micLive(page);

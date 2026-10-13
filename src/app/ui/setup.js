@@ -394,10 +394,13 @@ export class SetupView {
     const only = !!sc && onlyScreen(sc);
     show($('screenOneTip'), only);
     if (only) {
-      const hides = st.prefs.floatingControls && st.prefs.autoHideControls;
-      text($('screenOneTipText'), 'This is your only screen, so Full Capture can’t stay in view while you teach. '
-        + (hides ? 'The floating controls hide as recording starts, so they stay out of the video. ' : '')
-        + 'Keyboard shortcuts work only in Full Capture: to pause, add a chapter or stop, switch back to this tab. That moment is recorded.');
+      const { floatingControls, autoHideControls } = st.prefs;
+      text($('screenOneTipText'), floatingControls && !autoHideControls
+        // Auto-hide turned off in Settings: they stay on top, and so they are recorded.
+        ? 'This is your only screen. The floating controls stay on top while you record, so they’ll be in the video. Keyboard shortcuts work only in Full Capture.'
+        : 'This is your only screen, so Full Capture can’t stay in view while you teach. '
+          + (floatingControls ? 'The floating controls hide as recording starts, so they stay out of the video. ' : '')
+          + 'Keyboard shortcuts work only in Full Capture: to pause, add a chapter or stop, switch back to this tab. That moment is recorded.');
     }
     const collapsed = status === 'done' && !this.expanded.has('stepScreen');
     this.#step('stepScreen', status, collapsed);
@@ -465,6 +468,11 @@ export class SetupView {
     attr(btn, 'aria-disabled', (!counting && !micReady) || starting ? 'true' : null);
     attr(btn, 'data-state', counting ? 'countdown' : starting ? 'starting' : 'idle');
     if (micReady) show($('startHint'), false);
+    // Until the microphone has been turned on (a first visit, or blocked), Start waits under the
+    // steps: pinned, it would cover Turn on microphone. A mic that is (re)opening, e.g. another
+    // device chosen, keeps it pinned, and so does a blocked Start's explanation, which is shown in it.
+    const unpinned = !micReady && !counting && !starting && mic.status !== 'starting' && $('startHint').hidden;
+    attr(btn.closest('.start-bar'), 'data-unpinned', unpinned ? '' : null);
   }
 
   #announce(st, inSetup) {

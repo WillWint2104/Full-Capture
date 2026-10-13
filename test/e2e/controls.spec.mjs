@@ -174,6 +174,13 @@ test('a whole-screen take on one display closes the floating controls before it 
     }).observe(document.getElementById('toasts'), { childList: true });
   });
   const hiddenToasts = () => page.evaluate(() => window.__toastTitles.filter(t => t === 'Floating controls hidden').length);
+  // Everything said to screen readers through the page's polite live region.
+  await page.evaluate(() => {
+    window.__spoken = [];
+    new MutationObserver(list => {
+      for (const m of list) for (const n of m.addedNodes) if (n.textContent) window.__spoken.push(n.textContent);
+    }).observe(document.getElementById('srStatus'), { childList: true });
+  });
 
   for (const take of [1, 2]) {
     if (take === 2) await newTake(page);
@@ -193,6 +200,8 @@ test('a whole-screen take on one display closes the floating controls before it 
       await expect(page.locator('#toasts')).toContainText('in the video');
     }
     expect(await hiddenToasts()).toBe(1);
+    // Screen readers hear it every take (the toast's own announcement the first time).
+    await expect.poll(() => page.evaluate(() => window.__spoken.filter(t => t.startsWith('Floating controls hidden')).length)).toBe(take);
     await expect(page.locator('#btnPopout')).toHaveAttribute('aria-pressed', 'false');
     await expect(page.locator('#btnPopout .on-tag')).toHaveText('Hidden');
 
@@ -413,15 +422,76 @@ test('paused, the floating controls make Resume the big button and keep Stop & s
   expect(await phase(page)).toBe('recording');
   await expect(resume).toBeHidden();
   await expect(pause).toBeVisible();
-  // A double click on Pause pauses once, and doesn't add a chapter with the button that moved under it.
+  // A double click on Pause pauses once: the second press lands on Stop & save, which has moved
+  // under the pointer, and is ignored.
   await page.waitForTimeout(600);
   await pause.dblclick();
   await expect.poll(() => phase(page)).toBe('paused');
   await page.waitForTimeout(800);
   expect(await phase(page)).toBe('paused');
-  expect(await state(page, st => st.take.markers.length)).toBe(0);
+  // Add chapter and More also ignore a press straight after Pause or Resume (their places move too).
   await page.waitForTimeout(600);
-  await resume.click();
+  await page.evaluate(() => {
+    const d = window.__pip.document;
+    d.querySelector('[data-action="resume"]').click();
+    d.querySelector('[data-action="marker"]').click();
+    d.querySelector('[data-action="more"]').click();
+  });
+  await expect.poll(() => phase(page)).toBe('recording');
+  expect(await state(page, st => st.take.markers.length)).toBe(0);
+  await expect(pip(page).locator('[data-part="confirm"]')).toBeHidden();
+  // A moment later they work as usual.
+  await page.waitForTimeout(600);
+  await pip(page).locator('[data-action="marker"]').click();
+  await expect.poll(() => state(page, st => st.take.markers.length)).toBe(1);
+  await stopTake(page);
+});
+
+test('paused with no sound, Resume is still the button that stands out, and a paused window with a warning still fits', async ({ page }) => {
+  // A microphone with a tone until window.__mute() silences it completely (a headset muted mid-take):
+  // a few seconds later the floating window turns red.
+  const mutableMic = () => {
+    const md = navigator.mediaDevices;
+    const real = md.getUserMedia.bind(md);
+    md.getUserMedia = async c => {
+      if (!c?.audio || c.video) return real(c);
+      const ctx = new AudioContext();
+      const osc = new OscillatorNode(ctx, { frequency: 220 });
+      const gain = new GainNode(ctx, { gain: 0.2 });
+      const dest = ctx.createMediaStreamDestination();
+      osc.connect(gain).connect(dest);
+      osc.start();
+      window.__mute = () => { gain.gain.value = 0; };
+      return dest.stream;
+    };
+  };
+  // The test browser's small quota raises "Storage is nearly full", which the controls show too.
+  await openApp(page, { autoHideControls: false }, [mutableMic]);
+  await micLive(page);
+  await chooseScreen(page);
+  await startTake(page);
+  await expect.poll(() => pipOpen(page)).toBe(true);
+  await page.waitForTimeout(600);
+  await pip(page).locator('[data-action="pause"]').click();
+  await expect.poll(() => phase(page)).toBe('paused');
+  await expect(pip(page).locator('[data-part="alert"]')).toBeVisible();
+  // Fits the 320 × 420 window: Add chapter and More are inside it, not cut off.
+  const frame = await page.locator('body > iframe').boundingBox();
+  for (const action of ['resume', 'stop', 'marker', 'more']) {
+    const b = await pip(page).locator(`[data-action="${action}"]`).boundingBox();
+    expect(b.y + b.height, `${action} inside the window`).toBeLessThanOrEqual(frame.y + frame.height);
+  }
+
+  await page.evaluate(() => window.__mute());
+  await expect.poll(() => state(page, st => st.alerts.some(a => a.id === 'no-audio')), { timeout: 15_000 }).toBe(true);
+  await expect(pip(page).locator('[data-part="nosound"]')).toBeVisible();
+  const colours = await page.evaluate(() => {
+    const d = window.__pip.document, bg = el => d.defaultView.getComputedStyle(el).backgroundColor;
+    return { resume: bg(d.querySelector('[data-action="resume"]')), stop: bg(d.querySelector('[data-action="stop"]')) };
+  });
+  expect(colours.resume).toBe('rgb(255, 255, 255)');          // white on the red window
+  expect(colours.stop).toBe('rgba(255, 255, 255, 0.14)');     // quiet, like the other secondary buttons
+  await pip(page).locator('[data-action="resume"]').click();
   await expect.poll(() => phase(page)).toBe('recording');
   await stopTake(page);
 });
