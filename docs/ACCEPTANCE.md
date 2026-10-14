@@ -4,6 +4,10 @@ Run once on the Windows PC you teach from, with the microphone, camera and
 screen you actually use. About 20 minutes. Tick each line; anything that
 doesn't happen as written is a failure. Note it with a screenshot.
 
+Much of this list can be run automatically, in the installed Chrome and Edge
+with real devices: see `test/windows/README.md`. What the kit can't do
+(Windows Media Player, the clap test, two monitors, a long take) stays here.
+
 **Before you start**
 - [ ] Chrome or Edge is version **126 or newer** (`chrome://version` or
       `edge://version`). Older versions save WebM instead of MP4.
