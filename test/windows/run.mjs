@@ -26,6 +26,9 @@ const WINDOW_SOURCE = `${PATTERN_TITLE} - `;
 const SETTINGS_KEY = 'full-capture:settings:v1';
 const LESSON = 'Acceptance test';
 const SETTLE = 650;              // the app ignores presses in a view's first 500 ms
+const RECOVERY_S = 30;           // recorded before the tab crashes or the browser is ended (as in docs/ACCEPTANCE.md)
+const LOST_OK_S = 3.5;           // seconds a recovered take may lack at its end and pass
+const LOST_MAX_S = 5;            // more than this is a failure
 const WIN = process.platform === 'win32';
 
 // ------------------------------------------------------------------ options
@@ -36,7 +39,8 @@ const HELP = `Usage: node test/windows/run.mjs [options]
   --seconds N        length of the main take, without its pause (default 60)
   --camera           camera bubble on for the main take (records your webcam)
   --only LIST        main,takes,reliability,recovery,window (default: all)
-  --guided [LIST]    also the steps that need you: speak,unplug,stop-sharing,folder (default: all four)
+  --guided [LIST]    also the steps that need you: speak,stop-sharing,folder (the default), and
+                     unplug (only with a microphone or headset you can unplug)
   --source TEXT      what the screen picker picks by itself (default "Entire screen", "Screen 1" with two screens)
   --window-source T  the window the picker picks for the window take (default "FC acceptance pattern - ")
   --no-sound         the test pattern flashes without clicks
@@ -55,7 +59,7 @@ function parseArgs(argv) {
     else if (a === '--seconds') o.seconds = Math.max(10, Number(next()) || 60);
     else if (a === '--camera') o.camera = true;
     else if (a === '--only') o.only = next().split(',');
-    else if (a === '--guided') o.guided = argv[i + 1] && !argv[i + 1].startsWith('--') ? next().split(',') : ['speak', 'unplug', 'stop-sharing', 'folder'];
+    else if (a === '--guided') o.guided = argv[i + 1] && !argv[i + 1].startsWith('--') ? next().split(',') : ['speak', 'stop-sharing', 'folder'];
     else if (a === '--source') o.source = next();
     else if (a === '--window-source') o.windowSource = next();
     else if (a === '--no-sound') o.sound = false;
@@ -66,6 +70,8 @@ function parseArgs(argv) {
     else throw new Error(`Unknown option ${a}\n${HELP}`);
   }
   o.browsers ||= WIN ? ['chrome', 'msedge'] : ['chromium'];
+  for (const b of o.browsers) if (!/^(chromium|chrome|msedge)(-beta|-dev|-canary)?$/.test(b)) throw new Error(`Unknown browser "${b}": use chrome, msedge or chromium`);
+  for (const g of o.guided || []) if (!['speak', 'unplug', 'stop-sharing', 'folder'].includes(g)) throw new Error(`Unknown guided step "${g}"`);
   o.guided ||= [];
   return o;
 }
@@ -81,18 +87,29 @@ const insideRepo = !path.relative(ROOT, OUT).startsWith('..') && !path.isAbsolut
 if (insideRepo) throw new Error(`The evidence folder must be outside the repository (it holds recordings): ${OUT}`);
 if (fs.existsSync(OUT) && fs.readdirSync(OUT).length) throw new Error(`${OUT} already has files in it; pick a new --out (nothing is overwritten).`);
 fs.mkdirSync(OUT, { recursive: true });
+// The run saves a few hundred MB of takes; never start it on a nearly full disk.
+try {
+  const st = fs.statfsSync(OUT);
+  if (st.bavail * st.bsize < 5e9) throw new Error(`Only ${(st.bavail * st.bsize / 1e9).toFixed(1)} GB free where the evidence goes (${OUT}); the kit needs 5 GB. Free some space or pass --out on another drive.`);
+} catch (e) { if (!/GB free/.test(e.message)) console.warn(`Couldn't check the free space: ${e.message}`); else throw e; }
 
 // ------------------------------------------------------------------ logging and results
 
 const LOG = path.join(OUT, 'run.log');
-const show = p => (p ? String(p).split(os.homedir()).join(WIN ? '%USERPROFILE%' : '~') : p);
+const HOME_FORMS = [...new Set([os.homedir(), os.homedir().replace(/\\/g, '/'), encodeURI(os.homedir().replace(/\\/g, '/'))])];
+/** A path or message with the home folder (and so the user name) replaced. */
+const show = p => (p ? HOME_FORMS.reduce((t, h) => t.split(h).join(WIN ? '%USERPROFILE%' : '~'), String(p)) : p);
 function log(msg) {
   const line = `${new Date().toISOString().slice(11, 19)} ${msg}`;
   console.log(line);
   fs.appendFileSync(LOG, line + '\n');
 }
 /** Something only the person at the computer can do: said plainly, then the kit waits and watches. */
-function action(msg) { log(`ACTION NEEDED: ${msg}`); }
+function action(msg, S) {
+  log(`ACTION NEEDED: ${msg}`);
+  S?.pattern?.evaluate(t => window.pattern?.say(t), msg).catch(() => {});
+}
+const done = S => S?.pattern?.evaluate(() => window.pattern?.say('')).catch(() => {});
 
 const results = [];
 const ICON = { pass: 'PASS', fail: 'FAIL', warn: 'WARN', 'not run': 'SKIP', manual: 'MANUAL', info: 'INFO' };
@@ -243,9 +260,8 @@ function instrument({ settingsKey, lesson, selfTest, periodMs }) {
 
 /** Launch the installed browser with real devices: no fake camera, microphone, screen or permission UI. */
 async function launch(S, source) {
-  S.source = source;
-  // Full Capture's window stays in the top left, clear of where the pattern's flashes are measured.
-  S.args = [`--auto-select-desktop-capture-source=${source}`, '--window-position=20,20', '--window-size=900,700'];
+  S.source = source;          // null: the person picks in the sharing window (--guided)
+  S.args = [...(source ? [`--auto-select-desktop-capture-source=${source}`] : []), '--window-position=20,20', '--window-size=900,700'];
   S.context = await chromium.launchPersistentContext(S.profile, {
     ...(S.channel ? { channel: S.channel } : {}),
     headless: false, viewport: null, acceptDownloads: true,
@@ -261,6 +277,15 @@ async function launch(S, source) {
   watch(S, S.app);
   S.pattern = null;
   await openApp(S, S.app);
+  // Full Capture's window stays in the top left, clear of the right fifth of the screen where the
+  // pattern's flashes are measured (at any display scaling).
+  const cdp = await S.context.newCDPSession(S.app);
+  try {
+    const { windowId } = await cdp.send('Browser.getWindowForTarget');
+    const [aw, ah] = await S.app.evaluate(() => [screen.availWidth, screen.availHeight]);
+    await cdp.send('Browser.setWindowBounds', { windowId, bounds: { left: 20, top: 20, width: Math.min(900, Math.floor(aw * 0.7)), height: Math.min(700, ah - 40) } });
+  } catch (e) { log(`Full Capture's window couldn't be sized: ${e.message}`); }
+  await cdp.detach().catch(() => {});
   if (!S.version) {
     // "Google Chrome 141.0.7390.66" or "Microsoft Edge 141.0.3537.71" (Playwright's own Chromium: "Chromium …").
     S.version = await S.app.evaluate(async () => {
@@ -280,7 +305,8 @@ function watch(S, page) {
 
 async function openApp(S, page) {
   await page.goto(APP_URL);
-  await page.waitForFunction(() => document.documentElement.dataset.ready === 'true', null, { timeout: 30_000 });
+  // Polled on a timer: a page hidden behind another window gets no animation frames on Windows.
+  await page.waitForFunction(() => document.documentElement.dataset.ready === 'true', null, { timeout: 30_000, polling: 250 });
 }
 
 const phase = S => S.app.evaluate(() => document.documentElement.dataset.phase);
@@ -301,7 +327,8 @@ async function pipPage(S) {
   }
   return null;
 }
-const elapsedS = async S => (await state(S, () => window.fullCapture.state.take?.elapsedMs ?? 0)) / 1000;
+/** Seconds since the take began, by the kit's clock (the app's own figure is refreshed by timers, slowly while it is hidden). */
+const sinceStart = start => (Date.now() - start.startedAt) / 1000;
 async function toApp(S) { await S.app.bringToFront(); await sleep(300); }
 async function toPattern(S) { if (await patternAlive(S)) await S.pattern.bringToFront(); }
 const patternAlive = async S => !!S.pattern && !S.pattern.isClosed() && !!(await S.pattern.evaluate(() => 1).catch(() => null));
@@ -347,13 +374,16 @@ async function chooseScreen(S) {
   await toApp(S);
   await sleep(SETTLE);
   await S.app.click('#btnChooseScreen');
-  let ok = await until(() => state(S, () => !!window.fullCapture.state.screen), 20_000);
+  // Without a source to pick by itself (two screens, --guided), the person picks the screen the pattern is on.
+  let ok = S.source && await until(() => state(S, () => !!window.fullCapture.state.screen), 20_000);
   if (!ok && OPT.guided.length) {
-    action(`In the browser's sharing window, choose "${S.source}" and press Share (the kit waits 3 minutes).`);
+    action(S.source ? `In the browser's sharing window, choose "${S.source}" and press Share (the kit waits 3 minutes).`
+      : 'In the browser\'s sharing window, choose the screen showing the test pattern (Entire screen tab) and press Share. The kit waits 3 minutes.', S);
     ok = await until(() => state(S, () => !!window.fullCapture.state.screen), 180_000, 500);
+    await done(S);
   }
   if (!ok) throw new Error(`The sharing window didn't choose "${S.source}" by itself. With two screens pass --source "Screen 1"; in a browser that isn't in English, pass the name it shows; or run with --guided and choose it yourself.`);
-  return state(S, () => { const s = window.fullCapture.state.screen; return { surface: s.surface, label: s.label, width: s.width, height: s.height, nativeWidth: s.nativeWidth, nativeHeight: s.nativeHeight }; });
+  return state(S, () => { const s = window.fullCapture.state.screen; return { surface: s.surface, label: s.label, width: s.width, height: s.height, nativeWidth: s.nativeWidth, nativeHeight: s.nativeHeight, hasAudio: s.hasAudio }; });
 }
 
 /** Back to "ready" from wherever the last step left the app. */
@@ -451,7 +481,7 @@ function judgeTake(S, sec, label, a, review, expect) {
   const appS = review ? review.durationMs / 1000 : null;
   const finalised = a.layout && a.layout.moov && a.layout.moovAtEnd && !a.layout.fragmented;
   const lenOk = appS == null || Math.abs(lengthS - appS) < 0.5;
-  record(b, 5, `mp4.format.${label}`, `${label}: MP4 (H.264 + AAC), finalised, length right`,
+  record(b, 5, `mp4.format.${label}`, `${label}: MP4 with H.264, finalised, length right`,
     /mp4/.test(p.container) && finalised && lenOk && (h264 || OPT.selfTest) ? 'pass' : 'fail',
     `${p.video?.codec}/${p.audio?.codec ?? 'no sound'} ${p.video?.width}×${p.video?.height} ${p.video?.avgFps} fps; layout ${a.layout ? a.layout.order.join(' ') : p.container}; ` +
     `length: app ${appS ?? '?'} s, header ${a.layout?.headerS ?? '–'} s, ffprobe ${p.durationS} s; ${(p.bytes / 1e6).toFixed(1)} MB`, { evidence: ev });
@@ -485,12 +515,15 @@ function judgeTake(S, sec, label, a, review, expect) {
     record(b, 4, `au.sync.${label}`, `${label}: sound and picture in sync (start, after pause, end)`, 'not run',
       `not measurable: ${sy.flashes} flashes and ${sy.clicks} clicks found${sy.clicks < 3 ? ' (the microphone didn’t hear the pattern’s clicks: a headset? Use the clap test in docs/ACCEPTANCE.md)' : ''}`);
   } else {
+    // The offset itself includes the speakers' and display's delays, so only a large one is worth a look.
+    // A change of it during the take (by the end, or after the pause) is the app's: more than 60 ms fails.
     const drift = Math.abs((sy.end?.medianMs ?? sy.medianMs) - (sy.start?.medianMs ?? sy.medianMs));
     const afterPause = sy.afterPause ? Math.abs(sy.afterPause.medianMs - (sy.start?.medianMs ?? sy.medianMs)) : 0;
-    const ok = Math.abs(sy.medianMs) <= 120 && drift <= 45 && afterPause <= 45;
-    record(b, 4, `au.sync.${label}`, `${label}: sound and picture in sync (start, after pause, end)`, ok ? 'pass' : 'warn',
+    const status = drift > 60 || afterPause > 60 ? 'fail' : Math.abs(sy.medianMs) > 120 || drift > 45 || afterPause > 45 ? 'warn' : 'pass';
+    record(b, 4, `au.sync.${label}`, `${label}: sound and picture in sync (start, after pause, end)`, status,
       `sound ${sy.medianMs > 0 ? 'late' : 'early'} by ${Math.abs(sy.medianMs)} ms (median of ${sy.pairs.length}; range ${sy.minMs}…${sy.maxMs}); start ${sy.start?.medianMs} ms, after pause ${sy.afterPause?.medianMs ?? '–'} ms, end ${sy.end?.medianMs} ms; ` +
-      `first pairs ${sy.pairs.slice(0, 3).map(x => `${x.at}s:${x.ms}`).join(' ')}. Includes the speakers' and display's own delay${S.patternInfo?.outputLatency != null ? ` (the browser reports ${Math.round(S.patternInfo.outputLatency * 1000)} ms output latency, allowed for)` : ''}.`);
+      `first pairs ${sy.pairs.slice(0, 3).map(x => `${x.at}s:${x.ms}`).join(' ')}. Includes the speakers' and display's own delay${S.patternInfo?.outputLatency != null ? ` (the browser reports ${Math.round(S.patternInfo.outputLatency * 1000)} ms output latency, allowed for)` : ''}` +
+      `${S.screenInfo?.hasAudio ? '. The computer’s sound is recorded too, so the clicks may have come through it rather than the microphone' : ''}.`);
   }
   for (const c of a.controls) {
     record(b, 3, `fc.frames.${label}.${c.name}`, `${label}: ${c.title}`, c.wrong ? 'fail' : c.frames ? 'pass' : 'warn',
@@ -502,6 +535,17 @@ function judgeTake(S, sec, label, a, review, expect) {
       `${lengthS} s in the file; ${expect.wallS.toFixed(1)} s recorded by the clock (pause of ${expect.pausedS?.toFixed(1) ?? 0} s left out)`);
   }
 }
+
+/** Stop this browser's run if the recording doesn't show the test pattern: something else on screen is being recorded. */
+function patternRecorded(S, a, label) {
+  if (a.sync.flashes >= 3) return;
+  record(S.name, 2, `cap.subject.${label}`, `${label}: the recording shows the test pattern`, 'fail',
+    `only ${a.sync.flashes} of its flashes are in the video, so another screen or window was recorded; the run stops here so nothing else on your screens is recorded`);
+  throw new StopRun('the recording doesn’t show the test pattern');
+}
+
+/** Ends this browser's run, not just the step it happens in. */
+class StopRun extends Error {}
 
 async function analyse(S, saved, name, expect = {}, raw = null) {
   log(`Analysing ${show(saved.file)} …`);
@@ -515,6 +559,7 @@ async function analyse(S, saved, name, expect = {}, raw = null) {
 async function playInBrowser(S, file, lengthS) {
   const page = await S.context.newPage();
   try {
+    await page.bringToFront();
     await page.goto(pathToFileURL(file).href);
     return await page.evaluate(async targets => {
       const v = document.querySelector('video');
@@ -577,7 +622,7 @@ async function setUp(S) {
   const sc = await chooseScreen(S);
   S.screenInfo = sc;
   record(b, 2, 'cap.screen', 'Whole screen chosen in the sharing window', sc.surface === 'monitor' ? 'pass' : 'fail',
-    `${sc.surface} “${sc.label}”, ${sc.nativeWidth}×${sc.nativeHeight} (recorded at ${sc.width}×${sc.height}); display ${S.displays.width}×${S.displays.height} at ${S.displays.dpr}× scaling, ${S.displays.isExtended ? 'more than one screen' : 'one screen'}; picked by “${S.source}”`);
+    `${sc.surface} “${sc.label}”, ${sc.nativeWidth}×${sc.nativeHeight} (recorded at ${sc.width}×${sc.height}), ${sc.hasAudio ? 'with' : 'without'} the computer’s sound; display ${S.displays.width}×${S.displays.height} at ${S.displays.dpr}× scaling, ${S.displays.isExtended ? 'more than one screen' : 'one screen'}; picked by “${S.source}”`);
   S.shots.push(await screenshot(S, 'setup-ready'));
 }
 
@@ -593,7 +638,7 @@ async function mainTake(S) {
   await sleep(SETTLE);
   await S.app.click('#btnMarker');
   await sleep(400);
-  const pauseAt = await elapsedS(S);
+  const pauseAt = sinceStart(start);
   const pausedWall = Date.now();
   await S.app.click('#btnPause');
   const paused = await waitPhase(S, 'paused', 5000);
@@ -627,6 +672,7 @@ async function mainTake(S) {
     `open during the countdown: ${start.pipInCountdown}; open when recording began: ${start.pipAtRecording}; “Floating controls hidden” toasts: ${toasts.filter(t => t === 'Floating controls hidden').length}`);
 
   const a = await analyse(S, saved, 'take-1', { pauseAt, controls: [{ name: 'hidden', title: 'no recorded frame shows the floating controls', from: -1, to: 1e9, shown: false }] }, raw);
+  patternRecorded(S, a, 'Take 1');
   judgeTake(S, 'main', 'Take 1', a, saved.review, { wallS, pausedS });
   const play = await playInBrowser(S, saved.file, a.layout?.headerS ?? a.probe.durationS);
   const playOk = !play.error && Math.abs(play.duration - (a.layout?.headerS ?? a.probe.durationS)) < 0.2 && play.seeks.every(s => Math.abs(s.at - s.target) < 0.1) && play.played > 0.5;
@@ -638,16 +684,16 @@ async function mainTake(S) {
 /** Take 2: the controls brought back mid-take (so they're in the video) and hidden again. */
 async function controlsTake(S) {
   const b = S.name;
-  await startTake(S);
+  const start = await startTake(S);
   await toPattern(S);
   await sleep(3000);
-  const shownAt = await elapsedS(S);
+  const shownAt = sinceStart(start);
   await S.app.keyboard.press('Alt+h');
   const shown = await until(() => pipOpen(S), 5000);
   await sleep(4000);
   const pip = await until(() => pipPage(S), 5000);
   if (!pip) throw new Error('the floating controls window isn’t reachable');
-  const hiddenAt = await elapsedS(S);
+  const hiddenAt = sinceStart(start);
   // The window can close under the click before Playwright hears back from it: that is the button working.
   await pip.click('[data-action="hide"]', { timeout: 5000 }).catch(e => { if (!/closed/i.test(e.message)) throw e; });
   const hidden = await until(async () => !(await pipOpen(S)), 5000);
@@ -655,10 +701,12 @@ async function controlsTake(S) {
   const saved = await stopAndSave(S);
   record(b, 3, 'fc.restore', 'Alt+H brings the controls back mid-take; Hide controls closes them again', shown && hidden ? 'pass' : 'fail', `shown at ${shownAt.toFixed(1)} s (${shown ? 'opened' : 'DID NOT OPEN'}), hidden at ${hiddenAt.toFixed(1)} s (${hidden ? 'closed' : 'STAYED OPEN'})`);
   const a = await analyse(S, saved, 'take-2', { controls: [
+    // Margins for the window opening and closing (and its animation).
     { name: 'before', title: 'controls hidden: in no frame', from: -1, to: shownAt - 0.3, shown: false },
-    { name: 'shown', title: 'controls shown: in the frames (proves the check sees them)', from: shownAt + 1, to: hiddenAt - 0.3, shown: true },
-    { name: 'after', title: 'hidden again: in no frame', from: hiddenAt + 1, to: 1e9, shown: false },
+    { name: 'shown', title: 'controls shown: in the frames (proves the check sees them)', from: shownAt + 1.5, to: hiddenAt - 0.5, shown: true },
+    { name: 'after', title: 'hidden again: in no frame', from: hiddenAt + 1.5, to: 1e9, shown: false },
   ] });
+  patternRecorded(S, a, 'Take 2');
   judgeTake(S, 'takes', 'Take 2', a, saved.review, {});
   S.takes.push(saved);
 }
@@ -780,8 +828,9 @@ async function reliability(S) {
   await step(S, 6, 'rel.disk', 'Low disk space: a warning before a long lesson', async () => {
     const page = await S.context.newPage();
     try {
+      await page.bringToFront();
       await page.goto(`${APP_URL}?kit-low-disk`);
-      await page.waitForFunction(() => document.documentElement.dataset.ready === 'true', null, { timeout: 30_000 });
+      await page.waitForFunction(() => document.documentElement.dataset.ready === 'true', null, { timeout: 30_000, polling: 250 });
       const alert = await until(() => page.evaluate(() => window.fullCapture.state.alerts.find(a => a.id === 'storage-low')), 15_000);
       const banner = await page.locator('#banners').textContent().catch(() => '');
       const file = path.join(S.dir, 'screenshots', 'low-disk.png');
@@ -794,16 +843,16 @@ async function reliability(S) {
 
 /** The tab crashes mid-take; the next visit offers the recording. */
 async function tabCrash(S) {
-  const b = S.name;
-  await startTake(S);
+  const start = await startTake(S);
   await toPattern(S);
-  await sleep(12_000);
-  const recordedS = await elapsedS(S);
+  await sleep(RECOVERY_S * 1000);
+  const recordedS = sinceStart(start);
   const crashed = new Promise(r => S.app.once('crash', r));
   const cdp = await S.context.newCDPSession(S.app);
   cdp.send('Page.crash').catch(() => {});
   await Promise.race([crashed, sleep(10_000)]);
   S.app = await S.context.newPage();
+  await S.app.bringToFront();
   await openApp(S, S.app);
   if (!(await patternAlive(S))) await openPattern(S);
   await recover(S, 'rel.tabcrash', 'The tab crashes mid-take: the next visit recovers a playable file', recordedS);
@@ -813,15 +862,15 @@ async function tabCrash(S) {
 async function browserKill(S, nextSource) {
   const b = S.name;
   await micOn(S);
-  await startTake(S);
+  const start = await startTake(S);
   await toPattern(S);
-  await sleep(12_000);
-  const recordedS = await elapsedS(S);
+  await sleep(RECOVERY_S * 1000);
+  const recordedS = sinceStart(start);
   const killed = killBrowser(S.profile);
   await Promise.race([S.context.close().catch(() => {}), sleep(10_000)]);
-  if (!killed) { record(b, 6, 'rel.kill', 'The browser is ended mid-take: the next start recovers it', 'fail', 'no browser process found to end'); return; }
   await sleep(2000);
   await launch(S, nextSource);
+  if (!killed) { record(b, 6, 'rel.kill', 'The browser is ended mid-take: the next start recovers it', 'fail', 'no browser process found to end'); return; }
   await recover(S, 'rel.kill', `The browser is ended mid-take (${killed} processes killed, like Task Manager’s End task): the next start recovers a playable file`, recordedS);
 }
 
@@ -837,11 +886,11 @@ async function recover(S, id, title, recordedS) {
   const errors = (await import('../tools/media.mjs')).decodeErrors(saved.file);
   const layout = /mp4/.test(p.container) ? A.mp4Layout(saved.file) : null;
   // The safety copy is written every second, and the browser's MP4 writer holds back about a second more,
-  // so the last few seconds before a crash can be missing (about 2 s after a tab crash and 3 s after the
-  // browser is ended, in the kit's own runs). More than 4 s is worth a look; more than 8 s is a failure.
+  // so the last seconds before a crash can be missing (2–3.5 s in the kit's own runs). Up to LOST_OK_S
+  // passes, up to LOST_MAX_S is worth a look, and more is lost footage: a failure.
   const lost = recordedS - p.durationS;
   const playable = saved.name.startsWith('RECOVERED_') && !errors && p.audio && (!layout || (layout.moovAtEnd && !layout.fragmented));
-  record(S.name, 6, id, title, !playable || lost > 8 ? 'fail' : lost > 4 ? 'warn' : 'pass',
+  record(S.name, 6, id, title, !playable || lost > LOST_MAX_S ? 'fail' : lost > LOST_OK_S ? 'warn' : 'pass',
     `“${saved.name}”: ${p.durationS} s of the ${recordedS.toFixed(1)} s recorded (the last ${Math.max(0, lost).toFixed(1)} s missing), ${p.video?.codec}/${p.audio?.codec ?? 'NO SOUND'}${layout ? `, ${layout.order.join(' ')}` : ''}${errors ? `; decode errors: ${errors.slice(0, 200)}` : ', decodes cleanly'}`,
     { evidence: [saved.file, shot] });
   await toApp(S);
@@ -871,28 +920,34 @@ async function windowCapture(S) {
 async function guided(S) {
   const b = S.name;
   if (OPT.guided.includes('speak')) await step(S, 4, 'au.speech', 'Speech: heard at a good level, not clipped', async () => {
-    await toApp(S);
-    action('Say “This is a Full Capture microphone test, one, two, three” at your normal teaching volume (the kit listens for 10 seconds).');
-    const m = await meter(S, 10_000);
+    action('Say “This is a Full Capture microphone test, one, two, three” at your normal teaching volume. The kit waits up to 2 minutes for you to start.', S);
+    // Wait for speech to start (relaying the request takes a while), then listen for 8 s.
+    const heard = await until(async () => (await meter(S, 1000)).speech > 3, 120_000, 0);
+    const m = heard ? await meter(S, 8000) : { speech: 0, peakMaxDb: null, clips: 0 };
+    await done(S);
     record(b, 4, 'au.speech', 'Speech: heard at a good level, not clipped', m.speech > 10 && m.peakMaxDb > -30 && !m.clips ? 'pass' : 'warn',
-      `peak ${m.peakMaxDb} dB, ${m.speech} meter readings with speech, ${m.clips} clipped samples`);
+      heard ? `peak ${m.peakMaxDb} dB, ${m.speech} meter readings with speech, ${m.clips} clipped samples` : 'no speech heard in 2 minutes');
   });
   if (OPT.guided.includes('unplug')) await step(S, 6, 'rel.unplug', 'Microphone unplugged mid-take, then plugged back in', async () => {
     await startTake(S);
-    action('Unplug your microphone or headset now (the kit waits 2 minutes).');
+    await toPattern(S);
+    action('Unplug your microphone or headset now (the kit waits 2 minutes).', S);
     const lost = await until(() => state(S, () => window.fullCapture.state.alerts.find(a => a.id === 'mic-lost')?.title), 120_000, 500);
     const still = await phase(S);
-    action('Plug it back in now (the kit waits 2 minutes).');
+    action('Plug it back in now (the kit waits 2 minutes).', S);
     const back = await until(async () => (await state(S, () => window.fullCapture.state.mic.status)) === 'live' && !(await state(S, () => window.fullCapture.state.alerts.some(a => a.id === 'mic-lost'))), 120_000, 500);
+    await done(S);
     const saved = await stopAndSave(S);
     record(b, 6, 'rel.unplug', 'Microphone unplugged mid-take, then plugged back in', lost && still === 'recording' && back ? 'pass' : 'fail',
       `warning “${lost || 'none'}”; take ${still}; microphone ${back ? 'back' : 'NOT BACK'}; saved “${saved.name}”`, { evidence: [saved.file] });
   });
   if (OPT.guided.includes('stop-sharing')) await step(S, 6, 'rel.stopshare', 'Stop sharing pressed in the browser’s bar: the take is saved and Review says why', async () => {
     await startTake(S);
+    await toPattern(S);
     const dl = S.app.waitForEvent('download', { timeout: 180_000 });
-    action('Click “Stop sharing” in the browser’s sharing bar (bottom of the screen) now (the kit waits 3 minutes).');
+    action('Click “Stop sharing” in the browser’s sharing bar (bottom of the screen) now (the kit waits 3 minutes).', S);
     const saved = await keep(S, await dl);
+    await done(S);
     await waitPhase(S, 'review', 30_000);
     const endedBy = await state(S, () => window.fullCapture.state.review?.endedBy);
     record(b, 6, 'rel.stopshare', 'Stop sharing pressed in the browser’s bar: the take is saved and Review says why', endedBy === 'share-ended' ? 'pass' : 'fail', `“${saved.name}”, ended by ${endedBy}`, { evidence: [saved.file] });
@@ -904,8 +959,9 @@ async function guided(S) {
     await ready(S);
     await sleep(SETTLE);
     await S.app.click('#btnChooseFolder');
-    action(`In the folder window, open ${dir}, select it, then press Select Folder and Allow (“View files”/“Allow” on the browser's question). The kit waits 3 minutes.`);
+    action(`In the folder window, open ${dir}, select it, then press Select Folder and Allow (“View files”/“Allow” on the browser's question). The kit waits 3 minutes.`, S);
     const okFolder = await until(() => state(S, () => window.fullCapture.state.folder.status === 'ready'), 180_000, 500);
+    await done(S);
     if (!okFolder) { record(b, 5, 'mp4.folder', 'Saving into a chosen folder', 'not run', 'no folder was chosen'); return; }
     await startTake(S);
     await toPattern(S);
@@ -927,6 +983,7 @@ async function guided(S) {
 /** Run one scenario; a failure is recorded and the run goes on. */
 async function step(S, section, id, title, fn) {
   try { await fn(); } catch (e) {
+    if (e instanceof StopRun) throw e;
     record(S.name, section, id, title, 'fail', `the step stopped: ${e.message.split('\n')[0]}`);
     try { await ready(S); } catch { /* the next step will say */ }
   }
@@ -944,11 +1001,21 @@ async function runBrowser(name) {
     record(name, 2, 'cap.launch', 'The installed browser starts', 'not run', `couldn't start ${name}: ${e.message.split('\n')[0]}`, { devices: 'n/a' });
     return S;
   }
-  const extended = await state(S, () => screen.isExtended);
-  if (extended && !OPT.source) { await S.context.close(); await launch(S, 'Screen 1'); }
-  record(name, 2, 'cap.launch', 'The installed browser starts with real devices', 'pass',
-    `${S.version}; no fake camera, microphone, screen or permission UI; switches: ${S.args.join(' ')}; permission prompts answered by the kit`, { devices: OPT.selfTest ? 'self-test' : 'real' });
   try {
+    // Two screens: which one the sharing window calls "Screen 1" isn't known, and recording the wrong one
+    // would record whatever else is on it. The person picks the screen with the pattern (--guided), or
+    // names it (--source); otherwise this browser's run stops here.
+    if (await state(S, () => screen.isExtended) && !OPT.source) {
+      if (!OPT.guided.length) {
+        record(name, 2, 'cap.launch', 'The installed browser starts with real devices', 'not run',
+          'Two screens: run with --guided (you choose the screen showing the test pattern) or with --source naming it, e.g. --source "Screen 1"', { devices: 'n/a' });
+        return S;
+      }
+      await S.context.close();
+      await launch(S, null);
+    }
+    record(name, 2, 'cap.launch', 'The installed browser starts with real devices', 'pass',
+      `${S.version}; no fake camera, microphone, screen or permission UI; switches: ${S.args.join(' ')}; permission prompts answered by the kit`, { devices: OPT.selfTest ? 'self-test' : 'real' });
     await setUp(S);
     if (want('main')) await step(S, 2, 'cap.main', 'Take 1: the main take', () => mainTake(S));
     if (want('takes')) {
@@ -964,7 +1031,7 @@ async function runBrowser(name) {
       await step(S, 6, 'rel.kill', 'The browser is ended mid-take: the next start recovers a playable file', async () => { await browserKill(S, OPT.windowSource || WINDOW_SOURCE); windowSource = true; });
     }
     if (want('window')) {
-      if (!windowSource) { await S.context.close(); await launch(S, OPT.windowSource || WINDOW_SOURCE); }
+      if (!windowSource) { await S.context.close().catch(() => {}); await launch(S, OPT.windowSource || WINDOW_SOURCE); }
       await step(S, 2, 'cap.window', 'Window capture records that window', () => windowCapture(S));
     }
   } catch (e) {
@@ -1058,7 +1125,8 @@ function report(env, sessions) {
     'Sound check (Check my sound → Hear it back) and your voice in the saved take.',
     'Two monitors, if you have them: controls on the screen you don’t record.',
     'A 20-minute take with Full Capture in the background: the display doesn’t dim or sleep.',
-    ...(OPT.guided.length ? [] : ['Guided steps not run: real unplug, Stop sharing in the browser bar, saving into a folder, speech level (`--guided`).']),
+    ...(['speak', 'stop-sharing', 'folder', 'unplug'].filter(g => !OPT.guided.includes(g)).length
+      ? [`Guided steps not run (\`--guided\`): ${['speak', 'stop-sharing', 'folder', 'unplug'].filter(g => !OPT.guided.includes(g)).join(', ')}. Unplugging needs a microphone or headset that can be unplugged.`] : []),
   ]) L.push(`- [ ] ${m}`);
   L.push('', '## Evidence', '', `In \`${show(OUT)}\` on this computer (not in the repository):`, '');
   for (const r of results) for (const e of r.evidence) L.push(`- ${r.browser || 'all'} · ${r.title.split(':')[0]}: \`${e}\``);
@@ -1071,6 +1139,11 @@ function report(env, sessions) {
   return L.join('\n') + '\n';
 }
 
+function writeResults(env, sessions) {
+  fs.writeFileSync(path.join(OUT, 'results.json'), JSON.stringify({ env, options: OPT, results, sessions: sessions.map(s => ({ name: s.name, version: s.version, devices: s.devices, displays: s.displays, screen: s.screenInfo, pattern: s.patternInfo, storage: s.storage, errors: s.errors.map(show) })) }, null, 1));
+  fs.writeFileSync(path.join(OUT, 'WINDOWS_ACCEPTANCE_RESULTS.draft.md'), report(env, sessions));
+}
+
 // ------------------------------------------------------------------ main
 
 log(`Full Capture acceptance kit. Evidence: ${show(OUT)}${OPT.selfTest ? ' (SELF-TEST: synthetic microphone, not an acceptance run)' : ''}`);
@@ -1080,10 +1153,12 @@ for (const b of OPT.browsers) {
   log(`=== ${b} ===`);
   const S = await runBrowser(b);
   sessions.push(S);
-  if (!OPT.keepProfile && !results.some(r => r.browser === b && r.status === 'fail')) fs.rmSync(S.profile, { recursive: true, force: true });
+  if (!OPT.keepProfile && !results.some(r => r.browser === b && r.status === 'fail')) {
+    try { fs.rmSync(S.profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 500 }); } catch (e) { log(`The test profile ${show(S.profile)} couldn't be deleted yet (${e.code || e.message}); delete it later.`); }
+  }
+  writeResults(env, sessions);
 }
-fs.writeFileSync(path.join(OUT, 'results.json'), JSON.stringify({ env, options: OPT, results, sessions: sessions.map(s => ({ name: s.name, version: s.version, devices: s.devices, displays: s.displays, screen: s.screenInfo, pattern: s.patternInfo, storage: s.storage, errors: s.errors })) }, null, 1));
-fs.writeFileSync(path.join(OUT, 'WINDOWS_ACCEPTANCE_RESULTS.draft.md'), report(env, sessions));
 const fails = results.filter(r => r.status === 'fail').length;
+writeResults(env, sessions);
 log(`Done: ${results.length} checks, ${fails} failed. Report: ${show(path.join(OUT, 'WINDOWS_ACCEPTANCE_RESULTS.draft.md'))}`);
 process.exitCode = fails ? 1 : 0;

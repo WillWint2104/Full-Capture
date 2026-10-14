@@ -18,13 +18,15 @@ manual list at the end of the report.
 | 1. Application | The commit is the pull request's latest. The committed `full-capture.html` is a fresh build of `src/`. The kit opens the repository's own copy, not a download. |
 | 2. Screen capture | Real devices only (no fake camera, microphone or screen). Whole screen chosen, with its resolution. 3-2-1 countdown. Pause/Resume and a chapter. Stop & save gives `Acceptance test (date time).mp4`. Three takes, numbered, none overwritten. The file's length matches the time recorded, without the pause. Window capture. Whether the page is hidden and holds a wake lock while in the background. |
 | 3. Floating controls | One screen: open for the countdown, closed before recording. In **no frame** of the saved video while hidden. Alt+H brings them back (and they're then in the frames, which proves the check sees them). Hide closes them again. Paused in the controls: Resume big, double-click safe, "✓ Saved · … · in Downloads". Window capture: they stay open and are in no frame. |
-| 4. Audio and camera | The microphone opens. Quiet-room level and the pattern's clicks. Recorded level, clipping, gaps and digital silence. **Sync** of the pattern's flashes and clicks at the start, after the pause and at the end. Camera bubble with `--camera`. |
-| 5. MP4 integrity | H.264 + AAC in MP4, finalised (`ftyp mdat moov`, not fragmented). Header length matches the app's. ffmpeg decodes every frame. Seeks at 25/50/75 % give a frame there, decode cleanly and keep the sync. The saved file holds **exactly** the recorder's packets; the recorder's original output is kept beside it. It plays and seeks in Chrome/Edge. Windows reads its length (Explorer → Properties → Details). |
-| 6. Reliability | Esc in the countdown. Stop & save double-clicked. Screen sharing ended and microphone lost (*simulated*). Low disk warning (*simulated*). **The tab crashing and the browser being ended mid-take**, both real, then recovery. The safety copy is written every second, so the last few seconds can be missing: up to 4 s passes, and the report gives the number. Page console errors. |
+| 4. Audio and camera | The microphone opens. Quiet-room level and the pattern's clicks. Recorded level, clipping, gaps and digital silence. **Sync** of the pattern's flashes and clicks at the start, after the pause and at the end: a change of more than 60 ms during a take fails; the offset itself includes the speakers' and display's delays, so a large one only warns. Camera bubble with `--camera`. |
+| 5. MP4 integrity | H.264 in MP4 (with AAC or Opus sound), finalised (`ftyp mdat moov`, not fragmented). Header length matches the app's. ffmpeg decodes every frame. Seeks at 25/50/75 % give a frame there, decode cleanly and keep the sync. The saved file holds **exactly** the recorder's packets; the recorder's original output is kept beside it. It plays and seeks in Chrome/Edge. Windows reads its length (Explorer → Properties → Details). |
+| 6. Reliability | Esc in the countdown. Stop & save double-clicked. Screen sharing ended and microphone lost (*simulated*). Low disk warning (*simulated*). **The tab crashing and the browser being ended mid-take** after 30 s, both real, then recovery. The safety copy is written every second, so the last seconds can be missing: up to 3.5 s passes, up to 5 s warns, more fails, and the report gives the number. Page console errors. |
 
-Real-world steps that need you are opt-in with `--guided`: speaking, unplugging
-the microphone, *Stop sharing* in the browser's bar, and saving into a folder.
-The kit says `ACTION NEEDED: …` and waits.
+Real-world steps that need you are opt-in with `--guided`: speaking, *Stop
+sharing* in the browser's bar, and saving into a folder. Add `unplug` by name
+(`--guided speak,stop-sharing,folder,unplug`) only if your microphone or
+headset can be unplugged. The kit prints `ACTION NEEDED: …`, shows the same
+words on the test pattern, and waits.
 
 ## Before you run it
 
@@ -36,13 +38,21 @@ The kit says `ACTION NEEDED: …` and waits.
   terminal (or pass `--ffmpeg-dir`).
 - Windows must let desktop apps use the microphone: Settings → Privacy &
   security → Microphone.
-- **Close or minimise anything private.** The test records the whole screen,
-  with a full-screen test pattern on top. The microphone records the room for
-  a few minutes. Everything stays in the evidence folder on this PC.
+- **Close or minimise anything private,** including the window you run the kit
+  from (Claude's window or a terminal). The test records the whole screen, with
+  a full-screen test pattern on top, and anything brought in front of it is
+  recorded too. Instructions for the guided steps appear on the pattern itself.
+  The microphone records the room for a few minutes. Everything stays in the
+  evidence folder on this PC.
+- **Two monitors:** the kit can't tell which one the sharing window calls
+  "Screen 1", so it doesn't guess. Run with `--guided` and choose the screen
+  showing the test pattern each time the sharing window opens, or name it with
+  `--source`. If a recording doesn't show the pattern, the kit stops that
+  browser's run at once.
 - Set the speakers to a moderate volume. The pattern clicks every 2 seconds so
   the microphone can hear it, which is how sync is measured. With a headset,
   sync can't be measured automatically, and the report says so.
-- Leave the PC alone while it runs (about 6–8 minutes per browser). The
+- Leave the PC alone while it runs (about 7–9 minutes per browser). The
   floating controls appear as a **magenta** box: the kit paints them so it can
   find them in the video.
 
@@ -50,14 +60,14 @@ The kit says `ACTION NEEDED: …` and waits.
 
 ```powershell
 npm run build                                   # must leave full-capture.html unchanged
-node test/windows/run.mjs                       # Chrome then Edge, about 15 minutes
+node test/windows/run.mjs                       # Chrome then Edge, about 15–20 minutes
 node test/windows/run.mjs --browsers chrome --guided    # with the steps that need you
 node test/windows/run.mjs --camera              # the main take with the camera bubble (records you)
 ```
 
 Options: `--seconds N` (main take length, default 60), `--only
-main,takes,reliability,recovery,window`, `--source "Screen 1"` (two monitors;
-picked automatically when Windows reports more than one), `--window-source`,
+main,takes,reliability,recovery,window`, `--source "Screen 1"` (the name the
+sharing window gives the screen to record), `--window-source`,
 `--no-sound`, `--out DIR`, `--keep-profile`. `--self-test` exists only to check
 the kit itself on a machine without a microphone or H.264 (it uses a
 synthetic microphone). Never use it for acceptance.
@@ -100,8 +110,13 @@ manual checks and the merge recommendation. Keep the evidence paths, but
 - **"No microphone":** the report gives the app's own message. Check the Windows
   privacy setting above and that no other app holds the microphone.
 - **A check fails:** keep the evidence folder, and rerun only that part with
-  `--only`. A failure in the kit itself (not the app) is fixed in
+  `--only`. A row that says "the step stopped" can be the kit or the PC (a
+  window that didn't come forward, a picker) rather than the app: look at it
+  before drawing a conclusion. A failure in the kit itself is fixed in
   `test/windows/`; production code changes only for a confirmed app defect.
+- **The run hangs:** stop only the kit (Ctrl+C, or end that `node` process). It
+  closes its own browsers; never end `chrome.exe` or `msedge.exe` by name, as
+  that would close your own browser windows too.
 
 ## Prompt for Claude Code on the Windows PC
 
@@ -116,14 +131,24 @@ manual checks and the merge recommendation. Keep the evidence paths, but
 >    unchanged.
 > 2. Check that ffmpeg/ffprobe, Chrome and Edge are installed. If ffmpeg is
 >    missing, ask me before installing it with winget.
-> 3. Tell me to close private windows and set the speakers to a moderate
->    volume. Then run `node test/windows/run.mjs --guided` in the background.
->    Watch its output: whenever it prints `ACTION NEEDED:`, tell me exactly
->    what to do. If it fails at a Windows permission or picker, stop and tell
->    me exactly what I need to do.
+>    Check the free disk space (the kit needs 5 GB) and whether I have one or
+>    two monitors.
+> 3. Tell me to close private windows, set the speakers to a moderate volume,
+>    and keep your own window off the screen being recorded (minimised, or on
+>    the other monitor). Then run
+>    `node test/windows/run.mjs --guided stop-sharing,folder,speak` in the
+>    background; add `unplug` only if I confirm my microphone can be
+>    unplugged. Watch its output: whenever it prints `ACTION NEEDED:`, tell me
+>    exactly what to do (it also shows on the test pattern). If it fails at a
+>    Windows permission or picker, stop and tell me exactly what I need to do.
+>    If it hangs, stop only its `node` process; never end `chrome.exe` or
+>    `msedge.exe` by name.
 > 4. Then do with me, one at a time, the manual list at the end of the draft
 >    report: Windows Media Player playback and scrubbing of Take 1, the clap
 >    test with my camera, the sound check, and two monitors if I have them.
+>    Treat a row that says "the step stopped" as possibly the kit or the PC:
+>    check it, and rerun that part with `--only`, before calling it an app
+>    defect.
 > 5. Write `docs/WINDOWS_ACCEPTANCE_RESULTS.md` from the draft and the manual
 >    results. Include the commit, browser and tool versions, pass/fail per
 >    check, real or simulated devices, the MP4 and seek results, sync

@@ -205,7 +205,8 @@ export function samePackets(rawFile, savedFile) {
   // The discard flag is left out: an edit list in the saved file marks the encoder's priming packets.
   const norm = l => l.replace(/,([K_])[D_][_C]?,?$/, ',$1');
   const count = list => list.reduce((m, l) => m.set(l, (m.get(l) || 0) + 1), new Map());
-  const a = ffprobePackets(rawFile).map(norm), b = ffprobePackets(savedFile).map(norm);
+  // trimEnd: ffprobe on Windows ends its lines with \r\n.
+  const a = ffprobePackets(rawFile).map(l => norm(l.trimEnd())), b = ffprobePackets(savedFile).map(l => norm(l.trimEnd()));
   const ca = count(a), cb = count(b);
   const onlyRaw = [...ca].filter(([l, n]) => (cb.get(l) || 0) < n).map(([l]) => l);
   const onlySaved = [...cb].filter(([l, n]) => (ca.get(l) || 0) < n).map(([l]) => l);
@@ -283,7 +284,8 @@ export async function analyseTake(file, { outDir, name, expect = {}, raw = null 
     const matches = after.map(p => { const same = all.find(x => Math.abs(x.at - p.at) < 0.002); return { at: p.at, ms: p.ms, wholeMs: same?.ms ?? null }; });
     r.seeks.push({
       target, firstVideo: frame.t, firstAudio: seekEnv.firstAudio, png: frame.saved ? png : null, decodeErrors: errors,
-      pairs: matches, syncKept: matches.length ? matches.every(m => m.wholeMs != null && Math.abs(m.ms - m.wholeMs) <= 10) : null,
+      // 15 ms: the sound is measured in 5 ms steps, which start at a different sample after a seek.
+      pairs: matches, syncKept: matches.length ? matches.every(m => m.wholeMs != null && Math.abs(m.ms - m.wholeMs) <= 15) : null,
     });
   }
   return r;

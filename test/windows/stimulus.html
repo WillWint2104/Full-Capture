@@ -21,7 +21,9 @@
 <style>
   html, body { margin: 0; height: 100%; background: #000; color: #8a96a3; overflow: hidden; font: 600 3.2vh/1.35 system-ui, "Segoe UI", sans-serif; }
   #flash { position: fixed; inset: 0; background: #fff; display: none; }
-  #info { position: fixed; left: 5vw; top: 7vh; right: 5vw; }
+  #info { position: fixed; left: 5vw; top: 7vh; max-width: 70vw; }   /* clear of the right fifth, where flashes are measured */
+  #action { margin-top: 2vh; color: #ffd84d; font-size: 4.2vh; }
+  #action:empty { display: none; }
   #clock { font-size: 14vh; line-height: 1.1; font-variant-numeric: tabular-nums; color: #b8c2cc; }
   #bar { position: fixed; left: 0; bottom: 10vh; width: 8vw; height: 4vh; background: #3a7d5c; }
   #start { margin-top: 3vh; font: inherit; padding: 1.2vh 2vw; border-radius: 8px; border: 2px solid #8a96a3; background: #12161a; color: #dfe6ec; cursor: pointer; }
@@ -35,6 +37,7 @@
   <div id="clock">00:00.0</div>
   <div id="frames">frame 0</div>
   <button id="start" type="button">Start the test pattern</button>
+  <div id="action" role="status"></div>
 </div>
 <div id="bar"></div>
 <div id="flash"></div>
@@ -105,6 +108,8 @@
     return pattern;
   };
   document.getElementById('start').addEventListener('click', () => pattern.start());
+  /** What the person at the computer is asked to do, shown here so they needn't look at another window. */
+  pattern.say = text => { document.getElementById('action').textContent = text ? `Action needed: ${text}` : ''; };
 </script>
 </body>
 </html>
