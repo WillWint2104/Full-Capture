@@ -1,0 +1,151 @@
+/* Layout by width: ≥ 1000 px two columns (mode panel left, stage right);
+   720–999 px one centred column; < 720 px phone: a 160 px stage strip and the
+   main button stuck to the bottom of the screen. */
+
+/* Recovery cards scroll with the page; only critical alerts stay pinned */
+.banners:not(:has(.banner[data-kind="error"])) { position: static; }
+
+@media (min-width: 1000px) {
+  .workspace { grid-template-columns: minmax(400px, var(--panel)) minmax(0, 1fr); gap: var(--s6); }
+  .stage-col { position: sticky; top: var(--s5); }
+  html:has(.banner[data-kind="error"]) .stage-col { top: 136px; }
+}
+
+@media (max-width: 1199.98px) {
+  .tip-list-steps { grid-template-columns: minmax(0, 1fr); gap: var(--s3); }
+  .tip-list-steps li { grid-template-columns: 32px minmax(0, 1fr); gap: var(--s3); }
+  .tip-list-steps li > span:last-child { padding-top: 5px; }
+}
+
+@media (max-width: 999.98px) {
+  :root { --gutter: 24px; }
+  .workspace { max-width: 680px; margin: 0 auto; }
+  .stage-col { order: -1; }
+  .stage-wrap { width: min(100%, calc(42vh * 16 / 9)); }
+  .tips { display: none !important; }
+  .library { max-width: 680px; margin-left: auto; margin-right: auto; }
+  .modes { display: none; }
+}
+
+@media (max-width: 719.98px) {
+  :root { --gutter: 16px; --header-h: 56px; --fs-timer: 48px; }
+  html:is([data-phase="setup"], [data-phase="ready"], [data-phase="countdown"]) { scroll-padding-bottom: 150px; }
+
+  /* Header: brand mark, the save chip (kept, it says where takes go), icon buttons */
+  .app-header-inner { gap: var(--s3); }
+  .header-actions { gap: 0; }
+  .folder-chip { max-width: 190px; margin-right: var(--s1); padding: 0 12px 0 10px; }
+  .header-btn { width: 40px; min-height: 40px; padding: 0; }
+  .hide-narrow { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+  .app-main { padding-top: var(--s4); padding-bottom: var(--s5); }
+  .banners { padding-top: var(--s3); }
+  .banner { grid-template-columns: auto minmax(0, 1fr) auto; padding: var(--s3); gap: var(--s2) var(--s3); }
+  .banner .kind-icon { width: 32px; height: 32px; }
+  .banner .kind-icon .i { width: 18px; height: 18px; }
+  .banner-actions { grid-column: 1 / -1; justify-content: flex-start; }
+  .banner-close { grid-row: 1; grid-column: 3; }
+  .banner[data-kind="error"] .banner-title { font-size: var(--fs-md); }
+  .banner[data-kind="error"] .banner-text { font-size: var(--fs-sm); }
+
+  /* Toasts drop in under the header (over the stage strip), never over the header or the main buttons */
+  /* Toasts sit at the bottom on phones, above the pinned main button, so they
+     never cover the recording pill and timer at the top. */
+  .toasts { top: auto; bottom: calc(var(--s4) + 96px); left: var(--s4); right: var(--s4); width: auto; }
+  .toast { padding-block: 10px; }
+
+  .workspace { gap: var(--s4); }
+
+  /* Stage: a 160 px strip with its label above it, so it never covers the slide */
+  .stage-wrap { width: 100%; gap: var(--s2); }
+  .stage { height: 160px; aspect-ratio: auto; }
+  .stage-label {
+    position: static;
+    order: -1;
+    justify-self: start;
+    padding: 0;
+    background: none;
+    color: var(--text-2);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .stage-label::before { background: var(--good-fill); }
+  .stage-wrap:has(#stage[data-mode="playback"]) .stage-label::before { background: var(--text-2); }
+  .stage-empty { gap: var(--s2); padding: var(--s3); }
+  .stage-empty-illus, .stage-empty-text { display: none; }
+  .stage-empty-title { font-size: var(--fs-md); }
+  .stage-empty .btn { min-height: 36px; font-size: var(--fs-sm); }
+  .veil-pill { padding: 6px 12px 6px 10px; font-size: var(--fs-sm); }
+  .countdown { gap: var(--s1); }
+  .cd-kicker { font-size: var(--fs-sm); }
+  .countdown-num { width: 76px; height: 76px; font-size: 40px; }
+  .cd-hint { font-size: var(--fs-sm); }
+  .stage-hint, .stage-caption { display: none !important; }
+
+  .view-title { font-size: var(--fs-lg); }
+  .step { padding: var(--s4); }
+  .step-body { padding-left: 0; }
+  .option-grid { grid-template-columns: 1fr 1fr; gap: var(--s4); }
+  .sc-line { font-size: var(--fs-lg); }
+  .tip { align-items: flex-start; }
+
+  /* Start: a bar stuck to the bottom of the screen */
+  .start-bar {
+    margin: 0 calc(var(--gutter) * -1);
+    padding: var(--s3) var(--gutter) calc(var(--s3) + env(safe-area-inset-bottom));
+    background: color-mix(in srgb, var(--bg) 92%, transparent);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid var(--line);
+  }
+  .start-card { gap: 6px; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; }
+  /* All set: two words instead of a clipped list (the full line stays in the DOM for screen readers) */
+  .readiness[data-ready="true"] { font-size: 0; }
+  .readiness[data-ready="true"]::before { content: "✓ All set – ready when you are"; font-size: var(--fs-sm); }
+  .btn-keys { display: none !important; }
+
+  .card, .rec-card { padding: var(--s4); }
+  .view-primary { position: sticky; bottom: var(--s3); z-index: 5; box-shadow: var(--shadow-lg); }
+  html[data-phase="paused"] .view-primary { position: static; box-shadow: var(--shadow-xs); }
+  html:is([data-phase="recording"], [data-phase="review"]) { scroll-padding-bottom: 80px; }
+  .rec-timer { margin: -2px 0 -6px; }
+  .rec-keys { display: none; }
+  .rec-banner { grid-template-columns: auto minmax(0, 1fr); gap: var(--s3); padding: var(--s4); margin-bottom: var(--s4); }
+  .rec-banner-icon { width: 40px; height: 40px; }
+  .rec-banner-actions { grid-column: 1 / -1; display: grid; justify-content: stretch; }
+  .talking-hint { max-width: none; }
+  .rec-banner-btn { width: 100%; }
+
+  .review-heading { font-size: var(--fs-lg); }
+  .review-actions-row { flex-direction: column; }
+  .chapters-card { padding: var(--s4); }
+  .chapter-time { min-width: 52px; }
+
+  .library { margin-top: var(--s6); }
+  .library-empty { gap: var(--s4); padding: var(--s4); }
+  .library-empty-illus { width: 72px; }
+
+  .dialog { width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; margin: 0; border-radius: 0; }
+  .dialog-confirm { width: calc(100vw - 32px); height: fit-content; margin: auto; border-radius: var(--r-lg); }
+  .set-field-inline { grid-template-columns: 1fr; }
+  .stats { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 479.98px) {
+  .brand-name { display: none; }
+  .rec-actions-row .btn { padding: 0 var(--s2); gap: 6px; }
+  #btnMarker > .i { display: none; }
+}
+
+@media (max-width: 359.98px) {
+  .rec-actions-row { grid-template-columns: 1fr; }
+  .folder-chip { max-width: 150px; }
+}
+
+/* Sticky alerts must not hide the control that has keyboard focus */
+html:has(.banners:not([hidden]) .banner[data-kind="error"]) { scroll-padding-top: calc(var(--banners-bottom, 0px) + var(--s3)); }
+
+/* Camera options stack on narrow screens so Shape never runs under Size */
+@media (max-width: 479.98px) {
+  #cameraControls .option-grid { grid-template-columns: minmax(0, 1fr) !important; }
+}

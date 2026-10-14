@@ -1,0 +1,2185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson Recorder</title>
+<style>
+  :root {
+    --paper: #fafaf8;
+    --ink: #1c1d1f;
+    --ink-soft: #6b6d72;
+    --line: #e3e3df;
+    --rec-red: #d6453a;
+    --rec-red-dark: #b2362d;
+    --ok-green: #2e8b57;
+    --panel: #ffffff;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 20px 60px;
+  }
+  header {
+    width: 100%;
+    max-width: 820px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 24px;
+  }
+  h1 {
+    font-size: 22px;
+    font-weight: 650;
+    letter-spacing: -0.02em;
+  }
+  h1 .dot {
+    display: inline-block;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--rec-red);
+    margin-right: 8px;
+  }
+  #status {
+    font-size: 13px;
+    color: var(--ink-soft);
+    font-variant-numeric: tabular-nums;
+  }
+  #status.live { color: var(--rec-red); font-weight: 600; }
+
+  .stage {
+    width: 100%;
+    max-width: 820px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .preview-wrap {
+    position: relative;
+    background: #141517;
+    aspect-ratio: 16 / 9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: none;
+  }
+  video.show { display: block; }
+  .empty-state {
+    text-align: center;
+    color: #9a9ca1;
+    font-size: 14px;
+    line-height: 1.6;
+    padding: 20px;
+  }
+  .empty-state strong { color: #d2d3d6; display: block; font-size: 16px; margin-bottom: 4px; }
+
+  .rec-badge {
+    position: absolute;
+    top: 14px; left: 14px;
+    background: var(--rec-red);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    padding: 5px 12px;
+    border-radius: 100px;
+    display: none;
+    align-items: center;
+    gap: 7px;
+  }
+  .rec-badge.show { display: flex; }
+  .rec-badge .pulse {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #fff;
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+  .rec-badge.paused { background: #8a6d1f; }
+  .rec-badge.paused .pulse { animation: none; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.25; } }
+  @media (prefers-reduced-motion: reduce) { .rec-badge .pulse { animation: none; } }
+
+  .controls {
+    padding: 20px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  button {
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    color: var(--ink);
+    border-radius: 10px;
+    padding: 10px 18px;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s;
+  }
+  button:hover:not(:disabled) { background: #f2f2ef; }
+  button:focus-visible { outline: 2px solid var(--rec-red); outline-offset: 2px; }
+  button:disabled { opacity: 0.4; cursor: default; }
+
+  #btnRecord {
+    width: 64px; height: 64px;
+    border-radius: 50%;
+    border: 2px solid var(--line);
+    background: var(--panel);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    flex-shrink: 0;
+  }
+  #btnRecord .core {
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    background: var(--rec-red);
+    transition: border-radius 0.18s, width 0.18s, height 0.18s;
+  }
+  #btnRecord:hover:not(:disabled) { border-color: var(--rec-red); background: var(--panel); }
+  #btnRecord.recording .core {
+    width: 26px; height: 26px;
+    border-radius: 6px;
+  }
+
+  .timer {
+    font-size: 26px;
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
+    min-width: 110px;
+  }
+  .timer.idle { color: var(--ink-soft); }
+
+  .spacer { flex: 1; }
+
+  .mic-enable {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+  }
+  .mic-enable input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--rec-red); cursor: pointer; }
+
+  .session-row {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 0 24px 18px;
+    flex-wrap: wrap;
+  }
+  .sess-name {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink-soft);
+    flex: 1;
+    min-width: 240px;
+  }
+  .sess-name input {
+    flex: 1;
+    font-family: inherit;
+    font-size: 14px;
+    color: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    padding: 9px 12px;
+    background: #fff;
+  }
+  .sess-name input:focus-visible { outline: 2px solid var(--rec-red); outline-offset: 1px; border-color: var(--rec-red); }
+  .sess-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+  }
+  .sess-toggle input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--rec-red); cursor: pointer; }
+
+  .sess-format {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .sess-format .fmt-label { color: var(--ink-soft); }
+  .sess-format label { display: flex; align-items: center; gap: 5px; cursor: pointer; user-select: none; }
+  .sess-format input[type="radio"] { accent-color: var(--rec-red); cursor: pointer; }
+  .sess-format label.disabled { opacity: 0.4; cursor: default; }
+
+  .qmode { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 600; }
+  .qmode-label { color: var(--ink-soft); }
+  .qmode label { display: flex; align-items: center; gap: 5px; cursor: pointer; user-select: none; }
+  .qmode input[type="radio"] { accent-color: var(--rec-red); cursor: pointer; }
+
+  .countdown-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(20,21,23,0.55);
+    z-index: 5;
+  }
+  .countdown-overlay span {
+    font-size: 120px;
+    font-weight: 800;
+    color: #fff;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 4px 24px rgba(0,0,0,0.5);
+    animation: cd-pop 1s ease-out;
+  }
+  @keyframes cd-pop { 0% { transform: scale(0.6); opacity: 0.2; } 40% { transform: scale(1.05); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+
+  .recover-banner {
+    width: 100%;
+    max-width: 820px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    background: #eef4fb;
+    border: 1px solid #c4d8ef;
+    border-radius: 12px;
+    padding: 14px 18px;
+  }
+  .rb-text { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 220px; }
+  .rb-text strong { font-size: 14.5px; color: #1c3e63; }
+  .rb-text span { font-size: 13px; color: #3a5a7d; }
+  .rb-actions { display: flex; align-items: center; gap: 14px; }
+  .rb-save {
+    font-size: 14px; font-weight: 600;
+    background: #1c3e63; color: #fff; border: 1px solid #1c3e63;
+    border-radius: 10px; padding: 10px 18px; cursor: pointer;
+  }
+  .rb-save:hover { background: #142f4d; }
+
+  .monitor {
+    border-top: 1px solid var(--line);
+    padding: 18px 24px 22px;
+    background: #fcfcfa;
+  }
+  .sc-panel {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    margin-bottom: 14px;
+  }
+  .sc-main { flex: 1; min-width: 0; }
+  .sc-step {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--ink-soft);
+    margin-bottom: 4px;
+  }
+  .sc-step.bg { color: #8a6d1f; }
+  .sc-step.voice { color: #1f6b40; }
+  .sc-instruction { font-size: 15px; font-weight: 600; line-height: 1.4; }
+  .sc-instruction .big { font-size: 17px; }
+  .sc-instruction .read { color: var(--ink); background: #fff3cd; padding: 1px 6px; border-radius: 4px; font-weight: 650; }
+  .sc-live {
+    margin-top: 10px;
+    height: 6px;
+    background: var(--line);
+    border-radius: 100px;
+    overflow: hidden;
+  }
+  .sc-live-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--ok-green);
+    border-radius: 100px;
+    transition: width 0.05s linear;
+  }
+  .sc-live-fill.hot { background: var(--rec-red); }
+  .sc-actions { display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
+  .sc-go {
+    font-size: 14px;
+    font-weight: 650;
+    padding: 11px 20px;
+    border-radius: 10px;
+    background: var(--ink);
+    color: #fff;
+    border-color: var(--ink);
+    white-space: nowrap;
+  }
+  .sc-go:hover:not(:disabled) { background: #000; }
+  .sc-go.checking { background: var(--ink-soft); border-color: var(--ink-soft); }
+  .listen-btn { font-size: 12.5px; padding: 9px 16px; border-radius: 10px; white-space: nowrap; }
+  .listen-btn.on { background: var(--rec-red); color: #fff; border-color: var(--rec-red); }
+  .listen-btn.on:hover:not(:disabled) { background: var(--rec-red-dark); }
+
+  .sc-results {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 4px 18px;
+    margin-bottom: 14px;
+  }
+  .sc-result-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 13px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .sc-result-row:last-of-type { border-bottom: none; }
+  .sc-result-icon {
+    font-size: 17px;
+    line-height: 1.5;
+    flex-shrink: 0;
+    width: 22px;
+    text-align: center;
+  }
+  .sc-result-text { display: flex; flex-direction: column; gap: 2px; }
+  .sc-result-text strong { font-size: 14.5px; }
+  .sc-result-text span { font-size: 13px; color: var(--ink-soft); line-height: 1.45; }
+  .sc-result-row.good strong { color: #1f6b40; }
+  .sc-result-row.warn strong { color: #8a6d1f; }
+  .sc-result-row.bad strong { color: #b2362d; }
+  .sc-verdict {
+    padding: 12px 0 14px;
+    font-size: 14.5px;
+    font-weight: 650;
+    text-align: center;
+  }
+  .sc-verdict.ready { color: #1f6b40; }
+  .sc-verdict.fix { color: #8a6d1f; }
+
+  .sc-readiness {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px;
+    border-radius: 12px;
+    font-size: 17px;
+    font-weight: 750;
+    letter-spacing: -0.01em;
+    margin-bottom: 14px;
+  }
+  .sc-readiness span:first-child { font-size: 22px; line-height: 1; }
+  .sc-readiness.ideal   { background: #e4f3ea; color: #1f6b40; border: 1px solid #b8e0c8; }
+  .sc-readiness.usable  { background: #fdf7e8; color: #8a6d1f; border: 1px solid #ecd6a3; }
+  .sc-readiness.notready{ background: #fdeceb; color: #b2362d; border: 1px solid #f0c9c6; }
+
+  .sc-applied {
+    font-size: 13px;
+    color: var(--ink-soft);
+    padding: 4px 2px 2px;
+    line-height: 1.6;
+  }
+  .sc-applied strong { color: #1f6b40; font-weight: 650; }
+
+  .sc-lockrow {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    padding-top: 6px;
+  }
+  .sc-lock-note { font-size: 12.5px; color: var(--ink-soft); }
+
+  .test-panel {
+    margin-top: 14px;
+    padding: 14px 16px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: #fff;
+  }
+  .test-head { display: flex; flex-direction: column; gap: 3px; margin-bottom: 10px; }
+  .test-head strong { font-size: 14px; }
+  .test-note { font-size: 12px; color: var(--ink-soft); }
+  #testAudio { width: 100%; height: 40px; display: block; }
+  .test-actions { display: flex; gap: 18px; margin-top: 10px; }
+  .listen-btn.rec-test { background: var(--rec-red); color: #fff; border-color: var(--rec-red); }
+
+  .opts-row {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+    font-size: 13px;
+  }
+  .opts-row label {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+  }
+  .opts-row input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--rec-red); cursor: pointer; }
+  .link-btn {
+    margin-left: auto;
+    border: none;
+    background: none;
+    color: var(--ink-soft);
+    font-size: 12.5px;
+    font-weight: 600;
+    text-decoration: underline;
+    padding: 4px;
+    cursor: pointer;
+  }
+  .link-btn:hover { color: var(--ink); background: none; }
+
+  .details { margin-top: 16px; padding-top: 16px; border-top: 1px dashed var(--line); }
+  .gain-manual-label { font-size: 12px; font-weight: 600; color: var(--ink); }
+
+  .spectrum-wrap { margin-bottom: 16px; }
+  #spectrum {
+    width: 100%;
+    height: 90px;
+    display: block;
+    background: #141517;
+    border-radius: 8px;
+  }
+  .spectrum-label {
+    font-size: 11px;
+    color: var(--ink-soft);
+    margin-top: 5px;
+  }
+
+  .meter-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 16px;
+  }
+  .meter-track {
+    position: relative;
+    flex: 1;
+    height: 18px;
+    background: #ebebe7;
+    border-radius: 100px;
+    overflow: hidden;
+  }
+  .meter-zone-good {
+    position: absolute;
+    top: 0; bottom: 0;
+    left: 55%; right: 12%;
+    background: rgba(46,139,87,0.13);
+    z-index: 0;
+  }
+  .meter-fill {
+    position: absolute;
+    top: 0; bottom: 0; left: 0;
+    width: 0%;
+    background: linear-gradient(90deg, #2e8b57 0%, #2e8b57 70%, #d99a1f 88%, var(--rec-red) 100%);
+    border-radius: 100px;
+    z-index: 1;
+    transition: width 0.05s linear;
+  }
+  .meter-peak {
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 3px;
+    background: var(--ink);
+    left: 0%;
+    z-index: 2;
+    transition: left 0.1s linear;
+  }
+  .meter-floor {
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 2px;
+    background: repeating-linear-gradient(0deg, var(--ink-soft) 0 3px, transparent 3px 6px);
+    left: 0%;
+    z-index: 2;
+  }
+  .meter-readout {
+    font-size: 14px;
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+    min-width: 74px;
+    text-align: right;
+  }
+
+  .readout-grid {
+    display: flex;
+    align-items: center;
+    gap: 22px;
+    flex-wrap: wrap;
+  }
+  .stat { display: flex; flex-direction: column; gap: 2px; }
+  .stat label { font-size: 11px; color: var(--ink-soft); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+  .stat span { font-size: 15px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .gain-control {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .gain-control label {
+    font-size: 12px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .gain-control input[type="checkbox"] { width: 14px; height: 14px; accent-color: var(--rec-red); cursor: pointer; }
+  .gain-control input[type="range"] { width: 110px; accent-color: var(--rec-red); cursor: pointer; }
+  .gain-control input[type="range"]:disabled { opacity: 0.45; cursor: default; }
+  #gainLabel { min-width: 42px; font-variant-numeric: tabular-nums; font-size: 13px; font-weight: 600; }
+  .mic-hint { font-size: 11.5px; color: var(--ink-soft); }
+
+  .discard-btn {
+    font-size: 14px;
+    font-weight: 600;
+    background: none;
+    border: 1px solid var(--line);
+    color: var(--ink-soft);
+    border-radius: 10px;
+    padding: 10px 18px;
+    cursor: pointer;
+  }
+  .discard-btn:hover { background: #fdeeec; border-color: #f0c9c6; color: var(--rec-red); }
+  .cancel-btn:hover:not(:disabled) { background: #fdeeec; border-color: #f0c9c6; color: var(--rec-red); }
+
+  .result {
+    width: 100%;
+    max-width: 820px;
+    margin-top: 20px;
+    display: none;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 18px 22px;
+    align-items: center;
+    gap: 16px;
+  }
+  .result.show { display: flex; flex-wrap: wrap; }
+  .result .info { flex: 1; min-width: 200px; }
+  .result .info strong { display: block; font-size: 15px; margin-bottom: 2px; }
+  .result .info span { font-size: 13px; color: var(--ink-soft); }
+  .result a {
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 600;
+    background: var(--ink);
+    color: #fff;
+    padding: 10px 20px;
+    border-radius: 10px;
+  }
+  .result a:hover { background: #000; }
+
+  .tips {
+    width: 100%;
+    max-width: 820px;
+    margin-top: 26px;
+    font-size: 13px;
+    color: var(--ink-soft);
+    line-height: 1.7;
+  }
+  .tips strong { color: var(--ink); font-weight: 600; }
+
+  .error-bar {
+    width: 100%;
+    max-width: 820px;
+    margin-top: 16px;
+    display: none;
+    background: #fdf1f0;
+    border: 1px solid #f0c9c6;
+    color: #8c2f28;
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 13.5px;
+    line-height: 1.5;
+  }
+  .error-bar.show { display: block; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1><span class="dot"></span>Lesson Recorder</h1>
+  <div id="status">Ready</div>
+</header>
+
+<div class="recover-banner" id="recoverBanner" hidden>
+  <div class="rb-text"><strong>Unfinished recording found</strong><span id="recoverInfo"></span></div>
+  <div class="rb-actions">
+    <button id="btnRecover" class="rb-save">Recover &amp; download</button>
+    <button id="btnRecoverDiscard" class="link-btn">Discard</button>
+  </div>
+</div>
+
+<div class="stage">
+  <div class="preview-wrap">
+    <video id="preview" autoplay muted playsinline></video>
+    <video id="playback" controls playsinline></video>
+    <div class="empty-state" id="emptyState">
+      <strong>No screen selected yet</strong>
+      Click <em>Choose screen</em>, then pick the monitor you want to record.
+    </div>
+    <div class="rec-badge" id="recBadge"><span class="pulse"></span><span id="recBadgeText">REC</span></div>
+    <div class="countdown-overlay" id="countdownOverlay" hidden><span id="countdownNum">3</span></div>
+  </div>
+  <div class="controls">
+    <button id="btnRecord" disabled aria-label="Start recording" title="Start recording"><span class="core"></span></button>
+    <div class="timer idle" id="timer">00:00</div>
+    <button id="btnPause" disabled>Pause</button>
+    <button id="btnCancelTake" class="cancel-btn" disabled title="Stop and throw away this take">Cancel take</button>
+    <button id="btnChoose">Choose screen</button>
+    <button id="btnPopout" title="Open floating controls on another screen">Pop out controls</button>
+    <div class="spacer"></div>
+    <label class="mic-enable"><input type="checkbox" id="micToggle" checked> Microphone <span class="mic-hint" id="micHint">off</span></label>
+  </div>
+
+  <div class="session-row">
+    <label class="sess-name">Lesson name
+      <input type="text" id="lessonName" placeholder="e.g. Fractions - Week 3" maxlength="80" autocomplete="off">
+    </label>
+    <div class="sess-format" id="formatGroup">
+      <span class="fmt-label">Save as</span>
+      <label><input type="radio" name="fmt" id="fmtMp4" value="mp4"> MP4</label>
+      <label><input type="radio" name="fmt" id="fmtWebm" value="webm" checked> WebM</label>
+    </div>
+    <label class="sess-toggle"><input type="checkbox" id="countdownToggle" checked> 3-2-1 countdown</label>
+  </div>
+
+  <div class="monitor" id="monitor">
+    <div class="sc-panel">
+      <div class="sc-main">
+        <div class="sc-step" id="scStep">Sound check</div>
+        <div class="sc-instruction" id="scInstruction">Run a quick sound check before recording \u2014 I\u2019ll measure your room, then your voice, and set your levels.</div>
+        <div class="sc-live"><div class="sc-live-fill" id="scLiveFill"></div></div>
+      </div>
+      <div class="sc-actions">
+        <button id="btnCheck" disabled class="sc-go">Run sound check</button>
+        <button id="btnTest" class="listen-btn" disabled>\u25CF Test 8s</button>
+        <button id="btnListen" class="listen-btn" disabled>\u25B6 Listen</button>
+      </div>
+    </div>
+
+    <div class="test-panel" id="testPanel" hidden>
+      <div class="test-head">
+        <strong id="testTitle">Test recording</strong>
+        <span class="test-note">This clip is kept only in memory \u2014 nothing is saved unless you record for real.</span>
+      </div>
+      <audio id="testAudio" controls></audio>
+      <div class="test-actions">
+        <button id="btnTestRedo" class="link-btn">Record another test</button>
+        <button id="btnTestDiscard" class="link-btn">Discard &amp; close</button>
+      </div>
+    </div>
+
+    <div class="sc-results" id="scResults" hidden>
+      <div class="sc-readiness" id="scReadiness"><span id="scReadyIcon"></span><span id="scReadyText"></span></div>
+      <div class="sc-result-row" id="scBgRow">
+        <span class="sc-result-icon" id="scBgIcon"></span>
+        <div class="sc-result-text"><strong id="scBgTitle"></strong><span id="scBgAdvice"></span></div>
+      </div>
+      <div class="sc-result-row" id="scVoiceRow">
+        <span class="sc-result-icon" id="scVoiceIcon"></span>
+        <div class="sc-result-text"><strong id="scVoiceTitle"></strong><span id="scVoiceAdvice"></span></div>
+      </div>
+      <div class="sc-applied" id="scApplied"></div>
+      <div class="sc-verdict" id="scVerdict"></div>
+      <div class="sc-lockrow">
+        <button id="btnLockRetest" class="sc-go">Lock in &amp; re-test</button>
+        <button id="btnCopyPrompt" class="listen-btn">Copy desktop-fix prompt</button>
+        <span class="sc-lock-note" id="scLockNote"></span>
+      </div>
+    </div>
+
+    <div class="opts-row">
+      <label><input type="checkbox" id="gateToggle" checked> Block room &amp; outside noise</label>
+      <label><input type="checkbox" id="autoLevel"> Auto-adjust my volume</label>
+      <div class="qmode" title="Clean: Chrome removes background noise (great default). Studio EQ: raw mic + built-in high-pass and 100/120 Hz hum notches for full control.">
+        <span class="qmode-label">Audio</span>
+        <label><input type="radio" name="qmode" id="qClean" checked> Clean</label>
+        <label><input type="radio" name="qmode" id="qStudio"> Studio EQ</label>
+      </div>
+      <button id="detailsToggle" class="link-btn">Show details</button>
+    </div>
+
+    <div class="details" id="details" hidden>
+      <div class="spectrum-wrap">
+        <canvas id="spectrum" width="760" height="90"></canvas>
+        <div class="spectrum-label">frequency \u2192 &nbsp; (steady bars when you\u2019re silent = background noise)</div>
+      </div>
+      <div class="meter-row">
+        <div class="meter-track">
+          <div class="meter-zone-good"></div>
+          <div class="meter-fill" id="meterFill"></div>
+          <div class="meter-peak" id="meterPeak"></div>
+          <div class="meter-floor" id="meterFloor" title="Background noise floor"></div>
+        </div>
+        <div class="meter-readout"><span id="dbNow">\u2212\u221e dB</span></div>
+      </div>
+      <div class="readout-grid">
+        <div class="stat"><label>Noise floor</label><span id="floorDb">\u2014</span></div>
+        <div class="stat"><label>Speech peak</label><span id="peakDb">\u2014</span></div>
+        <div class="stat"><label>Voice \u2212 noise</label><span id="snrDb">\u2014</span></div>
+        <div class="gain-control">
+          <span class="gain-manual-label">Manual volume</span>
+          <input type="range" id="gainSlider" min="25" max="400" value="100" aria-label="Microphone gain">
+          <span id="gainLabel">100%</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="error-bar" id="errorBar"></div>
+
+<div class="result" id="result">
+  <div class="info">
+    <strong id="resultName">recording.webm</strong>
+    <span id="resultMeta"></span>
+  </div>
+  <a id="downloadLink" download>Save recording</a>
+  <button id="btnDiscardTake" class="discard-btn">Discard take</button>
+</div>
+
+<div class="tips">
+  <strong>How it works:</strong> Choose screen → pick your monitor in the popup (use the "Entire screen" tab to see each monitor) → say a few words and check both cards read green → press the red button. "Block room &amp; outside noise" mutes your mic between sentences so hallway and street sounds don't get in. Choose <strong>MP4</strong> if you'll edit the lesson (it imports cleanly into video editors) or <strong>WebM</strong> for a smaller file; both upload fine to YouTube.
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const preview = $('preview'), playback = $('playback'), emptyState = $('emptyState');
+  const btnRecord = $('btnRecord'), btnPause = $('btnPause'), btnChoose = $('btnChoose');
+  const timerEl = $('timer'), statusEl = $('status'), recBadge = $('recBadge'), recBadgeText = $('recBadgeText');
+  const micToggle = $('micToggle'), micHint = $('micHint');
+  const result = $('result'), resultName = $('resultName'), resultMeta = $('resultMeta'), downloadLink = $('downloadLink');
+  const errorBar = $('errorBar');
+  const autoLevel = $('autoLevel'), gainSlider = $('gainSlider'), gainLabel = $('gainLabel');
+  const spectrum = $('spectrum'), sctx = spectrum.getContext('2d');
+  const meterFill = $('meterFill'), meterPeak = $('meterPeak'), meterFloor = $('meterFloor');
+  const dbNow = $('dbNow'), floorDb = $('floorDb'), peakDb = $('peakDb'), snrDb = $('snrDb');
+  const btnListen = $('btnListen');
+  const gateToggle = $('gateToggle'), detailsToggle = $('detailsToggle'), details = $('details');
+  const qClean = $('qClean'), qStudio = $('qStudio');
+
+  function switchQualityMode() {
+    const next = qStudio.checked ? 'studio' : 'clean';
+    if (next === qualityMode) return;
+    qualityMode = next;
+    if (recorder && recorder.state !== 'inactive') {
+      // Don't swap the pipeline mid-recording; revert the radio and warn
+      (qualityMode === 'studio' ? qClean : qStudio).checked = false;
+      (qualityMode === 'studio' ? qStudio : qClean).checked = true;
+      qualityMode = next === 'studio' ? 'studio' : 'clean';
+    }
+    if (micToggle.checked) setupMic(); // re-acquire the mic with the new processing
+  }
+  qClean.addEventListener('change', switchQualityMode);
+  qStudio.addEventListener('change', switchQualityMode);
+  const btnCheck = $('btnCheck'), scStep = $('scStep'), scInstruction = $('scInstruction'), scLiveFill = $('scLiveFill');
+  const scResults = $('scResults');
+  const scBgRow = $('scBgRow'), scBgIcon = $('scBgIcon'), scBgTitle = $('scBgTitle'), scBgAdvice = $('scBgAdvice');
+  const scVoiceRow = $('scVoiceRow'), scVoiceIcon = $('scVoiceIcon'), scVoiceTitle = $('scVoiceTitle'), scVoiceAdvice = $('scVoiceAdvice');
+  const scVerdict = $('scVerdict');
+  const scReadiness = $('scReadiness'), scReadyIcon = $('scReadyIcon'), scReadyText = $('scReadyText');
+  const scApplied = $('scApplied'), btnLockRetest = $('btnLockRetest'), scLockNote = $('scLockNote');
+  const btnCopyPrompt = $('btnCopyPrompt');
+  let lastCheckIdeal = false;
+  let lastCheck = null;
+  const btnTest = $('btnTest'), testPanel = $('testPanel'), testAudio = $('testAudio');
+  const btnTestRedo = $('btnTestRedo'), btnTestDiscard = $('btnTestDiscard'), testTitle = $('testTitle');
+  let testRecorder = null, testChunks = [], testUrl = null, testCountdown = null;
+  const lessonName = $('lessonName'), countdownToggle = $('countdownToggle');
+  const fmtMp4 = $('fmtMp4'), fmtWebm = $('fmtWebm');
+  const btnCancelTake = $('btnCancelTake'), btnDiscardTake = $('btnDiscardTake');
+  let aborting = false;
+  const countdownOverlay = $('countdownOverlay'), countdownNum = $('countdownNum');
+  const recoverBanner = $('recoverBanner'), recoverInfo = $('recoverInfo'), btnRecover = $('btnRecover'), btnRecoverDiscard = $('btnRecoverDiscard');
+
+  // ---- Crash-recovery store (IndexedDB); degrades gracefully if unavailable ----
+  const recovery = (() => {
+    let idbFactory;
+    try { idbFactory = window.indexedDB; } catch (e) { idbFactory = null; }
+    if (!idbFactory) return null;
+    const DB = 'lessonRecorderDB', VER = 1;
+    let dbP = null;
+    function open() {
+      if (dbP) return dbP;
+      dbP = new Promise((res, rej) => {
+        const req = idbFactory.open(DB, VER);
+        req.onupgradeneeded = () => {
+          const db = req.result;
+          if (!db.objectStoreNames.contains('chunks')) db.createObjectStore('chunks', { autoIncrement: true });
+          if (!db.objectStoreNames.contains('meta')) db.createObjectStore('meta');
+        };
+        req.onsuccess = () => res(req.result);
+        req.onerror = () => rej(req.error);
+      });
+      return dbP;
+    }
+    function tx(store, mode, fn) {
+      return open().then(db => new Promise((res, rej) => {
+        const t = db.transaction(store, mode);
+        const out = fn(t.objectStore(store));
+        t.oncomplete = () => res(out && out.result !== undefined ? out.result : out);
+        t.onerror = () => rej(t.error);
+        t.onabort = () => rej(t.error);
+      }));
+    }
+    return {
+      begin: async (meta) => { await tx('chunks','readwrite',s=>s.clear()); await tx('meta','readwrite',s=>{s.put(meta,'current');}); },
+      addChunk: async (blob) => { await tx('chunks','readwrite',s=>{s.add(blob);}); },
+      updateMeta: async (patch) => { const cur = await tx('meta','readonly',s=>s.get('current'))||{}; await tx('meta','readwrite',s=>{s.put({...cur,...patch},'current');}); },
+      finish: async () => { await tx('chunks','readwrite',s=>s.clear()); await tx('meta','readwrite',s=>s.delete('current')); },
+      pending: async () => { const meta = await tx('meta','readonly',s=>s.get('current')); if (!meta||meta.status!=='recording') return null; const count = await tx('chunks','readonly',s=>s.count()); return count?{meta,count}:null; },
+      assemble: async () => { const parts = await tx('chunks','readonly',s=>s.getAll()); const meta = await tx('meta','readonly',s=>s.get('current')); return {parts,meta}; }
+    };
+  })();
+
+  function safeName(base) {
+    const clean = (base || '').trim().replace(/[^\w\- ]+/g, '').replace(/\s+/g, ' ').trim().replace(/ /g, '_');
+    return clean || 'lesson';
+  }
+  function makeFilename(ext) {
+    const d = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const stamp = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}`;
+    return safeName(lessonName.value) + '_' + stamp + '.' + (ext || 'webm');
+  }
+
+  // Detect native MP4 (H.264/AAC) recording support
+  function supportedMp4Mime() {
+    const opts = [
+      'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+      'video/mp4;codecs=avc1,mp4a',
+      'video/mp4;codecs=h264,aac',
+      'video/mp4'
+    ];
+    for (const m of opts) { try { if (MediaRecorder.isTypeSupported(m)) return m; } catch (e) {} }
+    return '';
+  }
+  const MP4_MIME = supportedMp4Mime();
+  if (MP4_MIME) {
+    fmtMp4.checked = true; fmtWebm.checked = false; // prefer MP4 when available (editing-friendly)
+  } else {
+    fmtMp4.disabled = true;
+    fmtMp4.closest('label').classList.add('disabled');
+    fmtMp4.closest('label').title = 'This browser can\u2019t record MP4 directly \u2014 update Chrome/Edge. WebM still uploads to YouTube.';
+  }
+  let currentContainer = 'webm';
+
+  let screenStream = null, micStream = null, recorder = null;
+  let chunks = [], startTime = 0, pausedTotal = 0, pauseStart = 0, timerInterval = null;
+  let audioCtx = null, analyser = null, analyserRaw = null, vuRaf = null;
+  let gainNode = null, compressorNode = null, micDest = null, monitorGain = null, gateGain = null;
+  let eqNodes = [];
+  let qualityMode = 'clean'; // 'clean' = Chrome noise suppression; 'studio' = raw + our EQ
+  let recWatchAnalyser = null, recWatchInterval = null, recSilentMs = 0, recSilent = false;
+  let gateOpen = false, gateOpenT = 0;
+  let lastUrl = null;
+  const TARGET_RMS = 0.11;   // comfortable speech level after processing
+  const SPEECH_GATE = 0.015; // fallback speech threshold when uncalibrated
+
+  // Calibration from the sound check (raw pre-gain levels). null until a check runs.
+  let calNoise = null, calVoice = null;
+  // Sound check state machine
+  let check = null;
+  let peakHoldAmp = 0, peakHoldT = 0;
+
+  function showError(msg) {
+    errorBar.textContent = msg;
+    errorBar.classList.add('show');
+  }
+  function clearError() { errorBar.classList.remove('show'); }
+
+  function fmt(ms) {
+    const s = Math.floor(ms / 1000);
+    const m = Math.floor(s / 60), sec = s % 60;
+    const h = Math.floor(m / 60);
+    if (h > 0) return String(h).padStart(2,'0') + ':' + String(m % 60).padStart(2,'0') + ':' + String(sec).padStart(2,'0');
+    return String(m).padStart(2,'0') + ':' + String(sec).padStart(2,'0');
+  }
+
+  const ampToDb = a => a <= 0.0001 ? -80 : 20 * Math.log10(a);
+  const dbToPct = db => Math.max(0, Math.min(100, (db + 60) / 60 * 100));
+  const fmtDb = db => db <= -79 ? '\u2212\u221e dB' : (db >= 0 ? '+' : '\u2212') + Math.abs(db).toFixed(0) + ' dB';
+
+  // ---------- Microphone: gain -> compressor -> (meter + recording + optional monitor) ----------
+  async function setupMic() {
+    stopMic();
+    if (!micToggle.checked) { micHint.textContent = 'off'; resetMeters(); btnListen.disabled = true; return; }
+    try {
+      const studio = qualityMode === 'studio';
+      micStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          // Studio mode takes the raw mic so our own EQ does the cleanup;
+          // Clean mode lets Chrome's processing suppress noise (very effective).
+          echoCancellation: !studio,
+          noiseSuppression: !studio,
+          autoGainControl: false,           // we always run our own levelling
+          sampleRate: { ideal: 48000 },      // Opus-native rate; 'ideal' so it falls back safely
+          channelCount: { ideal: 1 }         // voice is mono \u2014 no benefit to stereo
+        }
+      });
+      micHint.textContent = 'live';
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+
+      const src = audioCtx.createMediaStreamSource(micStream);
+      gainNode = audioCtx.createGain();
+      gainNode.gain.value = Number(gainSlider.value) / 100;
+
+      compressorNode = audioCtx.createDynamicsCompressor();
+      compressorNode.threshold.value = -22;
+      compressorNode.knee.value = 12;
+      compressorNode.ratio.value = 4;
+      compressorNode.attack.value = 0.003;
+      compressorNode.release.value = 0.25;
+
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 2048;
+      analyser.smoothingTimeConstant = 0.6;
+      // Raw analyser taps the mic BEFORE our gain, so measurements don't depend on gain setting
+      analyserRaw = audioCtx.createAnalyser();
+      analyserRaw.fftSize = 2048;
+      analyserRaw.smoothingTimeConstant = 0.3;
+      src.connect(analyserRaw);
+      micDest = audioCtx.createMediaStreamDestination();
+
+      // Noise gate: closes between sentences so room/outside sounds in the gaps aren't recorded
+      gateGain = audioCtx.createGain();
+      gateGain.gain.value = 1;
+      gateOpen = true;
+
+      // Watchdog analyser on the actual recording feed (runs even when tab is hidden,
+      // because the audio graph keeps processing in the background unlike rAF)
+      recWatchAnalyser = audioCtx.createAnalyser();
+      recWatchAnalyser.fftSize = 1024;
+      gateGain.connect(recWatchAnalyser);
+
+      // Headphone monitoring path (muted until "Listen" is on)
+      monitorGain = audioCtx.createGain();
+      monitorGain.gain.value = btnListen.classList.contains('on') ? 1 : 0;
+
+      // Studio EQ: high-pass out sub-85Hz rumble + sharp notches on 100/120Hz mains hum.
+      // Inserted between gain and compressor so the compressor never pumps on hum.
+      src.connect(gainNode);
+      if (studio) {
+        const hp = audioCtx.createBiquadFilter();
+        hp.type = 'highpass'; hp.frequency.value = 85; hp.Q.value = 0.7;
+        const n1 = audioCtx.createBiquadFilter();
+        n1.type = 'notch'; n1.frequency.value = 100; n1.Q.value = 30;
+        const n2 = audioCtx.createBiquadFilter();
+        n2.type = 'notch'; n2.frequency.value = 120; n2.Q.value = 30;
+        gainNode.connect(hp); hp.connect(n1); n1.connect(n2); n2.connect(compressorNode);
+        eqNodes = [hp, n1, n2];
+      } else {
+        gainNode.connect(compressorNode);
+        eqNodes = [];
+      }
+      compressorNode.connect(analyser);      // measure BEFORE the gate
+      compressorNode.connect(gateGain);
+      gateGain.connect(micDest);             // recording feed (gated)
+      gateGain.connect(monitorGain);
+      monitorGain.connect(audioCtx.destination);
+
+      peakHoldAmp = 0;
+      btnListen.disabled = false;
+      btnCheck.disabled = false;
+      btnTest.disabled = false;
+      runMeter();
+    } catch (e) {
+      micToggle.checked = false;
+      micHint.textContent = 'blocked';
+      btnListen.disabled = true;
+      btnCheck.disabled = true;
+      btnTest.disabled = true;
+      showError('Microphone access was blocked. Click the camera/mic icon in your browser address bar to allow it, then re-tick Microphone.');
+    }
+  }
+
+  function stopMic() {
+    if (vuRaf) cancelAnimationFrame(vuRaf), vuRaf = null;
+    check = null;
+    discardTest();
+    resetMeters();
+    if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+    analyser = null; analyserRaw = null; gainNode = null; compressorNode = null; micDest = null; monitorGain = null; gateGain = null; eqNodes = []; recWatchAnalyser = null;
+    btnCheck.disabled = true; btnListen.disabled = true; btnTest.disabled = true;
+  }
+
+  function resetMeters() {
+    meterFill.style.width = '0%';
+    meterPeak.style.left = '0%';
+    meterFloor.style.left = '0%';
+    scLiveFill.style.width = '0%';
+    dbNow.textContent = '\u2212\u221e dB';
+    floorDb.textContent = '\u2014'; peakDb.textContent = '\u2014'; snrDb.textContent = '\u2014';
+    if (sctx) { sctx.clearRect(0, 0, spectrum.width, spectrum.height); }
+  }
+
+  function setGainUI(g) {
+    const pct = Math.round(g * 100);
+    gainSlider.value = pct;
+    gainLabel.textContent = pct + '%';
+  }
+
+  function runMeter() {
+    const td = new Uint8Array(analyser.fftSize);
+    const tdRaw = new Uint8Array(analyserRaw.fftSize);
+    const fd = new Uint8Array(analyser.frequencyBinCount);
+    const W = spectrum.width, H = spectrum.height;
+    const BARS = 56;
+
+    const tick = () => {
+      if (!analyser || !analyserRaw) return;
+      const now = performance.now();
+
+      // --- post-processing level (what gets recorded): for meter + spectrum display ---
+      analyser.getByteTimeDomainData(td);
+      let peak = 0;
+      for (let i = 0; i < td.length; i++) peak = Math.max(peak, Math.abs((td[i] - 128) / 128));
+
+      // --- RAW mic level (pre-gain): stable, gain-independent. Drives check + gate ---
+      analyserRaw.getByteTimeDomainData(tdRaw);
+      let sumSqR = 0;
+      for (let i = 0; i < tdRaw.length; i++) { const v = (tdRaw[i] - 128) / 128; sumSqR += v * v; }
+      const rawRms = Math.sqrt(sumSqR / tdRaw.length);
+
+      // --- live "mic is working" bar (shows post-gain level) ---
+      scLiveFill.style.width = Math.min(100, peak * 140) + '%';
+      scLiveFill.classList.toggle('hot', peak > 0.9);
+
+      // --- details meter ---
+      if (peak >= peakHoldAmp) { peakHoldAmp = peak; peakHoldT = now; }
+      else if (now - peakHoldT > 1200) peakHoldAmp *= 0.93;
+      const curDb = ampToDb(peak);
+      meterFill.style.width = dbToPct(curDb) + '%';
+      meterPeak.style.left = dbToPct(ampToDb(peakHoldAmp)) + '%';
+      dbNow.textContent = fmtDb(curDb);
+      if (calNoise != null) meterFloor.style.left = dbToPct(ampToDb(calNoise)) + '%';
+
+      // --- sound check state machine (uses rawRms) ---
+      if (check) runCheckStep(rawRms, now);
+
+      // --- noise gate (uses rawRms + calibrated thresholds when available) ---
+      if (gateGain) {
+        if (gateToggle.checked && !document.hidden) {
+          let openThresh, closeThresh;
+          if (calNoise != null && calVoice != null) {
+            openThresh = Math.min(calVoice * 0.3, Math.max(calNoise * 3.5, SPEECH_GATE));
+            closeThresh = openThresh * 0.6;
+          } else {
+            openThresh = SPEECH_GATE * 1.6; closeThresh = SPEECH_GATE;
+          }
+          if (rawRms > openThresh) { gateOpen = true; gateOpenT = now; }
+          else if (rawRms < closeThresh && now - gateOpenT > 280) gateOpen = false;
+          gateGain.gain.setTargetAtTime(gateOpen ? 1 : 0, audioCtx.currentTime, gateOpen ? 0.005 : 0.06);
+        } else {
+          // Gate off, OR tab hidden (rAF is paused so we can't gate safely) -> fail OPEN
+          gateGain.gain.setTargetAtTime(1, audioCtx.currentTime, 0.01);
+        }
+      }
+
+      // --- spectrum ---
+      analyser.getByteFrequencyData(fd);
+      sctx.clearRect(0, 0, W, H);
+      const usable = Math.floor(fd.length * 0.7);
+      const step = usable / BARS, bw = W / BARS;
+      for (let b = 0; b < BARS; b++) {
+        let m = 0;
+        const start = Math.floor(b * step), end = Math.floor((b + 1) * step);
+        for (let i = start; i < end; i++) m = Math.max(m, fd[i]);
+        const h = (m / 255) * H;
+        sctx.fillStyle = b < 4 ? 'rgba(217,154,31,0.85)' : 'rgba(46,180,120,0.85)';
+        sctx.fillRect(b * bw + 1, H - h, bw - 2, h);
+      }
+
+      // --- auto-level (optional; off by default now that sound check sets gain) ---
+      if (autoLevel.checked && gainNode && rawRms > (calNoise != null ? calNoise * 4 : SPEECH_GATE)) {
+        const postRms = peak; // approximate
+        const desired = Math.min(5, Math.max(0.25, gainNode.gain.value * (TARGET_RMS / Math.max(postRms, 0.001))));
+        const next = gainNode.gain.value + (desired - gainNode.gain.value) * 0.02;
+        gainNode.gain.value = next;
+        setGainUI(next);
+      }
+      vuRaf = requestAnimationFrame(tick);
+    };
+    tick();
+  }
+
+  // ---------- Guided sound check ----------
+  const CHECK_BG_MS = 3000;     // measure background
+  const CHECK_VOICE_MS = 5000;  // measure voice
+  const TEST_LINE = '\u201cTesting, one two three \u2014 today we\u2019re learning about\u2026\u201d';
+
+  function startCheck() {
+    if (!analyserRaw) { showError('Turn the microphone on first.'); return; }
+    clearError();
+    scResults.setAttribute('hidden', '');
+    // Use a fixed, known gain during measurement so results are stable
+    autoLevel.checked = false;
+    gainSlider.disabled = false;
+    check = { phase: 'count', t0: performance.now(), bg: [], voice: [] };
+    btnCheck.disabled = true;
+    btnCheck.classList.add('checking');
+    btnCheck.textContent = 'Checking\u2026';
+  }
+
+  function runCheckStep(rawRms, now) {
+    const el = check;
+    const elapsed = now - el.t0;
+
+    if (el.phase === 'count') {
+      const left = Math.ceil((1000 - elapsed) / 1000);
+      scStep.textContent = 'Get ready'; scStep.className = 'sc-step';
+      scInstruction.innerHTML = '<span class="big">Starting in ' + Math.max(1, left) + '\u2026 stay quiet</span>';
+      if (elapsed >= 1000) { el.phase = 'bg'; el.t0 = now; }
+      return;
+    }
+
+    if (el.phase === 'bg') {
+      el.bg.push(rawRms);
+      const left = Math.ceil((CHECK_BG_MS - elapsed) / 1000);
+      scStep.textContent = 'Step 1 of 2 \u00b7 Background'; scStep.className = 'sc-step bg';
+      scInstruction.innerHTML = '\ud83e\udd2b <span class="big">Stay silent\u2026 measuring your room (' + Math.max(0, left) + ')</span>';
+      if (elapsed >= CHECK_BG_MS) { el.phase = 'voice'; el.t0 = now; }
+      return;
+    }
+
+    if (el.phase === 'voice') {
+      el.voice.push(rawRms);
+      const left = Math.ceil((CHECK_VOICE_MS - elapsed) / 1000);
+      scStep.textContent = 'Step 2 of 2 \u00b7 Your voice'; scStep.className = 'sc-step voice';
+      scInstruction.innerHTML = '\ud83c\udf99\ufe0f <span class="big">Read aloud, normal voice (' + Math.max(0, left) + ')</span><br><span class="read">' + TEST_LINE + '</span>';
+      if (elapsed >= CHECK_VOICE_MS) { finishCheck(); }
+      return;
+    }
+  }
+
+  function median(arr) {
+    if (!arr.length) return 0;
+    const s = [...arr].sort((a, b) => a - b);
+    return s[Math.floor(s.length / 2)];
+  }
+  function upperMean(arr, frac) {
+    if (!arr.length) return 0;
+    const s = [...arr].sort((a, b) => a - b);
+    const start = Math.floor(s.length * (1 - frac));
+    let sum = 0, n = 0;
+    for (let i = start; i < s.length; i++) { sum += s[i]; n++; }
+    return n ? sum / n : 0;
+  }
+
+  function finishCheck() {
+    const bg = check;
+    check = null;
+    btnCheck.disabled = false;
+    btnCheck.classList.remove('checking');
+    btnCheck.textContent = 'Run sound check again';
+    scStep.textContent = 'Sound check'; scStep.className = 'sc-step';
+    scInstruction.textContent = 'Done. Here\u2019s how it looks:';
+
+    // Robust estimates from raw (pre-gain) samples
+    const noise = median(bg.bg);              // typical background level
+    const voice = upperMean(bg.voice, 0.4);   // typical speaking level (louder 40%)
+    calNoise = Math.max(noise, 0.0005);
+    calVoice = Math.max(voice, calNoise * 1.05);
+
+    const snr = ampToDb(calVoice) - ampToDb(calNoise);
+
+    // Details readouts reflect the measured calibration
+    floorDb.textContent = fmtDb(ampToDb(calNoise));
+    peakDb.textContent = fmtDb(ampToDb(calVoice));
+    snrDb.textContent = snr.toFixed(0) + ' dB';
+
+    // ---- Recommend a gain that brings the voice to target, without clipping ----
+    let recGain = TARGET_RMS / calVoice;
+    const clipCap = 0.85 / (calVoice * 2); // assume peaks ~2x rms; keep them under 0.85
+    recGain = Math.min(recGain, clipCap);
+    recGain = Math.max(0.25, Math.min(4.0, recGain));
+    const recPct = Math.round(recGain * 100);
+    const reachedTarget = calVoice * recGain >= TARGET_RMS * 0.75; // false => voice faint at source
+    const voiceFaint = !reachedTarget;
+
+    // ---- Guard: did we actually hear a voice distinct from the room? ----
+    if (snr < 6 || calVoice < calNoise * 1.6) {
+      lastCheckIdeal = false;
+      scReadiness.className = 'sc-readiness notready';
+      scReadyIcon.textContent = '\u2753';
+      scReadyText.textContent = 'NO VOICE DETECTED \u2014 try again';
+      scBgRow.className = 'sc-result-row warn';
+      scBgIcon.textContent = '\u2753';
+      scBgTitle.textContent = 'I couldn\u2019t hear your voice clearly';
+      scBgAdvice.textContent = 'During step 2 your voice wasn\u2019t much louder than the room. Run the check again and read the sentence aloud at your normal teaching volume, a hand-span from the mic.';
+      scVoiceRow.className = 'sc-result-row warn';
+      scVoiceIcon.textContent = '\ud83c\udf99\ufe0f';
+      scVoiceTitle.textContent = 'Let\u2019s try once more';
+      scVoiceAdvice.textContent = 'Make sure the right mic is selected (Windows \u2192 Sound \u2192 Input) and speak through step 2.';
+      scApplied.textContent = '';
+      scVerdict.className = 'sc-verdict fix';
+      scVerdict.textContent = 'Re-run the check and talk during the voice step.';
+      scLockNote.textContent = '';
+      scResults.removeAttribute('hidden');
+      return;
+    }
+
+    // ---- Background verdict: driven by voice-to-noise ratio, aware of the cause ----
+    const roomQuiet = calNoise < 0.012; // genuinely low room level (~ -38 dBFS or quieter)
+    let bgCls, bgTitle, bgAdvice;
+    if (snr >= 20) {
+      bgCls = 'good'; scBgIcon.textContent = '\u2705';
+      bgTitle = 'Background: quiet';
+      bgAdvice = 'Your voice sits well above the room \u2014 clean for an educational video.';
+    } else if (snr >= 12) {
+      bgCls = 'warn'; scBgIcon.textContent = '\u26a0\ufe0f';
+      bgTitle = 'Background: a bit noisy';
+      if (voiceFaint || roomQuiet) {
+        bgAdvice = 'The room itself is quiet \u2014 this is mostly your voice sitting too close to it. Move closer to the mic (a hand-span away) so your voice rises clear of the room.';
+      } else {
+        bgAdvice = 'Some background is audible. Getting closer to the mic raises your voice over the room better than more gain does. If the room feels silent to you, the noise is likely mic hiss \u2014 turn off \u201cMicrophone Boost\u201d in Windows \u2192 Sound \u2192 your mic \u2192 Properties \u2192 Levels.';
+      }
+    } else { // snr < 12 \u2014 poor separation
+      if (voiceFaint || roomQuiet) {
+        bgCls = 'warn'; scBgIcon.textContent = '\u26a0\ufe0f';
+        bgTitle = 'Voice is faint vs the room';
+        bgAdvice = 'The room is quiet \u2014 the problem is your voice is too weak or far from the mic. Move closer (a hand-span away) and/or raise your Windows mic level, then re-check.';
+      } else {
+        bgCls = 'bad'; scBgIcon.textContent = '\u26d4';
+        bgTitle = 'Background: too noisy';
+        bgAdvice = 'The room is nearly as loud as your voice, so noise will be clearly audible. Move the mic closer to your mouth, turn off fans/AC, close the door and windows, or record in a smaller, softer room.';
+      }
+    }
+    scBgRow.className = 'sc-result-row ' + bgCls;
+    scBgTitle.textContent = bgTitle;
+    scBgAdvice.textContent = bgAdvice;
+
+    // ---- Voice verdict (after applying recommended gain) ----
+    let vCls, vTitle, vAdvice;
+    if (voiceFaint) {
+      vCls = 'bad'; scVoiceIcon.textContent = '\u26d4';
+      vTitle = 'Your voice: too faint \u2014 I set gain to ' + recPct + '%';
+      vAdvice = 'Even at maximum boost your voice is quiet. Move closer (a hand-span away), speak up, and check Windows \u2192 Sound \u2192 Input that the right mic is picked and its level is up near 80\u2013100%.';
+    } else if (recGain >= 2.5) {
+      vCls = 'warn'; scVoiceIcon.textContent = '\u26a0\ufe0f';
+      vTitle = 'Your voice: set to ' + recPct + '% (a big boost)';
+      vAdvice = 'That reaches a good level, but a high boost also lifts background noise. Moving closer to the mic, or raising your Windows mic level, lets me use less boost for a cleaner sound.';
+    } else {
+      vCls = 'good'; scVoiceIcon.textContent = '\u2705';
+      vTitle = 'Your voice: set to a clear level (' + recPct + '%)';
+      vAdvice = 'I set your gain to ' + recPct + '% \u2014 your voice will sit at a strong, consistent level throughout the recording.';
+    }
+    scVoiceRow.className = 'sc-result-row ' + vCls;
+    scVoiceTitle.textContent = vTitle;
+    scVoiceAdvice.textContent = vAdvice;
+
+    // Apply the recommended gain + auto-enable the noise gate (automated adjustments)
+    gainNode && (gainNode.gain.value = recGain);
+    setGainUI(recGain);
+    gainSlider.disabled = false;
+    gateToggle.checked = true;
+
+    // ---- Clear readiness verdict: IDEAL / USABLE / NOT READY ----
+    const ideal = (bgCls === 'good' && vCls === 'good');
+    const notReady = (bgCls === 'bad' || vCls === 'bad');
+    lastCheckIdeal = ideal;
+
+    if (ideal) {
+      scReadiness.className = 'sc-readiness ideal';
+      scReadyIcon.textContent = '\u2705';
+      scReadyText.textContent = 'IDEAL RANGE \u2014 ready to record';
+    } else if (notReady) {
+      scReadiness.className = 'sc-readiness notready';
+      scReadyIcon.textContent = '\u26d4';
+      scReadyText.textContent = 'NOT READY \u2014 fix the item above';
+    } else {
+      scReadiness.className = 'sc-readiness usable';
+      scReadyIcon.textContent = '\u26a0\ufe0f';
+      scReadyText.textContent = 'USABLE \u2014 but not ideal yet';
+    }
+
+    // What was auto-applied vs what needs a manual fix
+    scApplied.innerHTML = 'Auto-applied for you: <strong>mic gain ' + recPct + '%</strong> and <strong>noise gate on</strong>.' +
+      (ideal ? '' : ' The one thing left needs you: see the highlighted item above.');
+
+    // Save the measured picture for the desktop-fix prompt
+    lastCheck = {
+      floorDb: Math.round(ampToDb(calNoise)),
+      voiceDb: Math.round(ampToDb(calVoice)),
+      snr: Math.round(snr),
+      recPct, voiceFaint, roomQuiet,
+      bg: bgCls, voice: vCls, ideal
+    };
+
+    // Verdict line + lock button guidance
+    if (ideal) {
+      scVerdict.className = 'sc-verdict ready';
+      scVerdict.textContent = 'Press \u201cLock in & re-test\u201d to freeze these settings, then record.';
+      scLockNote.textContent = 'Locks your gain so it can\u2019t drift, keeps the gate on, and re-checks.';
+    } else if (notReady) {
+      scVerdict.className = 'sc-verdict fix';
+      scVerdict.textContent = 'Make the fix above, then lock in & re-test to confirm.';
+      scLockNote.textContent = 'You can lock and re-test after adjusting.';
+    } else {
+      scVerdict.className = 'sc-verdict fix';
+      scVerdict.textContent = 'Recordable now \u2014 or nudge the item above to reach ideal, then re-test.';
+      scLockNote.textContent = 'Lock in & re-test to confirm your settings.';
+    }
+    scResults.removeAttribute('hidden');
+  }
+
+  // Freeze the good settings and immediately re-run the check to confirm
+  function lockAndRetest() {
+    autoLevel.checked = false;   // freeze gain so it won't drift mid-lesson
+    gateToggle.checked = true;   // keep room/outside noise blocked
+    gainSlider.disabled = false; // gain stays at the applied value, adjustable if needed
+    statusEl.textContent = 'Settings locked \u2014 re-testing\u2026';
+    setTimeout(startCheck, 400);
+  }
+
+  btnCheck.addEventListener('click', startCheck);
+  btnLockRetest.addEventListener('click', lockAndRetest);
+
+  // ---- Generate a task prompt for Claude Code / Codex to fix Windows mic settings ----
+  function buildDesktopPrompt() {
+    const c = lastCheck;
+    let diag, asks = [];
+    if (c) {
+      diag =
+        'Diagnostics from my recorder\u2019s sound check:\n' +
+        '- Background noise floor: about ' + c.floorDb + ' dBFS\n' +
+        '- My speaking level: about ' + c.voiceDb + ' dBFS\n' +
+        '- Voice-to-noise ratio: about ' + c.snr + ' dB\n' +
+        '- The app had to boost my mic by ' + c.recPct + '% in software to reach a good level.\n' +
+        '- Overall it rated my setup: ' + (c.ideal ? 'IDEAL' : (c.voice === 'bad' || c.bg === 'bad' ? 'NOT READY' : 'USABLE but not ideal')) + '.\n';
+      if (c.voiceFaint || c.recPct >= 200)
+        asks.push('My voice is faint at the source (needed a big software boost). Raise the default microphone\u2019s input level toward 90\u2013100%, and confirm my intended mic (a headset) is set as the default input device.');
+      if (c.roomQuiet === false && c.snr < 20)
+        asks.push('There is audible background noise. Check whether "Microphone Boost" is enabled and, if it is amplifying hiss/noise, reduce or disable it.');
+      if (c.roomQuiet && c.snr < 20)
+        asks.push('The room is quiet but my voice sits close to the noise \u2014 verify no wrong/low-quality mic is selected as default, and that levels aren\u2019t set too low.');
+      if (!asks.length)
+        asks.push('Levels look reasonable \u2014 just verify the correct mic is default, its level is around 85\u201395%, and "Microphone Boost" isn\u2019t adding avoidable noise.');
+    } else {
+      diag = '(I haven\u2019t run the in-app sound check yet \u2014 please just inspect and optimise my mic settings for clear voice recording.)\n';
+      asks.push('Confirm the correct microphone is the default input, set its level to around 85\u201395%, and review "Microphone Boost" so it isn\u2019t adding noise.');
+    }
+    return (
+      'You are running on my Windows PC with terminal access. Goal: optimise my microphone settings for recording clear educational voice-over. Work safely and reversibly \u2014 make one change at a time, show me before/after, and tell me how to undo each change.\n\n' +
+      diag + '\n' +
+      'Please:\n' +
+      '1. List my audio input devices and tell me which is the default.\n' +
+      asks.map((a, i) => (i + 2) + '. ' + a).join('\n') + '\n' +
+      (asks.length + 2) + '. Make sure no application has the mic in exclusive mode that would override these levels.\n' +
+      (asks.length + 3) + '. Re-report the final settings when done.\n\n' +
+      'Use PowerShell. The community module AudioDeviceCmdlets is handy for listing/setting default devices and volume \u2014 install it if I approve. Microphone Boost lives in the device\u2019s registry FxProperties, so handle that carefully and back up any key you change.'
+    );
+  }
+
+  btnCopyPrompt.addEventListener('click', async () => {
+    const text = buildDesktopPrompt();
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (e) {
+      const ta = document.createElement('textarea');
+      ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); } catch (e2) {}
+      document.body.removeChild(ta);
+    }
+    const orig = btnCopyPrompt.textContent;
+    btnCopyPrompt.textContent = 'Copied \u2713 paste into Claude Code';
+    setTimeout(() => { btnCopyPrompt.textContent = orig; }, 2600);
+  });
+
+  btnListen.addEventListener('click', () => {
+    const on = !btnListen.classList.contains('on');
+    btnListen.classList.toggle('on', on);
+    btnListen.textContent = on ? '\u25A0 Stop listening' : '\u25B6 Listen';
+    if (monitorGain) monitorGain.gain.value = on ? 1 : 0;
+    if (on) showError('Monitoring is live \u2014 use headphones. Through speakers this will cause feedback (a loud squeal).');
+    else clearError();
+  });
+
+  detailsToggle.addEventListener('click', () => {
+    const hidden = details.hasAttribute('hidden');
+    if (hidden) { details.removeAttribute('hidden'); detailsToggle.textContent = 'Hide details'; }
+    else { details.setAttribute('hidden', ''); detailsToggle.textContent = 'Show details'; }
+  });
+
+  autoLevel.addEventListener('change', () => {
+    gainSlider.disabled = autoLevel.checked;
+    if (!autoLevel.checked && gainNode) {
+      gainNode.gain.value = Number(gainSlider.value) / 100;
+    }
+  });
+
+  gainSlider.addEventListener('input', () => {
+    gainLabel.textContent = gainSlider.value + '%';
+    if (gainNode) gainNode.gain.value = Number(gainSlider.value) / 100;
+  });
+
+  micToggle.addEventListener('change', () => {
+    if (recorder && recorder.state !== 'inactive') {
+      micToggle.checked = !micToggle.checked; // can't change mid-recording
+      showError('The mic can\u2019t be toggled mid-recording. Stop first, then change it.');
+      return;
+    }
+    clearError();
+    setupMic();
+  });
+
+  // ---------- Screen selection ----------
+  btnChoose.addEventListener('click', async () => {
+    clearError();
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: {
+          displaySurface: 'monitor',
+          frameRate: { ideal: 30 },
+          width: { ideal: 3840 },  // ask for full native resolution
+          height: { ideal: 2160 }  // (browser caps this at the monitor's actual size)
+        },
+        audio: true // system audio, if the browser/monitor supports it
+      });
+      if (screenStream) screenStream.getTracks().forEach(t => t.stop());
+      screenStream = stream;
+      playback.classList.remove('show');
+      preview.srcObject = stream;
+      preview.classList.add('show');
+      emptyState.style.display = 'none';
+      btnRecord.disabled = false;
+      result.classList.remove('show');
+      const track = stream.getVideoTracks()[0];
+      const s = track.getSettings();
+      const surface = s.displaySurface || 'screen';
+      const label = track.label || 'screen';
+      statusEl.textContent = (surface === 'monitor' ? 'Full screen' : 'Window only') +
+        ' \u00b7 ' + s.width + '\u00d7' + s.height + ' \u00b7 ' + label;
+      statusEl.classList.remove('live');
+      if (surface !== 'monitor') {
+        showError('Heads up: you picked a single window, not a whole monitor. Only that window will be recorded. To capture the entire screen, click Choose screen again and use the \u201cEntire Screen\u201d tab.');
+      } else {
+        clearError();
+      }
+      // If the user stops sharing via the browser bar, end gracefully
+      track.addEventListener('ended', () => {
+        if (recorder && recorder.state !== 'inactive') stopRecording();
+        else resetPreview();
+      });
+    } catch (e) {
+      const msg = (e.message || '').toLowerCase();
+      const blockedByPolicy = msg.includes('policy') || msg.includes('permission') || msg.includes('disallowed') || msg.includes('not allowed');
+      if (e.name === 'NotAllowedError' && !blockedByPolicy) {
+        showError('Screen picker was closed without choosing a screen. Click Choose screen again and pick a monitor under the \u201cEntire Screen\u201d tab.');
+        return;
+      }
+      showError('Screen capture is blocked here (' + e.name + '). This usually means the page is running inside an embedded preview \u2014 download this file and open it directly in Chrome or Edge, then try again.');
+    }
+  });
+
+  function resetPreview() {
+    preview.classList.remove('show');
+    preview.srcObject = null;
+    if (!playback.classList.contains('show')) emptyState.style.display = '';
+    btnRecord.disabled = true;
+    screenStream = null;
+    statusEl.textContent = 'Screen sharing ended \u2014 choose a screen';
+    statusEl.classList.remove('live');
+  }
+
+// WebM duration patch — injects/updates the Duration element so players can scrub
+function vintLength(firstByte) {
+  for (let i = 0; i < 8; i++) if (firstByte & (0x80 >> i)) return i + 1;
+  return -1;
+}
+function readId(bytes, pos) {
+  const len = vintLength(bytes[pos]);
+  if (len < 1 || pos + len > bytes.length) return null;
+  let id = 0;
+  for (let i = 0; i < len; i++) id = id * 256 + bytes[pos + i];
+  return { id, length: len };
+}
+function readSize(bytes, pos) {
+  const len = vintLength(bytes[pos]);
+  if (len < 1 || pos + len > bytes.length) return null;
+  let value = bytes[pos] & (0xFF >> len);
+  for (let i = 1; i < len; i++) value = value * 256 + bytes[pos + i];
+  const max = Math.pow(2, 7 * len) - 1;
+  return { value, length: len, unknown: value === max };
+}
+function encodeSize(value) {
+  let len = 1;
+  while (value >= Math.pow(2, 7 * len) - 1 && len < 8) len++;
+  const out = new Uint8Array(len);
+  let v = value;
+  for (let i = len - 1; i > 0; i--) { out[i] = v & 0xFF; v = Math.floor(v / 256); }
+  out[0] = (0x80 >> (len - 1)) | v;
+  return out;
+}
+function injectWebmDuration(bytes, durationMs) {
+  let pos = 0;
+  let id = readId(bytes, pos);
+  if (!id || id.id !== 0x1A45DFA3) throw new Error('no EBML header');
+  pos += id.length;
+  let size = readSize(bytes, pos);
+  if (!size || size.unknown) throw new Error('bad EBML size');
+  pos += size.length + size.value;
+  id = readId(bytes, pos);
+  if (!id || id.id !== 0x18538067) throw new Error('no Segment');
+  pos += id.length;
+  size = readSize(bytes, pos);
+  if (!size) throw new Error('bad Segment size');
+  const segSizeUnknown = size.unknown;
+  pos += size.length;
+  while (pos < bytes.length) {
+    const cid = readId(bytes, pos);
+    if (!cid) throw new Error('parse fail in Segment');
+    const cSizePos = pos + cid.length;
+    const cSize = readSize(bytes, cSizePos);
+    if (!cSize || cSize.unknown) {
+      if (cid.id === 0x1F43B675) break; // hit Clusters without finding Info
+      throw new Error('unsized Segment child');
+    }
+    const dataStart = cSizePos + cSize.length;
+    if (cid.id === 0x1549A966) { // Info element
+      let p = dataStart, timecodeScale = 1000000, durPos = -1, durSize = 0;
+      while (p < dataStart + cSize.value) {
+        const kid = readId(bytes, p);
+        if (!kid) throw new Error('parse fail in Info');
+        const kSize = readSize(bytes, p + kid.length);
+        if (!kSize || kSize.unknown) throw new Error('unsized Info child');
+        const kData = p + kid.length + kSize.length;
+        if (kid.id === 0x2AD7B1) {
+          let v = 0;
+          for (let i = 0; i < kSize.value; i++) v = v * 256 + bytes[kData + i];
+          timecodeScale = v || 1000000;
+        }
+        if (kid.id === 0x4489) { durPos = kData; durSize = kSize.value; }
+        p = kData + kSize.value;
+      }
+      const ticks = durationMs * 1e6 / timecodeScale;
+      if (durPos >= 0) { // Duration exists — overwrite in place
+        const dv = new DataView(bytes.buffer, bytes.byteOffset + durPos, durSize);
+        if (durSize === 8) dv.setFloat64(0, ticks);
+        else dv.setFloat32(0, ticks);
+        return bytes;
+      }
+      if (!segSizeUnknown) throw new Error('fixed Segment size, cannot grow');
+      const durEl = new Uint8Array(11);
+      durEl[0] = 0x44; durEl[1] = 0x89; durEl[2] = 0x88;
+      new DataView(durEl.buffer).setFloat64(3, ticks);
+      const newInfoSize = encodeSize(cSize.value + 11);
+      const out = new Uint8Array(bytes.length - cSize.length + newInfoSize.length + 11);
+      let o = 0;
+      out.set(bytes.subarray(0, cSizePos), o); o += cSizePos;
+      out.set(newInfoSize, o); o += newInfoSize.length;
+      out.set(bytes.subarray(dataStart, dataStart + cSize.value), o); o += cSize.value;
+      out.set(durEl, o); o += 11;
+      out.set(bytes.subarray(dataStart + cSize.value), o);
+      return out;
+    }
+    pos = dataStart + cSize.value;
+  }
+  throw new Error('Info element not found');
+}
+
+  // ---------- Recording ----------
+  function buildRecordingStream() {
+    const tracks = [...screenStream.getVideoTracks()];
+    const sysAudio = screenStream.getAudioTracks();
+    const micProcessed = micDest ? micDest.stream.getAudioTracks() : [];
+
+    if (sysAudio.length && micProcessed.length) {
+      // Mix system audio with the levelled mic into one track
+      const mixDest = audioCtx.createMediaStreamDestination();
+      audioCtx.createMediaStreamSource(new MediaStream(sysAudio)).connect(mixDest);
+      gateGain.connect(mixDest);
+      tracks.push(...mixDest.stream.getAudioTracks());
+    } else if (micProcessed.length) {
+      tracks.push(micProcessed[0]);
+    } else if (sysAudio.length) {
+      tracks.push(sysAudio[0]);
+    }
+    return new MediaStream(tracks);
+  }
+
+  function pickMime() {
+    const options = [
+      'video/webm;codecs=vp9,opus',
+      'video/webm;codecs=vp8,opus',
+      'video/webm'
+    ];
+    return options.find(m => MediaRecorder.isTypeSupported(m)) || '';
+  }
+
+  function pickAudioMime() {
+    const options = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus'];
+    return options.find(m => MediaRecorder.isTypeSupported(m)) || '';
+  }
+
+  // ---------- Test recording (in-memory only, never saved) ----------
+  const TEST_MS = 8000;
+
+  function discardTest() {
+    if (testRecorder && testRecorder.state !== 'inactive') { try { testRecorder.stop(); } catch (e) {} }
+    testRecorder = null; testChunks = [];
+    if (testCountdown) { clearInterval(testCountdown); testCountdown = null; }
+    try { testAudio.pause(); } catch (e) {}
+    testAudio.removeAttribute('src'); testAudio.load();
+    if (testUrl) { URL.revokeObjectURL(testUrl); testUrl = null; } // free memory, nothing on disk
+    testPanel.setAttribute('hidden', '');
+    btnTest.classList.remove('rec-test');
+    btnTest.textContent = '\u25CF Test 8s';
+  }
+
+  function startTest() {
+    if (!micDest) { showError('Turn the microphone on first.'); return; }
+    if (recorder && recorder.state !== 'inactive') return; // not during a real recording
+    clearError();
+    // Reuse the exact recording audio path: gated mic (+ system audio if a screen with sound is selected)
+    let audioStream;
+    const sysAudio = screenStream ? screenStream.getAudioTracks() : [];
+    if (sysAudio.length && gateGain) {
+      const mixDest = audioCtx.createMediaStreamDestination();
+      audioCtx.createMediaStreamSource(new MediaStream(sysAudio)).connect(mixDest);
+      gateGain.connect(mixDest);
+      audioStream = mixDest.stream;
+    } else {
+      audioStream = micDest.stream;
+    }
+    const mime = pickAudioMime();
+    try {
+      testRecorder = new MediaRecorder(audioStream, mime ? { mimeType: mime, audioBitsPerSecond: 128_000 } : undefined);
+    } catch (e) {
+      showError('Test recording couldn\u2019t start: ' + e.message);
+      return;
+    }
+    testChunks = [];
+    testRecorder.ondataavailable = e => { if (e.data.size) testChunks.push(e.data); };
+    testRecorder.onstop = finishTest;
+    testRecorder.start();
+
+    // UI: countdown, click again to stop early
+    btnTest.classList.add('rec-test');
+    btnTest.disabled = false;
+    let left = Math.round(TEST_MS / 1000);
+    btnTest.textContent = '\u25A0 Stop (' + left + ')';
+    testCountdown = setInterval(() => {
+      left--;
+      if (left > 0) btnTest.textContent = '\u25A0 Stop (' + left + ')';
+    }, 1000);
+    setTimeout(() => { if (testRecorder && testRecorder.state === 'recording') stopTest(); }, TEST_MS);
+  }
+
+  function stopTest() {
+    if (testCountdown) { clearInterval(testCountdown); testCountdown = null; }
+    if (testRecorder && testRecorder.state !== 'inactive') testRecorder.stop();
+  }
+
+  function finishTest() {
+    btnTest.classList.remove('rec-test');
+    btnTest.textContent = '\u25CF Test 8s';
+    const blob = new Blob(testChunks, { type: (testChunks[0] && testChunks[0].type) || 'audio/webm' });
+    testChunks = [];
+    if (!blob.size) { showError('The test caught no audio \u2014 check the mic is on and try again.'); return; }
+    if (testUrl) URL.revokeObjectURL(testUrl);
+    testUrl = URL.createObjectURL(blob);           // in-memory blob URL; not written to disk
+    testAudio.src = testUrl;
+    const kb = (blob.size / 1024).toFixed(0);
+    testTitle.textContent = 'Test recording \u00b7 ' + kb + ' KB (in memory only)';
+    testPanel.removeAttribute('hidden');
+    testAudio.play().catch(() => {}); // autoplay the playback; ignore if blocked
+  }
+
+  btnTest.addEventListener('click', () => {
+    if (testRecorder && testRecorder.state === 'recording') stopTest();
+    else startTest();
+  });
+  btnTestRedo.addEventListener('click', () => { discardTest(); startTest(); });
+  btnTestDiscard.addEventListener('click', discardTest);
+
+
+  let counting = false, countdownTimer = null;
+
+  function toggleRecord() {
+    if (btnRecord.disabled) return;
+    if (recorder && recorder.state !== 'inactive') { stopRecording(); return; }
+    if (counting) { cancelCountdown(); return; }
+    if (countdownToggle.checked) startCountdown();
+    else startRecording();
+  }
+  btnRecord.addEventListener('click', toggleRecord);
+
+  function startCountdown() {
+    counting = true;
+    result.classList.remove('show');
+    if (screenStream) {
+      try { playback.pause(); } catch (e) {}
+      playback.classList.remove('show');
+      preview.srcObject = screenStream;
+      preview.classList.add('show');
+      emptyState.style.display = 'none';
+    }
+    let n = 3;
+    countdownNum.textContent = n;
+    countdownOverlay.removeAttribute('hidden');
+    btnRecord.classList.add('recording'); // show as "armed" (square)
+    statusEl.textContent = 'Starting\u2026';
+    countdownTimer = setInterval(() => {
+      n--;
+      if (n <= 0) {
+        clearInterval(countdownTimer); countdownTimer = null;
+        countdownOverlay.setAttribute('hidden', '');
+        counting = false;
+        startRecording();
+      } else {
+        countdownNum.textContent = n;
+        // retrigger pop animation
+        countdownNum.style.animation = 'none'; void countdownNum.offsetWidth; countdownNum.style.animation = '';
+      }
+    }, 1000);
+  }
+
+  function cancelCountdown() {
+    if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+    counting = false;
+    countdownOverlay.setAttribute('hidden', '');
+    btnRecord.classList.remove('recording');
+    statusEl.textContent = screenStream ? 'Ready' : 'Ready';
+  }
+
+  // ---- Silence watchdog: warns within seconds if the recording goes silent ----
+  function startSilenceWatch() {
+    stopSilenceWatch();
+    recSilentMs = 0; recSilent = false;
+    if (!recWatchAnalyser) return;
+    const buf = new Uint8Array(recWatchAnalyser.fftSize);
+    let last = Date.now();
+    recWatchInterval = setInterval(() => {
+      if (!recWatchAnalyser || !recorder || recorder.state !== 'recording') { last = Date.now(); return; }
+      recWatchAnalyser.getByteTimeDomainData(buf);
+      let peak = 0;
+      for (let i = 0; i < buf.length; i++) { const d = Math.abs(buf[i] - 128); if (d > peak) peak = d; }
+      const now = Date.now(), dt = now - last; last = now;
+      if (peak < 2) recSilentMs += dt; else { recSilentMs = 0; if (recSilent) { recSilent = false; clearError(); } }
+      if (recSilentMs > 6000 && !recSilent) {
+        recSilent = true;
+        showError('\u26a0 No audio is being captured \u2014 the recording has been silent for 6 seconds. Check the mic isn\u2019t muted or off, then stop and start a fresh take. (Watch the pop-out window for this alert while you teach.)');
+      }
+    }, 1000);
+  }
+  function stopSilenceWatch() {
+    if (recWatchInterval) { clearInterval(recWatchInterval); recWatchInterval = null; }
+    recSilent = false; recSilentMs = 0;
+  }
+
+  // If the tab is hidden mid-recording, rAF stops so the gate can't be managed \u2014 fail OPEN.
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && gateGain && audioCtx) {
+      gateOpen = true;
+      try { gateGain.gain.setTargetAtTime(1, audioCtx.currentTime, 0.02); } catch (e) {}
+    }
+  });
+
+  function startRecording() {
+    clearError();
+    chunks = [];
+    result.classList.remove('show');
+    // Coming back from reviewing a previous take: restore the live screen preview
+    if (screenStream) {
+      try { playback.pause(); } catch (e) {}
+      playback.classList.remove('show');
+      preview.srcObject = screenStream;
+      preview.classList.add('show');
+      emptyState.style.display = 'none';
+    }
+    const stream = buildRecordingStream();
+    const wantMp4 = fmtMp4.checked && MP4_MIME;
+    const mime = wantMp4 ? MP4_MIME : pickMime();
+    currentContainer = wantMp4 ? 'mp4' : 'webm';
+    try {
+      recorder = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 5_000_000, audioBitsPerSecond: 128_000 } : undefined);
+    } catch (e) {
+      showError('Recording couldn\u2019t start: ' + e.message);
+      return;
+    }
+
+    // Crash recovery: start a fresh session, then persist each chunk as it arrives
+    const recMime = recorder.mimeType || mime || 'video/webm';
+    if (recovery) recovery.begin({ name: lessonName.value, mime: recMime, container: currentContainer, status: 'recording', startTime: Date.now(), elapsedMs: 0 }).catch(()=>{});
+
+    recorder.ondataavailable = e => {
+      if (!e.data.size) return;
+      chunks.push(e.data);
+      if (recovery) recovery.addChunk(e.data).catch(()=>{});
+    };
+    recorder.onstop = finalize;
+    recorder.start(1000);
+
+    // Safety: begin every take with the gate OPEN so it can never start muted,
+    // and watch the actual recording feed for unexpected silence.
+    if (gateGain) { gateOpen = true; try { gateGain.gain.setTargetAtTime(1, audioCtx.currentTime, 0.01); } catch (e) {} }
+    startSilenceWatch();
+
+    startTime = Date.now();
+    pausedTotal = 0;
+    timerEl.classList.remove('idle');
+    let lastPersist = 0;
+    timerInterval = setInterval(() => {
+      const el = Date.now() - startTime - pausedTotal;
+      timerEl.textContent = fmt(el);
+      if (recovery && el - lastPersist > 2000) { lastPersist = el; recovery.updateMeta({ elapsedMs: el }).catch(()=>{}); }
+    }, 250);
+
+    btnRecord.classList.add('recording');
+    btnRecord.setAttribute('aria-label', 'Stop recording');
+    btnRecord.title = 'Stop recording';
+    btnPause.disabled = false;
+    btnCancelTake.disabled = false;
+    btnChoose.disabled = true;
+    btnTest.disabled = true;
+    qClean.disabled = true; qStudio.disabled = true;
+    discardTest();
+    recBadge.classList.add('show');
+    recBadge.classList.remove('paused');
+    recBadgeText.textContent = 'REC';
+    statusEl.textContent = 'Recording';
+    statusEl.classList.add('live');
+  }
+
+  function pauseResume() {
+    if (!recorder) return;
+    if (recorder.state === 'recording') {
+      recorder.pause();
+      pauseStart = Date.now();
+      btnPause.textContent = 'Resume';
+      recBadge.classList.add('paused');
+      recBadgeText.textContent = 'PAUSED';
+      statusEl.textContent = 'Paused';
+      statusEl.classList.remove('live');
+    } else if (recorder.state === 'paused') {
+      recorder.resume();
+      pausedTotal += Date.now() - pauseStart;
+      btnPause.textContent = 'Pause';
+      recBadge.classList.remove('paused');
+      recBadgeText.textContent = 'REC';
+      statusEl.textContent = 'Recording';
+      statusEl.classList.add('live');
+    }
+  }
+  btnPause.addEventListener('click', pauseResume);
+
+  function stopRecording() {
+    if (recorder && recorder.state !== 'inactive') recorder.stop();
+  }
+
+  // ---------- Pop-out floating controls (Document Picture-in-Picture) ----------
+  const btnPopout = $('btnPopout');
+  let pipWin = null, pipSync = null;
+
+  const PIP_CSS = `
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:"Segoe UI",system-ui,sans-serif; background:#1c1d1f; color:#fafaf8;
+      height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; user-select:none; }
+    .pdot { display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; letter-spacing:.06em; color:#9a9ca1; }
+    .pdot .c { width:9px; height:9px; border-radius:50%; background:#6b6d72; }
+    .pdot.live .c { background:#d6453a; animation:pp 1.2s infinite; }
+    .pdot.paused .c { background:#d99a1f; }
+    .pdot.silent { color:#ff6b6b; }
+    .pdot.silent .c { background:#ff3b3b; animation:pp .5s infinite; }
+    @keyframes pp { 0%,100%{opacity:1} 50%{opacity:.25} }
+    .ptime { font-size:34px; font-weight:700; font-variant-numeric:tabular-nums; letter-spacing:.01em; }
+    .prow { display:flex; gap:10px; }
+    button { font-family:inherit; font-size:14px; font-weight:600; border:1px solid #3a3b3e; background:#2a2b2e;
+      color:#fafaf8; border-radius:10px; padding:10px 16px; cursor:pointer; }
+    button:hover:not(:disabled){ background:#343538; }
+    button:disabled{ opacity:.4; cursor:default; }
+    #pRec { min-width:130px; }
+    #pRec.rec { background:#d6453a; border-color:#d6453a; }
+    #pRec.rec:hover { background:#b2362d; }
+    .pcancel { font-size:12.5px; padding:7px 14px; background:transparent; color:#9a9ca1; }
+    .pcancel:hover:not(:disabled){ background:#3a2422; color:#e08b82; border-color:#5c3733; }
+  `;
+
+  async function openPip() {
+    if (!('documentPictureInPicture' in window)) {
+      showError('Pop-out controls need Chrome or Edge (v116+). On your setup you can also just leave this tab open on your second screen.');
+      return;
+    }
+    if (pipWin) { try { pipWin.focus(); } catch (e) {} return; }
+    try {
+      pipWin = await documentPictureInPicture.requestWindow({ width: 300, height: 250 });
+    } catch (e) {
+      showError('Couldn\u2019t open pop-out controls: ' + e.message);
+      return;
+    }
+    const d = pipWin.document;
+    const st = d.createElement('style'); st.textContent = PIP_CSS; d.head.appendChild(st);
+    d.body.innerHTML =
+      '<div class="pdot" id="pDot"><span class="c"></span><span id="pDotText">READY</span></div>' +
+      '<div class="ptime" id="pTime">00:00</div>' +
+      '<div class="prow">' +
+        '<button id="pRec">Record</button>' +
+        '<button id="pPause" disabled>Pause</button>' +
+      '</div>' +
+      '<div class="prow">' +
+        '<button id="pCancel" class="pcancel" disabled>Discard take</button>' +
+      '</div>';
+    const pRec = d.getElementById('pRec'), pPause = d.getElementById('pPause');
+    const pCancel = d.getElementById('pCancel');
+    const pTime = d.getElementById('pTime'), pDot = d.getElementById('pDot'), pDotText = d.getElementById('pDotText');
+    pRec.addEventListener('click', toggleRecord);
+    pPause.addEventListener('click', pauseResume);
+    pCancel.addEventListener('click', () => btnCancelTake.click());
+
+    const sync = () => {
+      const rec = recorder && recorder.state === 'recording';
+      const paused = recorder && recorder.state === 'paused';
+      const active = rec || paused;
+      pRec.textContent = active ? 'Stop' : (counting ? 'Cancel' : 'Record');
+      pRec.classList.toggle('rec', active || counting);
+      pRec.disabled = !active && !counting && btnRecord.disabled;
+      pPause.disabled = !active;
+      pPause.textContent = paused ? 'Resume' : 'Pause';
+      pCancel.disabled = !active;
+      pTime.textContent = timerEl.textContent;
+      pDot.className = 'pdot' + (rec ? (recSilent ? ' silent' : ' live') : paused ? ' paused' : '');
+      pDotText.textContent = rec ? (recSilent ? '\u26a0 NO AUDIO' : 'RECORDING') : paused ? 'PAUSED' : counting ? 'STARTING\u2026' : (btnRecord.disabled ? 'PICK SCREEN' : 'READY');
+    };
+    pipSync = setInterval(sync, 250); sync();
+
+    pipWin.addEventListener('pagehide', () => {
+      if (pipSync) { clearInterval(pipSync); pipSync = null; }
+      pipWin = null;
+      btnPopout.textContent = 'Pop out controls';
+    });
+    btnPopout.textContent = 'Close pop-out';
+  }
+
+  btnPopout.addEventListener('click', () => {
+    if (pipWin) { try { pipWin.close(); } catch (e) {} }
+    else openPip();
+  });
+
+  async function finalize() {
+    clearInterval(timerInterval);
+    stopSilenceWatch();
+    const duration = Date.now() - startTime - pausedTotal;
+
+    // --- Cancelled take: throw everything away, save nothing ---
+    if (aborting) {
+      aborting = false;
+      chunks = [];
+      if (recovery) recovery.finish().catch(()=>{}); // clear the crash-recovery session too
+      result.classList.remove('show');
+      resetAfterRecording();
+      statusEl.textContent = 'Take discarded';
+      statusEl.classList.remove('live');
+      timerEl.textContent = '00:00';
+      return;
+    }
+
+    const isMp4 = currentContainer === 'mp4';
+    const type = isMp4 ? 'video/mp4' : 'video/webm';
+    let blob = new Blob(chunks, { type });
+    chunks = [];
+    // WebM: stamp the duration in so it's scrubbable everywhere. (MP4 from the
+    // recorder is already fine for editors/YouTube; the WebM patch doesn't apply.)
+    if (!isMp4) {
+      try {
+        const raw = new Uint8Array(await blob.arrayBuffer());
+        blob = new Blob([injectWebmDuration(raw, duration)], { type: 'video/webm' });
+      } catch (e) {
+        console.warn('Duration patch skipped:', e);
+      }
+    }
+
+    const name = makeFilename(isMp4 ? 'mp4' : 'webm');
+
+    if (lastUrl) URL.revokeObjectURL(lastUrl);
+    lastUrl = URL.createObjectURL(blob);
+    downloadLink.href = lastUrl;
+    downloadLink.download = name;
+    resultName.textContent = name;
+    const mb = (blob.size / (1024 * 1024)).toFixed(1);
+    resultMeta.textContent = fmt(duration) + ' \u00b7 ' + mb + ' MB';
+    result.classList.add('show');
+
+    // Recording saved cleanly \u2014 clear the crash-recovery session
+    if (recovery) recovery.finish().catch(()=>{});
+
+    // Show playback of the finished recording
+    preview.classList.remove('show');
+    preview.srcObject = null;
+    playback.src = lastUrl;
+    playback.classList.add('show');
+    emptyState.style.display = 'none';
+
+    // Auto-download so nothing is lost if the tab closes
+    downloadLink.click();
+
+    resetAfterRecording({ keepPlayback: true });
+    statusEl.textContent = screenStream ? 'Saved \u2713 \u00b7 ready for next take' : 'Saved \u2713';
+    statusEl.classList.remove('live');
+  }
+
+  // Shared control reset used by both a saved take and a discarded one.
+  // Keeps the screen selection alive so you can immediately record the next take.
+  function resetAfterRecording(opts) {
+    const keepPlayback = opts && opts.keepPlayback;
+    recorder = null;
+    const stillLive = screenStream && screenStream.getVideoTracks().some(t => t.readyState === 'live');
+    if (stillLive) {
+      // Screen is still shared \u2014 stay armed for the next take.
+      btnRecord.disabled = false;
+      if (!keepPlayback) {
+        // Discarded take: go straight back to the live preview
+        playback.classList.remove('show');
+        preview.srcObject = screenStream;
+        preview.classList.add('show');
+        emptyState.style.display = 'none';
+      }
+      // If keepPlayback, finalize already swapped in the recorded clip so you can
+      // review it; pressing record again restores the live preview (see startRecording).
+    } else {
+      // Sharing ended \u2014 a fresh screen pick is needed
+      if (screenStream) { screenStream.getTracks().forEach(t => t.stop()); screenStream = null; }
+      preview.classList.remove('show');
+      preview.srcObject = null;
+      btnRecord.disabled = true;
+      if (!keepPlayback) emptyState.style.display = '';
+    }
+    btnRecord.classList.remove('recording');
+    btnRecord.setAttribute('aria-label', 'Start recording');
+    btnRecord.title = 'Start recording';
+    btnPause.disabled = true;
+    btnPause.textContent = 'Pause';
+    btnCancelTake.disabled = true;
+    btnChoose.disabled = false;
+    qClean.disabled = false; qStudio.disabled = false;
+    if (micDest) btnTest.disabled = false;
+    recBadge.classList.remove('show', 'paused');
+    timerEl.classList.add('idle');
+    timerEl.textContent = '00:00';
+  }
+
+  // ---- Cancel a take in progress: stop recording and discard it ----
+  btnCancelTake.addEventListener('click', () => {
+    if (counting) { cancelCountdown(); return; }
+    if (!recorder || recorder.state === 'inactive') return;
+    const mins = Math.floor((Date.now() - startTime - pausedTotal) / 60000);
+    const warn = mins >= 1
+      ? `Discard this take? ${mins} minute${mins > 1 ? 's' : ''} recorded so far will be permanently lost.`
+      : 'Discard this take? It will not be saved.';
+    if (!confirm(warn)) return;
+    aborting = true;
+    if (recorder.state === 'paused') recorder.resume(); // ensure onstop fires
+    recorder.stop();
+  });
+
+  // ---- Discard a finished take (before/after it downloaded) ----
+  btnDiscardTake.addEventListener('click', () => {
+    if (!confirm('Discard this recording? If it already downloaded, delete it from your Downloads folder too.')) return;
+    try { playback.pause(); } catch (e) {}
+    playback.removeAttribute('src'); playback.load();
+    playback.classList.remove('show');
+    if (lastUrl) { URL.revokeObjectURL(lastUrl); lastUrl = null; }
+    downloadLink.removeAttribute('href');
+    result.classList.remove('show');
+    if (recovery) recovery.finish().catch(()=>{});
+    // Re-arm: if the screen is still shared, go straight back to the live preview
+    const stillLive = screenStream && screenStream.getVideoTracks().some(t => t.readyState === 'live');
+    if (stillLive) {
+      preview.srcObject = screenStream;
+      preview.classList.add('show');
+      emptyState.style.display = 'none';
+      btnRecord.disabled = false;
+      statusEl.textContent = 'Take discarded \u00b7 ready for next take';
+    } else {
+      emptyState.style.display = '';
+      btnRecord.disabled = true;
+      statusEl.textContent = 'Take discarded';
+    }
+    timerEl.textContent = '00:00';
+  });
+
+  // Warn before closing mid-recording
+  window.addEventListener('beforeunload', e => {
+    if (recorder && recorder.state !== 'inactive') { e.preventDefault(); e.returnValue = ''; }
+  });
+
+  // Start mic on load (user gesture may be needed in some browsers; the toggle handles retry)
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+    showError('This browser doesn\u2019t support screen capture. Open this file in Chrome or Edge.');
+    btnChoose.disabled = true;
+  } else {
+    setupMic();
+  }
+
+  // ---- Crash recovery: on load, offer to rescue any unfinished recording ----
+  async function checkRecovery() {
+    if (!recovery) return;
+    let p;
+    try { p = await recovery.pending(); } catch (e) { return; }
+    if (!p) return;
+    const mins = Math.round((p.meta.elapsedMs || 0) / 60000);
+    const nm = (p.meta.name && p.meta.name.trim()) ? '\u201c' + p.meta.name.trim() + '\u201d' : 'an untitled lesson';
+    recoverInfo.textContent = `${nm} \u2014 about ${mins} min captured before it stopped unexpectedly. Recover it before recording again.`;
+    recoverBanner.removeAttribute('hidden');
+  }
+
+  btnRecover.addEventListener('click', async () => {
+    try {
+      const { parts, meta } = await recovery.assemble();
+      const isMp4 = meta && meta.container === 'mp4';
+      const type = isMp4 ? 'video/mp4' : 'video/webm';
+      let blob = new Blob(parts, { type: (meta && meta.mime) || type });
+      const dur = (meta && meta.elapsedMs) || 0;
+      if (!isMp4 && dur > 0) {
+        try { const raw = new Uint8Array(await blob.arrayBuffer()); blob = new Blob([injectWebmDuration(raw, dur)], { type: 'video/webm' }); }
+        catch (e) { /* keep unpatched */ }
+      }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'RECOVERED_' + safeName(meta && meta.name) + '.' + (isMp4 ? 'mp4' : 'webm');
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      await recovery.finish();
+      recoverBanner.setAttribute('hidden', '');
+    } catch (e) {
+      showError('Recovery failed: ' + e.message);
+    }
+  });
+
+  btnRecoverDiscard.addEventListener('click', async () => {
+    try { await recovery.finish(); } catch (e) {}
+    recoverBanner.setAttribute('hidden', '');
+  });
+
+  checkRecovery();
+})();
+</script>
+</body>
+</html>

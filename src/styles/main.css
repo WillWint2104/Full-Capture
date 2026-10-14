@@ -1,0 +1,17 @@
+/* Full Capture · final UI. Based on the "Calm studio" design, with the
+   guided set-up of "Friendly guide" and the glanceable recording state of
+   "Console". esbuild bundles these files into one inline <style>. */
+
+@import "./tokens.css";
+@import "./base.css";
+@import "./components.css";
+@import "./layout.css";
+@import "./setup.css";
+@import "./stage.css";
+@import "./recording.css";
+@import "./review.css";
+@import "./library.css";
+@import "./dialogs.css";
+@import "./popout.css";
+@import "./responsive.css";
+@import "./a11y.css";

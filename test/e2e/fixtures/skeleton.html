@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Full Capture</title>
+<style>/*@inline-css*/</style>
+<style>
+  /* Unstyled skeleton used only to test behaviour before the real design lands. */
+  [hidden] { display: none !important; }
+  body { font: 14px system-ui; margin: 0; padding: 8px; max-width: 100vw; overflow-x: hidden; }
+  * { box-sizing: border-box; max-width: 100%; }
+  #stage { position: relative; aspect-ratio: 16/9; background: #222; width: 100%; overflow: hidden; }
+  #stage video, #stage img { width: 100%; height: 100%; object-fit: contain; }
+  #bubblePreview { position: absolute; overflow: hidden; border-radius: 50%; }
+  #bubblePreview video { width: 100%; height: 100%; object-fit: cover; }
+  .meter { height: 8px; background: linear-gradient(90deg, green calc(var(--level, 0) * 100%), #ddd 0); }
+  #countdown { position: absolute; inset: 0; display: grid; place-items: center; color: #fff; font-size: 64px; }
+</style>
+</head>
+<body>
+<header>
+  <strong>Full Capture</strong>
+  <button id="btnFolder" type="button"><span data-field="label">Choose a folder</span></button>
+  <button id="btnSettings" type="button">Settings</button>
+  <button id="btnHelp" type="button">Help</button>
+</header>
+<div id="srStatus" role="status" aria-live="polite"></div>
+<div id="srAlert" role="alert"></div>
+<div id="banners"></div>
+<div id="toasts" aria-live="polite"></div>
+<main id="main">
+  <section id="viewSetup">
+    <section id="stepLesson" class="step" aria-labelledby="hLesson"><h2 id="hLesson">1. Lesson name</h2><span id="lessonChip" class="chip"></span>
+      <input id="lessonName" aria-label="Lesson name"><button id="lessonSuggest" type="button" hidden></button>
+      <p id="fileNamePreview"></p>
+      <details><summary>Notes for yourself</summary><textarea id="notes" aria-label="Notes"></textarea></details>
+    </section>
+    <section id="stepMic" class="step" aria-labelledby="hMic"><h2 id="hMic">2. Microphone</h2><span id="micChip" class="chip"></span>
+      <div id="micIntro"><p>Your browser will ask to use your microphone.</p><button id="btnMicOn" type="button">Turn on microphone</button></div>
+      <div id="micControls">
+        <select id="micSelect" aria-label="Microphone"></select>
+        <button id="micSuggest" type="button" hidden></button>
+        <div id="micMeter" class="meter"></div><span id="micMeterLabel"></span>
+        <label><input type="checkbox" id="noiseToggle"> Reduce background noise (recommended)</label>
+      </div>
+      <div id="micMessage"></div>
+      <button id="btnSoundCheck" type="button">Check my sound</button>
+      <div id="scRun" hidden><p id="scStep"></p><p id="scInstruction"></p><p id="scLine"></p><div id="scProgress" class="meter"></div></div>
+      <div id="scResult" hidden>
+        <h3 id="scHeadline"></h3><p id="scText"></p><div id="scTips"></div><p id="scApplied"></p>
+        <button id="btnScPlay" type="button">Hear it back</button><audio id="scAudio"></audio>
+        <button id="btnScAgain" type="button">Check again</button>
+        <details id="scFix"><summary>How to fix this in Windows</summary>
+          <div id="scFixWin11"></div><div id="scFixWin10"></div>
+          <button id="btnScCopySteps" type="button">Copy these steps</button>
+          <button id="btnScCopyPrompt" type="button">Copy a prompt for Claude Code</button>
+        </details>
+      </div>
+      <div id="micSummary" hidden><span data-field="summary"></span> <button type="button" data-action="change">Change</button></div>
+    </section>
+    <section id="stepScreen" class="step" aria-labelledby="hScreen"><h2 id="hScreen">3. Screen</h2><span id="screenChip" class="chip"></span>
+      <p id="screenIntro">If you'll play videos or sounds, switch on Share system audio in the next window.</p>
+      <button id="btnChooseScreen" type="button">Choose screen</button>
+      <div id="screenSummary" hidden><span id="screenLabel"></span> · <span id="screenDetail"></span></div>
+      <span id="sysAudioChip"></span>
+      <div id="screenMessage"></div>
+      <p id="screenTip" hidden>Move this window to your other screen.</p>
+    </section>
+    <section id="stepCamera" class="step" aria-labelledby="hCam"><h2 id="hCam">4. Camera bubble (optional)</h2><span id="cameraChip" class="chip"></span>
+      <label><input type="checkbox" id="cameraToggle"> Show my camera</label>
+      <div id="cameraControls" hidden>
+        <select id="cameraSelect" aria-label="Camera"></select>
+        <fieldset><legend>Shape</legend><label><input type="radio" name="bubbleShape" value="circle">Circle</label><label><input type="radio" name="bubbleShape" value="rounded">Rounded</label></fieldset>
+        <fieldset><legend>Size</legend><label><input type="radio" name="bubbleSize" value="s">S</label><label><input type="radio" name="bubbleSize" value="m">M</label><label><input type="radio" name="bubbleSize" value="l">L</label></fieldset>
+        <label><input type="checkbox" id="bubbleMirror"> Mirror</label>
+        <button id="btnCornerTL" type="button">↖</button><button id="btnCornerTR" type="button">↗</button><button id="btnCornerBL" type="button">↙</button><button id="btnCornerBR" type="button">↘</button>
+      </div>
+      <div id="cameraMessage"></div>
+    </section>
+    <p id="readiness"></p>
+    <button id="btnStart" type="button"><span data-field="label">Start recording</span></button>
+    <p id="startHint" hidden></p>
+  </section>
+  <section id="viewRecording" hidden>
+    <div id="recBanner" hidden>Paused – not recording <button id="btnResumeBig" type="button">Resume</button></div>
+    <p id="recLesson"></p><span id="recPill"></span><span id="recTimer">00:00</span><span id="recSafety"></span>
+    <div id="recMicMeter" class="meter"></div><span id="recMicLabel"></span>
+    <div id="recSysRow" hidden><div id="recSysMeter" class="meter"></div></div>
+    <button id="btnStop" type="button"><span data-field="label">Stop &amp; save</span></button>
+    <button id="btnPause" type="button"><span data-field="label">Pause</span></button>
+    <button id="btnMarker" type="button">Add chapter <span id="markerCount"></span></button>
+    <button id="btnPopout" type="button">Floating controls</button>
+    <button id="btnDiscard" type="button">Discard take</button>
+    <p id="recNotes"></p><p id="recTalkingHint" hidden>You're talking, but recording is paused – Resume?</p>
+  </section>
+  <section id="viewReview" hidden>
+    <h2 id="reviewHeading"></h2>
+    <input id="reviewName" aria-label="Lesson name">
+    <p id="reviewSaved"></p><p id="reviewNotice"></p>
+    <ol id="chapterList"></ol><p id="chapterEmpty">No chapters.</p><p id="chapterIssues"></p>
+    <button id="btnCopyChapters" type="button">Copy YouTube chapters</button>
+    <button id="btnSaveChapters" type="button">Save chapters file</button>
+    <button id="btnNewTake" type="button">Record another take</button>
+    <button id="btnDownloadTake" type="button"><span data-field="label">Download a copy</span></button>
+    <button id="btnDeleteTake" type="button">Delete take</button>
+    <button id="btnFinish" type="button">Finish – stop sharing my screen</button>
+  </section>
+  <section aria-label="Preview">
+    <div id="stage"><span id="stageLabel"></span>
+      <video id="screenVideo"></video><video id="reviewVideo" hidden></video><img id="stageThumb" alt="" hidden>
+      <div id="stageEmpty"><button id="btnChooseScreenBig" type="button">Choose screen</button></div>
+      <div id="bubblePreview" hidden><video id="cameraVideo"></video></div>
+      <div id="countdown" hidden><span id="countdownNum"></span></div>
+      <p id="stageHint" hidden></p>
+    </div>
+  </section>
+</main>
+<section id="library" aria-labelledby="hLib"><h2 id="hLib">Your takes</h2><ul id="takeList"></ul><p id="libraryEmpty">No takes yet.</p></section>
+<dialog id="settingsDialog">
+  <select id="formatSelect"><option value="auto">Automatic</option><option value="mp4">MP4</option><option value="webm">WebM</option></select><p id="formatNote"></p>
+  <select id="qualitySelect"><option value="standard">Standard</option><option value="high">High</option><option value="smooth">Smooth</option><option value="small">Small</option></select><p id="qualityNote"></p><p id="sizeEstimate"></p>
+  <label><input type="checkbox" id="countdownToggle">Countdown</label><label><input type="checkbox" id="beepsToggle">Beeps</label>
+  <label><input type="checkbox" id="floatingToggle">Floating</label><label><input type="checkbox" id="hidePreviewToggle">Hide preview</label>
+  <label><input type="checkbox" id="shortcutsToggle">Shortcuts</label>
+  <select id="themeSelect"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select>
+  <p id="folderStatus"></p><button id="btnChooseFolder" type="button">Choose a folder</button><button id="btnForgetFolder" type="button">Forget</button>
+  <details id="advancedAudio"><summary>Advanced</summary>
+    <label><input type="checkbox" id="rawMicToggle">Raw</label><label><input type="checkbox" id="speakersToggle">Speakers</label>
+    <label><input type="checkbox" id="gateToggle">Gate</label><label><input type="checkbox" id="autoLevelToggle">Auto</label>
+    <input type="range" id="gainSlider" min="25" max="1600" aria-label="Mic level"><span id="gainLabel"></span>
+    <input type="range" id="sysAudioLevel" min="0" max="150" aria-label="Computer sound volume">
+    <label><input type="checkbox" id="noVoiceToggle">No voice</label>
+    <details id="detailMeters"><summary>Detailed meters</summary><canvas id="spectrum" aria-hidden="true"></canvas>
+      <span id="statFloor"></span><span id="statVoice"></span><span id="statSnr"></span><span id="statPeak"></span></details>
+  </details>
+  <button id="btnResetSettings" type="button">Reset all settings</button><button id="btnSettingsClose" type="button">Close</button>
+</dialog>
+<dialog id="helpDialog"><p>Help</p><button id="btnHelpClose" type="button">Close</button></dialog>
+<dialog id="confirmDialog"><h2 id="confirmTitle"></h2><p id="confirmText"></p><button id="btnConfirmCancel" type="button">Cancel</button><button id="btnConfirmOk" type="button">OK</button></dialog>
+<template id="tplToast"><div class="toast"><strong data-field="title"></strong> <span data-field="text"></span><div data-actions></div><button type="button" data-action="dismiss" aria-label="Dismiss">×</button></div></template>
+<template id="tplBanner"><div class="banner"><strong data-field="title"></strong> <span data-field="text"></span><div data-actions></div><button type="button" data-action="dismiss" aria-label="Dismiss">×</button></div></template>
+<template id="tplMessage"><div class="message"><strong data-field="title"></strong> <span data-field="text"></span><div data-actions></div></div></template>
+<template id="tplTake"><li class="take"><img data-field="thumb" alt=""><span data-field="name"></span> <span data-field="date"></span> <span data-field="duration"></span> <span data-field="size"></span> <span data-field="chapters"></span> <span data-field="saved"></span>
+  <button type="button" data-action="open">Play</button><button type="button" data-action="download">Download</button><button type="button" data-action="copy-chapters">Copy chapters</button><button type="button" data-action="delete">Delete</button></li></template>
+<template id="tplChapter"><li class="chapter"><span data-field="time"></span><input data-field="title"><button type="button" data-action="delete">Delete</button></li></template>
+<template id="tplPopout"><div class="popout-root">
+  <div data-part="nosound" hidden>NO SOUND</div>
+  <span data-field="pill"></span><span data-field="timer"></span><span data-field="lesson"></span><span data-field="countdown"></span>
+  <div class="meter" data-field="meter"></div><span data-field="micLabel"></span>
+  <div data-part="idle"><button type="button" data-action="start">Start recording</button></div>
+  <div data-part="active"><button type="button" data-action="stop">Stop &amp; save</button><button type="button" data-action="pause">Pause</button><button type="button" data-action="marker">Chapter</button><button type="button" data-action="more">…</button></div>
+  <div data-part="confirm" hidden><span data-field="confirmText"></span><button type="button" data-action="discard-no">Keep recording</button><button type="button" data-action="discard-yes">Discard</button></div>
+  <p data-field="notes"></p>
+</div></template>
+<script>/*@inline-js*/</script>
+</body>
+</html>

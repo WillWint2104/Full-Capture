@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FC acceptance pattern</title>
+<!--
+  The capture subject for the Windows acceptance kit (test/windows/run.mjs):
+  nothing private, and every part of it can be measured in the saved video.
+  - The whole window flashes white for 120 ms every 2 s, at whole multiples of
+    2 s of the computer's clock, so another page can make sound at the same
+    instants.
+  - Started with sound, a short click plays through the speakers at each
+    flash, timed to leave the speakers as the flash is drawn (the browser's
+    reported output latency is allowed for). A microphone in the room hears
+    it; a headset microphone may not.
+  - A clock and a moving bar show the video is live, and a seek can be checked
+    by eye. No magenta anywhere: magenta marks the floating controls.
+  ?period=2&flash=0.12&volume=0.3&sound=1 (sound=0: flashes only)
+-->
+<style>
+  html, body { margin: 0; height: 100%; background: #000; color: #8a96a3; overflow: hidden; font: 600 3.2vh/1.35 system-ui, "Segoe UI", sans-serif; }
+  #flash { position: fixed; inset: 0; background: #fff; display: none; }
+  #info { position: fixed; left: 5vw; top: 7vh; max-width: 70vw; }   /* clear of the right fifth, where flashes are measured */
+  #action { margin-top: 2vh; color: #ffd84d; font-size: 4.2vh; }
+  #action:empty { display: none; }
+  #clock { font-size: 14vh; line-height: 1.1; font-variant-numeric: tabular-nums; color: #b8c2cc; }
+  #bar { position: fixed; left: 0; bottom: 10vh; width: 8vw; height: 4vh; background: #3a7d5c; }
+  #start { margin-top: 3vh; font: inherit; padding: 1.2vh 2vw; border-radius: 8px; border: 2px solid #8a96a3; background: #12161a; color: #dfe6ec; cursor: pointer; }
+  body.running #start { display: none; }
+</style>
+</head>
+<body>
+<div id="info">
+  <div>Full Capture acceptance test pattern: nothing private is shown.</div>
+  <div>A white flash and a click every <span id="periodText">2</span> s. Please stay quiet while the test records.</div>
+  <div id="clock">00:00.0</div>
+  <div id="frames">frame 0</div>
+  <button id="start" type="button">Start the test pattern</button>
+  <div id="action" role="status"></div>
+</div>
+<div id="bar"></div>
+<div id="flash"></div>
+<script>
+  const q = new URLSearchParams(location.search);
+  const periodMs = Number(q.get('period') || 2) * 1000;
+  const flashMs = Number(q.get('flash') || 0.12) * 1000;
+  const volume = Number(q.get('volume') ?? 0.3);
+  const now = () => performance.timeOrigin + performance.now();
+  const shownAt = now();
+  document.getElementById('periodText').textContent = periodMs / 1000;
+
+  const flash = document.getElementById('flash');
+  const clock = document.getElementById('clock');
+  const frameText = document.getElementById('frames');
+  const bar = document.getElementById('bar');
+  let frame = 0;
+  const pad = n => String(n).padStart(2, '0');
+  function draw() {
+    const t = now();
+    flash.style.display = t % periodMs < flashMs ? 'block' : 'none';
+    const s = (t - shownAt) / 1000;
+    clock.textContent = `${pad(Math.floor(s / 60))}:${pad(Math.floor(s % 60))}.${Math.floor((s * 10) % 10)}`;
+    frameText.textContent = `frame ${++frame}`;
+    bar.style.transform = `translateX(${((t % 4000) / 4000) * 92}vw)`;
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+
+  /** Clicks through the speakers at every flash. */
+  const pattern = window.pattern = { periodMs, flashMs, volume, sound: false, scheduled: 0, outputLatency: null, baseLatency: null };
+  pattern.start = async function start({ sound = q.get('sound') !== '0', fullscreen = true } = {}) {
+    document.body.classList.add('running');
+    if (fullscreen) await document.documentElement.requestFullscreen?.().catch(() => {});
+    if (!sound || pattern.sound) return pattern;
+    const ctx = new AudioContext({ latencyHint: 'interactive' });
+    await ctx.resume();
+    pattern.sound = true;
+    pattern.outputLatency = ctx.outputLatency ?? null;
+    pattern.baseLatency = ctx.baseLatency ?? null;
+    // A 60 ms noise burst with a sharp start, kept to the 1–5 kHz band (a click, not a hiss).
+    const n = Math.round(ctx.sampleRate * 0.06);
+    const buf = ctx.createBuffer(1, n, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.015));
+    const filter = new BiquadFilterNode(ctx, { type: 'bandpass', frequency: 2500, Q: 0.6 });
+    filter.connect(new GainNode(ctx, { gain: volume })).connect(ctx.destination);
+    let next = Math.ceil((now() + 300) / periodMs) * periodMs;
+    const schedule = () => {
+      // When the sample now being played leaves the speakers (the browser's own estimate).
+      const ts = ctx.getOutputTimestamp?.() || {};
+      const map = ts.performanceTime > 0
+        ? e => ts.contextTime + (e - (performance.timeOrigin + ts.performanceTime)) / 1000
+        : e => ctx.currentTime + (e - now()) / 1000 - (ctx.outputLatency || 0) - (ctx.baseLatency || 0);
+      while (next < now() + 3000) {
+        const at = map(next);
+        if (at > ctx.currentTime + 0.02) {
+          const src = new AudioBufferSourceNode(ctx, { buffer: buf });
+          src.connect(filter);
+          src.start(at);
+          pattern.scheduled++;
+        }
+        next += periodMs;
+      }
+    };
+    schedule();
+    setInterval(schedule, 500);
+    return pattern;
+  };
+  document.getElementById('start').addEventListener('click', () => pattern.start());
+  /** What the person at the computer is asked to do, shown here so they needn't look at another window. */
+  pattern.say = text => { document.getElementById('action').textContent = text ? `Action needed: ${text}` : ''; };
+</script>
+</body>
+</html>

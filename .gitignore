@@ -7,3 +7,9 @@ Thumbs.db
 .venv/
 __pycache__/
 *.pyc
+test-results/
+playwright-report/
+.build/
+
+# UI design candidates and their screenshots (exploration only; the chosen design lives in src/)
+design/
